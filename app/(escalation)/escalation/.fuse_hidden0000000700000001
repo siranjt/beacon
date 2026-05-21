@@ -19,8 +19,11 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
+      <BeaconAmbient />
+      <div className="relative z-10 px-10 py-8">
         <EscalationHeader current="home" />
         <EscalationsBrowser />
-    </BeaconPageShell>
+      </div>
+    </main>
   );
 }

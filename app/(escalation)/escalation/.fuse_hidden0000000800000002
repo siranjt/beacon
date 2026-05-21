@@ -21,6 +21,7 @@ export default async function Page() {
     <BeaconPageShell>
         <EscalationHeader current="home" />
         <EscalationsBrowser />
-    </BeaconPageShell>
+      </div>
+    </main>
   );
 }

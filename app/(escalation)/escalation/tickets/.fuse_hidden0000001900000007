@@ -19,6 +19,8 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
+      <BeaconAmbient />
+      <div className="relative z-10 px-10 py-8">
         <EscalationHeader current="tickets" />
         <div className="text-center mb-10">
           <h1 className="text-4xl font-extrabold tracking-tight">All tickets</h1>
@@ -29,6 +31,7 @@ export default async function Page() {
           </p>
         </div>
         <TicketsBrowser />
-    </BeaconPageShell>
+      </div>
+    </main>
   );
 }

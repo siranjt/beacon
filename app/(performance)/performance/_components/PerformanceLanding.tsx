@@ -7,7 +7,7 @@ import { useRecentReports, type RecentReport } from "./useRecentReports";
 import ClientPreview from "./ClientPreview";
 import ZocaLogo from "@/components/ZocaLogo";
 import { BeaconMark } from "@/components/BeaconMark";
-import { BeaconAmbient } from "@/components/BeaconAmbient";
+import BeaconPageShell from "@/components/BeaconPageShell";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -61,9 +61,8 @@ export default function PerformanceLanding() {
   const selected = visible.find((r) => r.entityId === selectedId) ?? visible[0] ?? null;
 
   return (
-    <main style={{ position: "relative", minHeight: "100vh" }}>
-      <BeaconAmbient />
-      <div style={{ position: "relative", zIndex: 10, padding: "32px 40px 56px" }}>
+    <BeaconPageShell>
+      <>
       {/* Top bar — ZOCA wordmark | divider | animated flame + Beacon */}
       <header
         style={{
@@ -323,8 +322,8 @@ export default function PerformanceLanding() {
         entities.location_insights) and Postgres (website.booking_enquiries),
         accessed via the Metabase Dataset API.
       </footer>
-      </div>
-    </main>
+      </>
+    </BeaconPageShell>
   );
 }
 

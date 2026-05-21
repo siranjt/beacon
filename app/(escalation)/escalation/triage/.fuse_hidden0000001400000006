@@ -29,6 +29,7 @@ export default async function Page() {
           </p>
         </div>
         <TriageClient />
-    </BeaconPageShell>
+      </div>
+    </main>
   );
 }

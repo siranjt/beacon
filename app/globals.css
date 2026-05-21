@@ -230,14 +230,14 @@ body {
 
 /* ─────────────────────────────────────────────────────────────
    Escalation Beacon — Watchfire typography overrides
-   Scoped via the .beacon-escalation class on the page <main>.
+   Scoped via the .beacon-page class on the page <main>.
    Brings the agent's headings into Georgia serif register so the
    /escalation surface feels native to Beacon, not the old utilitarian
    Customer 360 standalone.
    ───────────────────────────────────────────────────────────── */
-.beacon-escalation h1,
-.beacon-escalation h2,
-.beacon-escalation h3 {
+.beacon-page h1,
+.beacon-page h2,
+.beacon-page h3 {
   font-family: Georgia, "Times New Roman", "Times", serif;
   font-weight: 500;
   letter-spacing: -0.018em;
@@ -250,7 +250,7 @@ body {
  * Sea Lapis → Char → Deep Crimson → Brass, applied via background-clip:text.
  * The agent's source uses .brand-gradient-text on the accent word ("360", "Queue").
  */
-.beacon-escalation .brand-gradient-text {
+.beacon-page .brand-gradient-text {
   background: linear-gradient(90deg, #2A4D5C 0%, #2B1F14 35%, #7C2D12 70%, #D9A441 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -265,24 +265,24 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(217, 164, 65, 0.55); }
   60%      { box-shadow: 0 0 0 6px rgba(217, 164, 65, 0); }
 }
-.beacon-escalation .live-dot {
+.beacon-page .live-dot {
   animation: pp-live-dot 2.4s ease-out infinite;
 }
 
 /* Hero eyebrow pill — Watchfire Brass instead of utilitarian blue */
-.beacon-escalation .escalation-eyebrow {
+.beacon-page .escalation-eyebrow {
   background: #F5E6BB;
   border: 1px solid #D9A441;
   color: #B8852E;
 }
 /* Primary button — Brass with Char text, matches Performance Beacon */
-.beacon-escalation .escalation-cta {
+.beacon-page .escalation-cta {
   background: #D9A441;
   color: #2B1F14;
   border: 1px solid #B8852E;
   font-weight: 600;
 }
-.beacon-escalation .escalation-cta:hover {
+.beacon-page .escalation-cta:hover {
   background: #B8852E;
   color: #F8EFD7;
 }

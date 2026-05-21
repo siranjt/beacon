@@ -29,6 +29,7 @@ export default async function Page() {
           </p>
         </div>
         <TicketsBrowser />
-    </BeaconPageShell>
+      </div>
+    </main>
   );
 }
