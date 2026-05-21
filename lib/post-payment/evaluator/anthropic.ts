@@ -13,14 +13,29 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Bundle } from "@/lib/post-payment/validator/bundle";
 import { PROMPT_MD } from "./prompt";
 
-// Default to Haiku — finishes this analysis in 15–30s and stays comfortably
-// within Vercel's function budget even on cold starts. Sonnet routinely hits
-// 90–150s on this prompt size, which left zero margin and produced repeated
-// pipeline_failed events. Quality difference is minimal because the ICP
-// framework and rules are fully spelled out in the prompt.
-//
-// To override: set ANTHROPIC_MODEL=claude-sonnet-4-6 (or opus) in Vercel envs.
+// Default model when no per-request override is supplied. Set
+// ANTHROPIC_MODEL=claude-sonnet-4-6 (or opus) in Vercel envs. Sonnet is the
+// production default — finishes in 90–150s, near-Opus quality on this prompt
+// because the ICP framework + rules are fully spelled out in prompt.ts.
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
+
+/**
+ * Resolve a model identifier — accepts either a full SKU (e.g.
+ * `claude-opus-4-6`) or a short alias (`opus`, `sonnet`, `haiku`). Unknown
+ * values pass through unchanged so the API surfaces a clear error rather than
+ * us silently substituting. Returns the env default when input is undefined.
+ *
+ * Used by the analyze route to honor a `?model=opus` URL override on a
+ * per-request basis without changing the production default.
+ */
+function resolveModel(input?: string | null): string {
+  const trimmed = (input ?? "").trim().toLowerCase();
+  if (!trimmed) return MODEL;
+  if (trimmed === "opus") return "claude-opus-4-6";
+  if (trimmed === "sonnet") return "claude-sonnet-4-6";
+  if (trimmed === "haiku") return "claude-haiku-4-5-20251001";
+  return input!; // assume full SKU; caller responsible for validity
+}
 const MAX_TOKENS = 12_000;
 
 // SDK retries: 4 attempts with exponential backoff. Anthropic's CDN
@@ -80,7 +95,7 @@ const TOOL_NAME = "submit_analysis";
  * The model is free to also emit a text content block alongside the tool call;
  * we capture that as the Markdown analysis for Slack.
  */
-async function callOnce(systemPrompt: string, userPrompt: string): Promise<{ markdown: string; reportData: any }> {
+async function callOnce(systemPrompt: string, userPrompt: string, model: string): Promise<{ markdown: string; reportData: any }> {
   const t0 = Date.now();
   try {
     // The `cache_control` fields below ride along into TextBlockParam + Tool
@@ -90,7 +105,7 @@ async function callOnce(systemPrompt: string, userPrompt: string): Promise<{ mar
     // forwarding to a documented API surface.
     const res = await client.messages.create(
       {
-        model: MODEL,
+        model,
         max_tokens: MAX_TOKENS,
         // PROMPT CACHING — cache the system prompt and tool schema, since
         // both are identical across every customer (~10K tokens combined).
@@ -424,7 +439,7 @@ async function callOnce(systemPrompt: string, userPrompt: string): Promise<{ mar
     const outputTok = u.output_tokens ?? 0;
     const cacheHit = cacheRead > 0;
     console.log(
-      `[llm] model=${MODEL} elapsed_ms=${elapsed} stop=${res.stop_reason} ` +
+      `[llm] model=${model} elapsed_ms=${elapsed} stop=${res.stop_reason} ` +
       `blocks=${res.content.map((b: any) => b.type).join(",")} ` +
       `cache=${cacheHit ? "HIT" : "MISS"} ` +
       `tokens=in:${inputTok}+cache_read:${cacheRead}+cache_write:${cacheWrite}/out:${outputTok}`
@@ -449,8 +464,8 @@ async function callOnce(systemPrompt: string, userPrompt: string): Promise<{ mar
     return { markdown: markdown.trim(), reportData };
   } catch (e: any) {
     const elapsed = Date.now() - t0;
-    console.error(`[llm] FAILED model=${MODEL} elapsed_ms=${elapsed} err=${e?.message ?? e}`);
-    throw new Error(`llm_call: ${e?.message ?? String(e)} (elapsed ${elapsed}ms, model ${MODEL})`);
+    console.error(`[llm] FAILED model=${model} elapsed_ms=${elapsed} err=${e?.message ?? e}`);
+    throw new Error(`llm_call: ${e?.message ?? String(e)} (elapsed ${elapsed}ms, model ${model})`);
   }
 }
 
@@ -464,7 +479,16 @@ export async function evaluate(args: {
   bundle: Bundle;
   fireflies?: any;
   hubspot?: any;
+  /**
+   * Per-request model override. Accepts short aliases (`opus`, `sonnet`,
+   * `haiku`) or full SKUs. Falls back to env `ANTHROPIC_MODEL` (then Haiku)
+   * when undefined. Used by the analyze route's `?model=` query param so
+   * specific high-stakes customers can be flagged for Opus quality without
+   * changing the production default.
+   */
+  model?: string;
 }): Promise<EvalResult> {
+  const resolvedModel = resolveModel(args.model);
   const basePrompt = loadPrompt();
   const canonical = loadCanonicalExample();
   // Append the worked example to the system prompt so the model sees the
@@ -507,7 +531,7 @@ export async function evaluate(args: {
     "You MAY also emit a short TEXT content block before the tool call summarizing the verdict — it'll be used as the Slack thread reply.",
   ].join("\n");
 
-  const { markdown, reportData } = await callOnce(systemPrompt, userPrompt);
+  const { markdown, reportData } = await callOnce(systemPrompt, userPrompt, resolvedModel);
 
   // OVERRIDE the deterministic sections with bundle-derived data. This
   // guarantees meta/section1/references are consistent across customers and

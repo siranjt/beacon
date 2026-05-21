@@ -108,9 +108,12 @@ function deriveScope(b: any): "discovery_first_pay" | "discovery_addon" | "no_su
  * top while this continues in the background. Logs an event at every step so
  * the diag endpoint shows exactly where it got to.
  */
-async function runPipeline(customerId: string) {
+async function runPipeline(customerId: string, modelOverride?: string) {
   const t0 = Date.now();
-  await logEvent(customerId, "pipeline_started", { ts_iso: new Date().toISOString() });
+  await logEvent(customerId, "pipeline_started", {
+    ts_iso: new Date().toISOString(),
+    model_override: modelOverride ?? null,
+  });
 
   // ===== Step 1: Build full bundle =====================================
   await setCustomerStatus(customerId, "processing");
@@ -193,12 +196,13 @@ async function runPipeline(customerId: string) {
 
   // ===== Step 2: LLM evaluation ========================================
   await logEvent(customerId, "llm_starting", {
-    model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+    model: modelOverride ?? process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+    override: !!modelOverride,
   });
   const llmT0 = Date.now();
   let evalResult;
   try {
-    evalResult = await evaluate({ bundle });
+    evalResult = await evaluate({ bundle, model: modelOverride });
     await logEvent(customerId, "llm_done", {
       elapsed_ms: Date.now() - llmT0,
       markdown_chars: evalResult.markdown.length,
@@ -305,6 +309,11 @@ export async function POST(req: NextRequest, ctx: { params: { customer_id: strin
   // instead — that's a 5-second operation.
   const url = new URL(req.url);
   const force = url.searchParams.get("force") === "true";
+  // Optional per-request model override. Accepts short aliases (opus, sonnet,
+  // haiku) or full SKUs (claude-opus-4-6). Resolved inside the evaluator —
+  // here we just plumb the raw string through. Production default (env
+  // ANTHROPIC_MODEL) is used when this param is absent.
+  const modelOverride = url.searchParams.get("model") ?? undefined;
   if (!force) {
     const existing = await getCustomer(customerId).catch(() => null);
     if (existing && (existing.status === "ready" || existing.status === "out_of_scope")) {
@@ -332,13 +341,17 @@ export async function POST(req: NextRequest, ctx: { params: { customer_id: strin
       ok: false, stage: "stub", error: e?.message ?? String(e),
     }, { status: 500 });
   }
-  await logEvent(customerId, "queued", { ts_iso: new Date().toISOString(), forced: force });
+  await logEvent(customerId, "queued", {
+    ts_iso: new Date().toISOString(),
+    forced: force,
+    model_override: modelOverride ?? null,
+  });
   await setCustomerStatus(customerId, "processing");
 
   // Kick off the full pipeline as background work. The response goes out as
   // soon as we return below; Vercel keeps the function alive (up to
   // maxDuration=300s with Fluid Compute) while runPipeline awaits each step.
-  waitUntil(runPipeline(customerId).catch(async (e: any) => {
+  waitUntil(runPipeline(customerId, modelOverride).catch(async (e: any) => {
     await logEvent(customerId, "pipeline_crashed", {
       error: e?.message ?? String(e),
       stack: (e?.stack ?? "").split("\n").slice(0, 6).join("\n"),
@@ -347,5 +360,13 @@ export async function POST(req: NextRequest, ctx: { params: { customer_id: strin
       .catch(() => undefined);
   }));
 
-  return NextResponse.json({ ok: true, status: "queued", customer_id: customerId }, { status: 202 });
+  return NextResponse.json(
+    {
+      ok: true,
+      status: "queued",
+      customer_id: customerId,
+      model_override: modelOverride ?? null,
+    },
+    { status: 202 },
+  );
 }

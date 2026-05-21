@@ -35,6 +35,10 @@ export function ReanalyzeButton({
   const [phase, setPhase] = useState<"idle" | "confirm" | "queuing" | "queued" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number>(180); // 3 min default refresh wait
+  // Which model the in-flight / completed call used — drives the success
+  // strip label so users know whether their Opus override was honored. null
+  // means "default" (whatever ANTHROPIC_MODEL says, typically Sonnet).
+  const [usedModel, setUsedModel] = useState<string | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Auto-refresh countdown after successful queue
@@ -56,12 +60,15 @@ export function ReanalyzeButton({
     };
   }, [phase, router]);
 
-  async function trigger() {
+  async function trigger(modelOverride?: "opus" | "sonnet" | "haiku") {
     setPhase("queuing");
     setError(null);
+    setUsedModel(modelOverride ?? null);
     try {
+      const qs = new URLSearchParams({ force: "true" });
+      if (modelOverride) qs.set("model", modelOverride);
       const res = await fetch(
-        `/post-payment/api/analyze/${customerId}?force=true`,
+        `/post-payment/api/analyze/${customerId}?${qs.toString()}`,
         {
           method: "POST",
           credentials: "same-origin",
@@ -76,7 +83,10 @@ export function ReanalyzeButton({
         // Shouldn't happen with force=true, but guard anyway
         throw new Error(body?.reason ?? "request skipped");
       }
-      setCountdown(180);
+      // Opus is ~2-3× slower than Sonnet — extend the auto-refresh countdown
+      // when the user explicitly opted into it so they don't hit "Refresh now"
+      // before the pipeline has had time to complete.
+      setCountdown(modelOverride === "opus" ? 360 : 180);
       setPhase("queued");
     } catch (e: any) {
       setError(e?.message ?? String(e));
@@ -109,7 +119,7 @@ export function ReanalyzeButton({
       >
         <span style={{ color: "#4A7C59" }}>✓</span>
         <span>
-          Queued — analysis running in background. Auto-refreshing in{" "}
+          Queued{usedModel ? ` (${usedModel})` : ""} — analysis running in background. Auto-refreshing in{" "}
           <strong style={{ fontVariantNumeric: "tabular-nums" }}>{stamp}</strong>
         </span>
         <button
@@ -221,13 +231,21 @@ export function ReanalyzeButton({
           background: "rgba(217, 164, 65, 0.10)",
           color: "#2B1F14",
           fontSize: 13,
+          flexWrap: "wrap",
         }}
       >
         <span>
-          Re-run analysis? <span style={{ color: "#7B6B57" }}>~2–5 min · overwrites current report</span>
+          Re-run analysis? <span style={{ color: "#7B6B57" }}>overwrites current report</span>
         </span>
+        {/*
+          Two paths: default model (env, typically Sonnet — fast/cheap) and
+          Opus override (~2-3× slower, ~10× more expensive, sharper on the
+          qualitative Section 5 / qualitative_flags reads). See anthropic.ts
+          for the model selection details.
+        */}
         <button
-          onClick={trigger}
+          onClick={() => trigger()}
+          title="Use the production default model (typically Sonnet — ~90–150s)"
           style={{
             padding: "4px 12px",
             background: "#C8431D",
@@ -240,6 +258,22 @@ export function ReanalyzeButton({
           }}
         >
           Yes, re-run
+        </button>
+        <button
+          onClick={() => trigger("opus")}
+          title="Use Opus 4.6 — sharper qualitative reads, but ~3–5 min and ~10× cost. For high-stakes edge cases."
+          style={{
+            padding: "4px 12px",
+            background: "transparent",
+            border: "1px solid #C8431D",
+            borderRadius: 6,
+            color: "#C8431D",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Use Opus
         </button>
         <button
           onClick={() => setPhase("idle")}
