@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { BeaconAmbient } from "@/components/BeaconAmbient";
 import EscalationHeader from "../_components/EscalationHeader";
 import TriageClient from "../_components/TriageClient";
 
@@ -17,8 +18,9 @@ export default async function Page() {
   }
 
   return (
-    <main className="beacon-escalation min-h-screen bg-bg">
-      <div className="px-10 py-8">
+    <main className="beacon-escalation min-h-screen bg-bg relative">
+      <BeaconAmbient />
+      <div className="relative z-10 px-10 py-8">
         <EscalationHeader current="triage" />
         <div className="text-center mb-10">
           <h1 className="text-4xl font-extrabold tracking-tight">Triage by message</h1>

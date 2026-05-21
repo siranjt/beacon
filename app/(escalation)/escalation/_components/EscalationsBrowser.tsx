@@ -502,9 +502,25 @@ export default function EscalationsBrowser() {
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-cobalt live-dot" />
           Customer Success · live from Chargebee + Metabase
         </div>
-        <h1 className="mt-5 font-extrabold text-[56px] leading-[1.0] tracking-[-0.04em] text-text">
-          Customer <span className="brand-gradient-text">360</span> Agent
-        </h1>
+        <div className="mt-5 flex items-center justify-center gap-5">
+          <span
+            aria-hidden
+            className="text-3xl select-none"
+            style={{ color: "#2A4D5C", opacity: 0.6 }}
+          >
+            ✦
+          </span>
+          <h1 className="font-extrabold text-[56px] leading-[1.0] tracking-[-0.04em] text-text">
+            Customer <span className="brand-gradient-text">360</span> Agent
+          </h1>
+          <span
+            aria-hidden
+            className="text-3xl select-none"
+            style={{ color: "#D9A441", opacity: 0.7 }}
+          >
+            ✦
+          </span>
+        </div>
         <p className="mt-5 max-w-[580px] mx-auto text-[15px] text-muted2 leading-[1.65]">
           One search returns triage of their latest message, all related Linear tickets, and the
           full 5-channel comms timeline.

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import EscalationQueue from "../_components/EscalationQueue";
+import { BeaconAmbient } from "@/components/BeaconAmbient";
 import EscalationHeader from "../_components/EscalationHeader";
 
 export const metadata = {
@@ -17,8 +18,9 @@ export default async function Page() {
   }
 
   return (
-    <main className="beacon-escalation min-h-screen bg-bg">
-      <div className="px-10 py-8">
+    <main className="beacon-escalation min-h-screen bg-bg relative">
+      <BeaconAmbient />
+      <div className="relative z-10 px-10 py-8">
         <EscalationHeader current="queue" />
         <EscalationQueue />
       </div>
