@@ -73,7 +73,7 @@ export const AGENTS: Agent[] = [
     name: "Post-Payment Reviews",
     description: "Auto-gates new Discovery customers via Module 02 ICP at first pay.",
     accent: "#4A7C59", // Patina
-    route: "https://zoca-payment-dashboard.vercel.app",
-    kind: "external",
+    route: "/post-payment",
+    kind: "internal",
   },
 ];
