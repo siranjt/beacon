@@ -205,8 +205,8 @@ export default function EscalationQueue() {
               {filtered.map((e) => {
                 const tier = tierFor(e.score);
                 const cls = e.latestTicket
-                  ? CLASSIFICATION_COLORS[e.latestTicket.classification] || "#838d9d"
-                  : "#838d9d";
+                  ? CLASSIFICATION_COLORS[e.latestTicket.classification] || "#8B7A66"
+                  : "#8B7A66";
                 const classLabel = e.latestTicket
                   ? CLASSIFICATION_LABELS[e.latestTicket.classification] || e.latestTicket.classification
                   : "";

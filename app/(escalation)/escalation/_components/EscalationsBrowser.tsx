@@ -111,10 +111,10 @@ type Tab = "triage" | "tickets" | "history";
 const CHANNELS: Channel[] = ["app_chat", "email", "phone", "video", "sms"];
 
 const SEVERITY: Record<string, { bar: string; chip: string }> = {
-  P0: { bar: "#ef4444", chip: "bg-errSoft text-err border-err/30" },
-  P1: { bar: "#ef4444", chip: "bg-errSoft text-err border-err/30" },
-  P2: { bar: "#3b5bff", chip: "bg-cobaltSoft text-cobalt border-cobalt/30" },
-  P3: { bar: "#838d9d", chip: "bg-panel2 text-muted2 border-border" },
+  P0: { bar: "#7C2D12", chip: "bg-errSoft text-err border-err/30" },
+  P1: { bar: "#7C2D12", chip: "bg-errSoft text-err border-err/30" },
+  P2: { bar: "#2A4D5C", chip: "bg-cobaltSoft text-cobalt border-cobalt/30" },
+  P3: { bar: "#8B7A66", chip: "bg-panel2 text-muted2 border-border" },
 };
 
 const TIME_WINDOWS: { key: string; label: string; days: number }[] = [
@@ -571,7 +571,7 @@ export default function EscalationsBrowser() {
           <section
             className="rounded-2xl border border-border p-8 fade-in-up"
             style={{
-              background: "linear-gradient(120deg, #f7f8ff 0%, #fff5fa 100%)",
+              background: "linear-gradient(120deg, #F8EFD7 0%, #FCE4D6 100%)",
             }}
           >
             <div className="flex items-start justify-between gap-8">
@@ -632,7 +632,7 @@ export default function EscalationsBrowser() {
               label="Tickets"
               value={String(ticketsAnimated)}
               sub={ticketCount > 0 ? `${openTicketCount} open · ${ticketCount - openTicketCount} closed` : "—"}
-              accent="#3b5bff"
+              accent="#2A4D5C"
             />
             <StatTile
               label="Comms · 30d"
@@ -644,7 +644,7 @@ export default function EscalationsBrowser() {
                     ? "loading…"
                     : "—"
               }
-              accent="#ff5aa0"
+              accent="#C8431D"
             />
             <StatTile
               label="Severity"
@@ -656,7 +656,7 @@ export default function EscalationsBrowser() {
                     ? "triaging…"
                     : "—"
               }
-              accent={SEVERITY[triage.result?.severity || "P3"]?.bar || "#838d9d"}
+              accent={SEVERITY[triage.result?.severity || "P3"]?.bar || "#8B7A66"}
               valueCls={
                 triage.result?.severity === "P0" || triage.result?.severity === "P1"
                   ? "text-err"
@@ -675,7 +675,7 @@ export default function EscalationsBrowser() {
                     ? "Below 85 · human review"
                     : "—"
               }
-              accent="#838d9d"
+              accent="#8B7A66"
             />
           </section>
 
@@ -769,7 +769,7 @@ export default function EscalationsBrowser() {
               {triage.status === "ready" && triage.result && triage.sourceMessage && (
                 <div
                   className="rounded-2xl border border-border bg-panel severity-bar pl-7 pr-8 py-7"
-                  style={{ ["--bar" as any]: SEVERITY[triage.result.severity]?.bar || "#838d9d" }}
+                  style={{ ["--bar" as any]: SEVERITY[triage.result.severity]?.bar || "#8B7A66" }}
                 >
                   <div className="flex items-baseline justify-between gap-3 mb-4">
                     <div className="flex items-center gap-3">
@@ -878,7 +878,7 @@ export default function EscalationsBrowser() {
                 </div>
               )}
               {filteredTickets.map((t) => {
-                const classBar = CLASSIFICATION_COLORS[t.classification] || "#838d9d";
+                const classBar = CLASSIFICATION_COLORS[t.classification] || "#8B7A66";
                 const classLabel = CLASSIFICATION_LABELS[t.classification] || t.classification;
                 const stateCls =
                   t.state === "Done"
@@ -963,9 +963,9 @@ export default function EscalationsBrowser() {
                           disabled={busy}
                           className="rounded-full border px-3 py-1 disabled:opacity-50 transition-all hover:-translate-y-0.5"
                           style={{
-                            borderColor: (CHANNEL_COLORS[ch] || "#838d9d") + "55",
-                            color: CHANNEL_COLORS[ch] || "#838d9d",
-                            background: (CHANNEL_COLORS[ch] || "#838d9d") + "10",
+                            borderColor: (CHANNEL_COLORS[ch] || "#8B7A66") + "55",
+                            color: CHANNEL_COLORS[ch] || "#8B7A66",
+                            background: (CHANNEL_COLORS[ch] || "#8B7A66") + "10",
                           }}
                         >
                           {busy ? `Loading ${CHANNEL_LABELS[ch]}…` : `Retry ${CHANNEL_LABELS[ch]}`}
@@ -989,9 +989,9 @@ export default function EscalationsBrowser() {
                         onClick={() => setChartChannelFilter(chartChannelFilter === c ? null : c)}
                         className="rounded-full border px-3 py-1 transition-colors"
                         style={{
-                          borderColor: on ? color + "55" : "#e5e7eb",
-                          background: on ? color + "10" : "#f7f8fb",
-                          color: on ? color : "#838d9d",
+                          borderColor: on ? color + "55" : "#D4C29B",
+                          background: on ? color + "10" : "#EBE0C2",
+                          color: on ? color : "#8B7A66",
                         }}
                       >
                         {CHANNEL_LABELS[c]}
@@ -1039,7 +1039,7 @@ export default function EscalationsBrowser() {
                           <div
                             key={key}
                             className="severity-bar row-divider row-hover px-5 py-3 cursor-pointer transition-all"
-                            style={{ ["--bar" as any]: CHANNEL_COLORS[m.channel] || "#838d9d" }}
+                            style={{ ["--bar" as any]: CHANNEL_COLORS[m.channel] || "#8B7A66" }}
                             onClick={() => toggleCommExpand(key)}
                             role="button"
                             tabIndex={0}
@@ -1089,7 +1089,7 @@ export default function EscalationsBrowser() {
                                 <div
                                   className="pointer-events-none absolute bottom-0 left-0 right-0 h-6"
                                   style={{
-                                    background: "linear-gradient(to bottom, rgba(255,255,255,0), #ffffff)",
+                                    background: "linear-gradient(to bottom, rgba(248,239,215,0), #F8EFD7)",
                                   }}
                                 />
                               )}

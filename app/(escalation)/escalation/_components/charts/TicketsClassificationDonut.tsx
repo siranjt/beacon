@@ -75,7 +75,7 @@ export default function TicketsClassificationDonut({
                 {data.map((entry, i) => (
                   <Cell
                     key={i}
-                    fill={CLASSIFICATION_COLORS[entry.name] || "#7e8794"}
+                    fill={CLASSIFICATION_COLORS[entry.name] || "#8B7A66"}
                     fillOpacity={selected === null || selected === entry.name ? 1 : 0.3}
                     style={{ cursor: "pointer", transition: "fill-opacity 0.15s" }}
                   />
@@ -108,7 +108,7 @@ export default function TicketsClassificationDonut({
                   <span className="flex items-center gap-1.5">
                     <span
                       className="inline-block w-2 h-2 rounded-full"
-                      style={{ background: CLASSIFICATION_COLORS[d.name] || "#7e8794" }}
+                      style={{ background: CLASSIFICATION_COLORS[d.name] || "#8B7A66" }}
                     />
                     {d.label}
                   </span>

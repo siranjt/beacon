@@ -18,7 +18,7 @@ export default async function Page() {
 
   return (
     <main className="beacon-escalation min-h-screen bg-bg">
-      <div className="mx-auto max-w-[1480px] px-8 py-8">
+      <div className="px-10 py-8">
         <EscalationHeader current="tickets" />
         <div className="text-center mb-10">
           <h1 className="text-4xl font-extrabold tracking-tight">All tickets</h1>

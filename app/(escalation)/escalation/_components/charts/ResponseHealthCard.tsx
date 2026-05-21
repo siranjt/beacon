@@ -58,7 +58,7 @@ export default function ResponseHealthCard({
   const confPct = Math.round(conf * 100);
   // Gauge: stroke-dasharray for circle of r=32 → circumference ≈ 201
   const dash = (conf * 201).toFixed(1);
-  const dashColor = conf >= 0.85 ? "#3ecf8e" : conf >= 0.5 ? "#ef9f27" : "#ef5b5b";
+  const dashColor = conf >= 0.85 ? "#4A7C59" : conf >= 0.5 ? "#D9A441" : "#7C2D12";
 
   return (
     <div className="rounded-xl border border-border bg-panel p-4">
@@ -68,7 +68,7 @@ export default function ResponseHealthCard({
       <div className="flex gap-4 items-center">
         <div className="relative w-20 h-20 shrink-0">
           <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
-            <circle cx="40" cy="40" r="32" fill="none" stroke="#1f2233" strokeWidth="8" />
+            <circle cx="40" cy="40" r="32" fill="none" stroke="#D4C29B" strokeWidth="8" />
             <circle
               cx="40"
               cy="40"

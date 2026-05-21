@@ -240,19 +240,35 @@ body {
 .beacon-escalation h3 {
   font-family: Georgia, "Times New Roman", "Times", serif;
   font-weight: 500;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.018em;
   color: var(--zoca-text);
+  /* note: sizes are set by Tailwind text-[Npx] utilities — don't override */
 }
-.beacon-escalation h1 {
-  font-size: 36px;
-  line-height: 1.1;
+
+/*
+ * Heraldic Watchfire gradient — matches v1 Customer Beacon's hero title.
+ * Sea Lapis → Char → Deep Crimson → Brass, applied via background-clip:text.
+ * The agent's source uses .brand-gradient-text on the accent word ("360", "Queue").
+ */
+.beacon-escalation .brand-gradient-text {
+  background: linear-gradient(90deg, #2A4D5C 0%, #2B1F14 35%, #7C2D12 70%, #D9A441 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
-.beacon-escalation h2 {
-  font-size: 22px;
+
+/*
+ * Live pulse dot — matches the heartbeat on v1's "● LIVE CUSTOMER SIGNALS" pill
+ * and the umbrella's launcher live indicator.
+ */
+@keyframes pp-live-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 164, 65, 0.55); }
+  60%      { box-shadow: 0 0 0 6px rgba(217, 164, 65, 0); }
 }
-.beacon-escalation h3 {
-  font-size: 16px;
+.beacon-escalation .live-dot {
+  animation: pp-live-dot 2.4s ease-out infinite;
 }
+
 /* Hero eyebrow pill — Watchfire Brass instead of utilitarian blue */
 .beacon-escalation .escalation-eyebrow {
   background: #F5E6BB;

@@ -71,7 +71,7 @@ export default function ChannelMixDonut({
                 {data.map((entry, i) => (
                   <Cell
                     key={i}
-                    fill={CHANNEL_COLORS[entry.name] || "#7e8794"}
+                    fill={CHANNEL_COLORS[entry.name] || "#8B7A66"}
                     fillOpacity={selected === null || selected === entry.name ? 1 : 0.3}
                     style={{ cursor: "pointer", transition: "fill-opacity 0.15s" }}
                   />

@@ -93,14 +93,14 @@ export default function TicketsOverTimeChart({
             contentStyle={CHART_TOOLTIP_STYLE}
             labelStyle={CHART_TOOLTIP_LABEL_STYLE}
             itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-            cursor={{ fill: "rgba(255,168,205,0.06)" }}
+            cursor={{ fill: "rgba(217,164,65,0.06)" }}
           />
           {ORDER.map((cls) => (
             <Bar
               key={cls}
               dataKey={cls}
               stackId="a"
-              fill={CLASSIFICATION_COLORS[cls] || "#7e8794"}
+              fill={CLASSIFICATION_COLORS[cls] || "#8B7A66"}
               name={CLASSIFICATION_LABELS[cls] || cls}
               radius={[2, 2, 0, 0]}
             />
