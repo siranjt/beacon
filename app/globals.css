@@ -148,7 +148,88 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Reduced motion — kill all flicker + ember loops
+   Performance Beacon animations
+   Prefix: pp- (so they're agent-scoped and don't leak)
+   ───────────────────────────────────────────────────────────── */
+
+/* Pulsing live indicator dot */
+@keyframes pp-pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 164, 65, 0.55); }
+  60%      { box-shadow: 0 0 0 10px rgba(217, 164, 65, 0); }
+}
+.pp-pulse-dot {
+  animation: pp-pulse-dot 2.4s ease-out infinite;
+}
+
+/* Stagger-friendly entrance for cards, hero, preview */
+@keyframes pp-fade-in-up {
+  0%   { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.pp-fade-in-up {
+  animation: pp-fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Generic hover-lift for cards (recent-reports, preview tiles) */
+.pp-card {
+  transition: transform 0.18s ease-out, border-color 0.18s ease-out,
+              box-shadow 0.18s ease-out;
+}
+.pp-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(200, 67, 29, 0.45);
+  box-shadow: 0 10px 24px -10px rgba(43, 31, 20, 0.18);
+}
+.pp-card-selected {
+  animation: pp-card-selected 2.6s ease-in-out infinite;
+}
+@keyframes pp-card-selected {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 67, 29, 0.30); }
+  50%      { box-shadow: 0 0 0 6px rgba(200, 67, 29, 0); }
+}
+
+/* SVG path draw-in. pathLength=100 lets us animate any length uniformly. */
+@keyframes pp-draw-line {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
+.pp-draw-line {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: pp-draw-line 1.4s ease-out 0.2s both;
+}
+
+/* Donut chart entrance — rotate-in from -90 with a slight scale */
+@keyframes pp-donut-in {
+  0%   { transform: rotate(-180deg) scale(0.86); opacity: 0; }
+  100% { transform: rotate(0) scale(1);          opacity: 1; }
+}
+.pp-donut-in {
+  transform-origin: center;
+  animation: pp-donut-in 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Keyword bar width animation — set --pp-target on the inner div */
+@keyframes pp-fill-bar {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.pp-fill-bar {
+  transform-origin: left center;
+  animation: pp-fill-bar 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Peak indicator pulse on the trajectory chart */
+@keyframes pp-peak-pulse {
+  0%, 100% { r: 5; opacity: 1; }
+  50%      { r: 6.5; opacity: 0.85; }
+}
+.pp-peak-pulse {
+  animation: pp-peak-pulse 2.2s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Reduced motion — kill all flicker + ember + Performance loops
    ───────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .beacon-flame-1,
@@ -160,7 +241,21 @@ body {
   .beacon-ember-3,
   .beacon-ember-4,
   .beacon-ember-5,
-  .beacon-ember-6 {
+  .beacon-ember-6,
+  .pp-pulse-dot,
+  .pp-fade-in-up,
+  .pp-card-selected,
+  .pp-draw-line,
+  .pp-donut-in,
+  .pp-fill-bar,
+  .pp-peak-pulse {
     animation: none !important;
+  }
+  .pp-draw-line {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+  .pp-fill-bar {
+    transform: scaleX(1);
   }
 }

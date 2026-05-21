@@ -48,23 +48,38 @@ export default function ReportPreview({ report }: { report: ComposedReport }) {
           gridTemplateColumns: "1fr 1fr",
           gap: 12,
         }}
+        className="pp-fade-in-up"
       >
         <SnapshotCard report={report} />
         <LeadSourceMixCard report={report} />
       </div>
 
       {/* Profile Clicks 18-month trajectory */}
-      <ProfileClicksCard report={report} />
+      <div className="pp-fade-in-up" style={{ animationDelay: "80ms" }}>
+        <ProfileClicksCard report={report} />
+      </div>
 
       {/* Top Keyword Rankings */}
-      <KeywordRankingsCard report={report} />
+      <div className="pp-fade-in-up" style={{ animationDelay: "160ms" }}>
+        <KeywordRankingsCard report={report} />
+      </div>
 
       {/* Action Checklist */}
-      <ActionChecklistCard report={report} />
+      <div className="pp-fade-in-up" style={{ animationDelay: "240ms" }}>
+        <ActionChecklistCard report={report} />
+      </div>
 
       {/* RCA + Forecast — collapsed to bottom for the dashboard layout */}
-      {report.rca.showDipBanner && <RcaNote report={report} />}
-      {report.forecast && <ForecastNote report={report} />}
+      {report.rca.showDipBanner && (
+        <div className="pp-fade-in-up" style={{ animationDelay: "320ms" }}>
+          <RcaNote report={report} />
+        </div>
+      )}
+      {report.forecast && (
+        <div className="pp-fade-in-up" style={{ animationDelay: "400ms" }}>
+          <ForecastNote report={report} />
+        </div>
+      )}
     </div>
   );
 }
@@ -235,6 +250,8 @@ function MiniArea({ data }: { data: { month: string; count: number }[] }) {
         strokeWidth={1.5}
         strokeLinejoin="round"
         strokeLinecap="round"
+        pathLength={100}
+        className="pp-draw-line"
       />
     </svg>
   );
@@ -307,25 +324,27 @@ function Donut({ slices }: { slices: { color: string; pct: number }[] }) {
   return (
     <svg viewBox="0 0 60 60" style={{ width: 80, height: 80, flexShrink: 0 }}>
       <circle cx={30} cy={30} r={radius} fill="none" stroke={SURFACE_TINT} strokeWidth={10} />
-      {slices.map((s, i) => {
-        const dashLen = (s.pct / 100) * circumference;
-        const arc = (
-          <circle
-            key={i}
-            cx={30}
-            cy={30}
-            r={radius}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={10}
-            strokeDasharray={`${dashLen.toFixed(2)} ${circumference.toFixed(2)}`}
-            strokeDashoffset={(-offset).toFixed(2)}
-            transform="rotate(-90 30 30)"
-          />
-        );
-        offset += dashLen;
-        return arc;
-      })}
+      <g className="pp-donut-in">
+        {slices.map((s, i) => {
+          const dashLen = (s.pct / 100) * circumference;
+          const arc = (
+            <circle
+              key={i}
+              cx={30}
+              cy={30}
+              r={radius}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={10}
+              strokeDasharray={`${dashLen.toFixed(2)} ${circumference.toFixed(2)}`}
+              strokeDashoffset={(-offset).toFixed(2)}
+              transform="rotate(-90 30 30)"
+            />
+          );
+          offset += dashLen;
+          return arc;
+        })}
+      </g>
     </svg>
   );
 }
@@ -414,8 +433,18 @@ function TrajectoryChart({ months }: { months: GbpMonthlyClicks[] }) {
         strokeWidth={2}
         strokeLinejoin="round"
         strokeLinecap="round"
+        pathLength={100}
+        className="pp-draw-line"
       />
-      <circle cx={peak.x} cy={peak.y} r={5} fill={EMBER} stroke={SURFACE} strokeWidth={2} />
+      <circle
+        cx={peak.x}
+        cy={peak.y}
+        r={5}
+        fill={EMBER}
+        stroke={SURFACE}
+        strokeWidth={2}
+        className="pp-peak-pulse"
+      />
     </svg>
   );
 }
@@ -479,11 +508,13 @@ function KeywordRankingsCard({ report }: { report: ComposedReport }) {
                 }}
               >
                 <div
+                  className="pp-fill-bar"
                   style={{
                     height: "100%",
                     width: `${width.toFixed(0)}%`,
                     background: `linear-gradient(90deg, ${EMBER} 0%, ${BRASS} 100%)`,
                     borderRadius: 999,
+                    animationDelay: `${0.2 + idx * 0.08}s`,
                   }}
                 />
               </div>

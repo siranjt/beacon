@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { fetchEntityReportData } from "@/lib/report/fetchers";
 import { composeReport } from "@/lib/report/compose";
 import ReportPreview from "../../_components/ReportPreview";
+import RecordRecentReport from "../../_components/RecordRecentReport";
 
 export const dynamic = "force-dynamic";
 
@@ -149,6 +150,13 @@ export default async function ReportPage({
       </section>
 
       <ReportPreview report={report} />
+
+      <RecordRecentReport
+        entityId={entityId}
+        bizname={i.title}
+        vertical={i.verticalDisplay ?? "Report"}
+        location={[i.city, i.state].filter(Boolean).join(", ")}
+      />
     </main>
   );
 }

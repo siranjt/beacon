@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import RecentReports from "./RecentReports";
+import { useRecentReports, type RecentReport } from "./useRecentReports";
+import ClientPreview from "./ClientPreview";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -19,19 +20,28 @@ const FADED = "#8B7A66";
 const BORDER = "#D4C29B";
 const SURFACE = "#F8EFD7";
 
+const MAX_VISIBLE = 4;
+
 /**
- * Performance Beacon — landing page client shell.
+ * Performance Beacon — landing page.
  *
- * Layout (mockup-driven):
- *  1. Top bar with brand + live indicator
- *  2. Hero with eyebrow, title, search input + Generate button
- *  3. Recent reports grid (sample cards)
- *  4. Inline preview (server-rendered, streamed in via {children})
+ * Drops the hardcoded sample list. Recent reports are sourced from
+ * localStorage (written when the user opens any /performance/report/[id]).
+ * Clicking a recent card swaps the inline preview without navigation.
  */
-export default function PerformanceLanding({ children }: { children: React.ReactNode }) {
+export default function PerformanceLanding() {
   const router = useRouter();
+  const recent = useRecentReports();
   const [entityId, setEntityId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Auto-select the most recent on first render after hydration.
+  useEffect(() => {
+    if (!selectedId && recent.length > 0) {
+      setSelectedId(recent[0].entityId);
+    }
+  }, [recent, selectedId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +53,9 @@ export default function PerformanceLanding({ children }: { children: React.React
     setError(null);
     router.push(`/performance/report/${id}`);
   };
+
+  const visible = recent.slice(0, MAX_VISIBLE);
+  const selected = visible.find((r) => r.entityId === selectedId) ?? visible[0] ?? null;
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "0 22px 56px" }}>
@@ -83,12 +96,12 @@ export default function PerformanceLanding({ children }: { children: React.React
           }}
         >
           <span
+            className="pp-pulse-dot"
             style={{
-              width: 6,
-              height: 6,
+              width: 8,
+              height: 8,
               borderRadius: 999,
               background: BRASS,
-              boxShadow: `0 0 0 3px ${EMBER}22`,
             }}
             aria-hidden
           />
@@ -97,7 +110,7 @@ export default function PerformanceLanding({ children }: { children: React.React
       </header>
 
       {/* Hero */}
-      <section style={{ padding: "44px 0 28px", textAlign: "center" }}>
+      <section style={{ padding: "44px 0 28px", textAlign: "center" }} className="pp-fade-in-up">
         <div
           style={{
             display: "inline-block",
@@ -143,7 +156,6 @@ export default function PerformanceLanding({ children }: { children: React.React
           Per-entity growth &amp; local-SEO report
         </p>
 
-        {/* Search */}
         <form
           onSubmit={handleSubmit}
           style={{
@@ -205,27 +217,33 @@ export default function PerformanceLanding({ children }: { children: React.React
         )}
       </section>
 
-      {/* Recent reports grid */}
-      <RecentReports />
+      {/* Recent reports */}
+      <RecentReportsRow
+        items={visible}
+        selectedId={selected?.entityId ?? null}
+        onSelect={(id) => setSelectedId(id)}
+      />
 
-      {/* Inline preview header */}
-      <div style={{ padding: "8px 0 14px" }}>
-        <div
-          style={{
-            fontFamily: SANS,
-            fontSize: 10,
-            letterSpacing: "0.14em",
-            color: FADED,
-            fontWeight: 600,
-            textTransform: "uppercase",
-          }}
-        >
-          Preview · Sheila Marie Aesthetics
+      {/* Preview header */}
+      {selected && (
+        <div style={{ padding: "8px 0 14px" }}>
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 10,
+              letterSpacing: "0.14em",
+              color: FADED,
+              fontWeight: 600,
+              textTransform: "uppercase",
+            }}
+          >
+            Preview · {selected.bizname}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Slot for the server-rendered preview (Suspense-streamed) */}
-      {children}
+      {/* Preview slot (client-fetched) */}
+      <ClientPreview entityId={selected?.entityId ?? null} />
 
       {/* Footer */}
       <footer
@@ -246,4 +264,209 @@ export default function PerformanceLanding({ children }: { children: React.React
       </footer>
     </main>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Recent-reports row
+// ---------------------------------------------------------------------------
+
+function RecentReportsRow({
+  items,
+  selectedId,
+  onSelect,
+}: {
+  items: RecentReport[];
+  selectedId: string | null;
+  onSelect: (entityId: string) => void;
+}) {
+  return (
+    <section style={{ marginBottom: 22 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 10,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: SANS,
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            color: MUTED,
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          Recent reports
+        </div>
+        <div
+          style={{
+            fontFamily: SANS,
+            fontSize: 11,
+            color: FADED,
+          }}
+        >
+          Click to preview · double-click to open
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyRecent />
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 10,
+          }}
+        >
+          {items.map((r, idx) => (
+            <RecentCard
+              key={r.entityId}
+              report={r}
+              selected={r.entityId === selectedId}
+              order={idx}
+              onSelect={() => onSelect(r.entityId)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RecentCard({
+  report,
+  selected,
+  order,
+  onSelect,
+}: {
+  report: RecentReport;
+  selected: boolean;
+  order: number;
+  onSelect: () => void;
+}) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      className={`pp-card pp-fade-in-up ${selected ? "pp-card-selected" : ""}`}
+      onClick={onSelect}
+      onDoubleClick={() => router.push(`/performance/report/${report.entityId}`)}
+      style={{
+        background: SURFACE,
+        border: `${selected ? "2" : "1"}px solid ${selected ? EMBER : BORDER}`,
+        borderRadius: 10,
+        padding: selected ? "11px 13px" : "12px 14px",
+        textAlign: "left",
+        cursor: "pointer",
+        fontFamily: SERIF,
+        color: "inherit",
+        animationDelay: `${order * 70}ms`,
+        display: "block",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div
+          style={{
+            fontFamily: SANS,
+            fontSize: 9,
+            letterSpacing: "0.14em",
+            color: selected ? EMBER : BRASS_DEEP,
+            fontWeight: 700,
+            textTransform: "uppercase",
+          }}
+        >
+          {report.vertical || "Report"}
+        </div>
+        <div
+          style={{
+            fontFamily: SANS,
+            fontSize: 10,
+            color: FADED,
+          }}
+        >
+          {timeAgo(report.openedAt)}
+        </div>
+      </div>
+      <div
+        style={{
+          fontFamily: SERIF,
+          fontSize: 15,
+          fontWeight: 600,
+          marginTop: 4,
+          color: TEXT,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+        title={report.bizname}
+      >
+        {report.bizname}
+      </div>
+      <div
+        style={{
+          fontFamily: SANS,
+          fontSize: 11,
+          color: MUTED,
+          marginTop: 2,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {report.location || "—"}
+      </div>
+    </button>
+  );
+}
+
+function EmptyRecent() {
+  return (
+    <div
+      style={{
+        background: SURFACE,
+        border: `1px dashed ${BORDER}`,
+        borderRadius: 10,
+        padding: "20px 22px",
+        fontFamily: SERIF,
+        color: MUTED,
+        fontSize: 14,
+        textAlign: "center",
+        lineHeight: 1.6,
+      }}
+    >
+      <div style={{ fontStyle: "italic" }}>
+        No reports yet. Paste an entity ID above to generate your first.
+      </div>
+      <div style={{ fontFamily: SANS, fontSize: 12, color: FADED, marginTop: 6 }}>
+        Try the sample:{" "}
+        <Link
+          href="/performance/report/a24bbd56-42ab-4540-9769-7cf65fadeaa6"
+          style={{ color: BRASS_DEEP, textDecoration: "none", fontWeight: 600 }}
+        >
+          Sheila Marie Aesthetics →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function timeAgo(ts: number): string {
+  const diffSec = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  const diffMo = Math.floor(diffDay / 30);
+  return `${diffMo}mo ago`;
 }
