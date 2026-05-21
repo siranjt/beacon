@@ -1,12 +1,13 @@
-// Chart palette tuned for the light theme. Matches Zoca's brand pair
-// (cobalt #3b5bff + neon pink #ff5aa0) plus a violet middle for the gradient.
+// Watchfire chart palette — distinct hues drawn from the Beacon vocabulary
+// (Ember, Brass, Patina, Sea Lapis, Deep Crimson) so categorical encodings
+// stay legible at a glance.
 
 export const CHANNEL_COLORS: Record<string, string> = {
-  app_chat: "#3b5bff",
-  email: "#8b4dff",
-  phone: "#22c55e",
-  video: "#eab308",
-  sms: "#ff5aa0",
+  app_chat: "#2A4D5C", // Sea Lapis
+  email: "#D9A441",    // Brass
+  phone: "#4A7C59",    // Patina
+  video: "#C8431D",    // Ember
+  sms: "#7C2D12",      // Deep Crimson
 };
 
 export const CHANNEL_LABELS: Record<string, string> = {
@@ -18,17 +19,17 @@ export const CHANNEL_LABELS: Record<string, string> = {
 };
 
 export const SENDER_COLORS = {
-  client: "#ff5aa0",
-  team: "#3b5bff",
-  unknown: "#838d9d",
+  client: "#C8431D",   // Ember (client = warm/attention)
+  team: "#2A4D5C",     // Sea Lapis (team = calm/measured)
+  unknown: "#8B7A66",  // Faded Smoke
 };
 
 export const CLASSIFICATION_COLORS: Record<string, string> = {
-  "Churn Ticket": "#ef4444",
-  "Retention Risk Alert": "#f59e0b",
-  "Subscription Support Ticket": "#3b5bff",
-  paid_user_offboarding: "#8b4dff",
-  Subscription_Cancellation: "#ff5aa0",
+  "Churn Ticket": "#7C2D12",                  // Deep Crimson
+  "Retention Risk Alert": "#D9A441",          // Brass
+  "Subscription Support Ticket": "#2A4D5C",   // Sea Lapis
+  paid_user_offboarding: "#4A7C59",           // Patina
+  Subscription_Cancellation: "#C8431D",       // Ember
 };
 
 export const CLASSIFICATION_LABELS: Record<string, string> = {
@@ -40,14 +41,19 @@ export const CLASSIFICATION_LABELS: Record<string, string> = {
 };
 
 export const CHART_TOOLTIP_STYLE: any = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
+  background: "#F8EFD7",      // Light Parchment
+  border: "1px solid #D4C29B", // Aged Brass
   borderRadius: "10px",
   fontSize: "12px",
-  color: "#0d1117",
+  color: "#2B1F14",            // Char
   padding: "10px 14px",
-  boxShadow: "0 4px 16px -8px rgba(13, 17, 23, 0.12)",
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif",
+  boxShadow: "0 4px 16px -8px rgba(43, 31, 20, 0.18)",
 };
 
-export const CHART_TOOLTIP_LABEL_STYLE = { color: "#838d9d", fontSize: "11px", marginBottom: "4px" };
-export const CHART_TOOLTIP_ITEM_STYLE = { color: "#0d1117" };
+export const CHART_TOOLTIP_LABEL_STYLE = {
+  color: "#6E5F50",  // Smoke
+  fontSize: "11px",
+  marginBottom: "4px",
+};
+export const CHART_TOOLTIP_ITEM_STYLE = { color: "#2B1F14" }; // Char

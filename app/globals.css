@@ -229,6 +229,49 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   Escalation Beacon — Watchfire typography overrides
+   Scoped via the .beacon-escalation class on the page <main>.
+   Brings the agent's headings into Georgia serif register so the
+   /escalation surface feels native to Beacon, not the old utilitarian
+   Customer 360 standalone.
+   ───────────────────────────────────────────────────────────── */
+.beacon-escalation h1,
+.beacon-escalation h2,
+.beacon-escalation h3 {
+  font-family: Georgia, "Times New Roman", "Times", serif;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--zoca-text);
+}
+.beacon-escalation h1 {
+  font-size: 36px;
+  line-height: 1.1;
+}
+.beacon-escalation h2 {
+  font-size: 22px;
+}
+.beacon-escalation h3 {
+  font-size: 16px;
+}
+/* Hero eyebrow pill — Watchfire Brass instead of utilitarian blue */
+.beacon-escalation .escalation-eyebrow {
+  background: #F5E6BB;
+  border: 1px solid #D9A441;
+  color: #B8852E;
+}
+/* Primary button — Brass with Char text, matches Performance Beacon */
+.beacon-escalation .escalation-cta {
+  background: #D9A441;
+  color: #2B1F14;
+  border: 1px solid #B8852E;
+  font-weight: 600;
+}
+.beacon-escalation .escalation-cta:hover {
+  background: #B8852E;
+  color: #F8EFD7;
+}
+
+/* ─────────────────────────────────────────────────────────────
    Reduced motion — kill all flicker + ember + Performance loops
    ───────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

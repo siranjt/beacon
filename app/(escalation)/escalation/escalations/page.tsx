@@ -21,7 +21,7 @@ export default async function Page() {
   }
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="beacon-escalation min-h-screen bg-bg">
       <div className="mx-auto max-w-[1480px] px-8 py-8">
         <EscalationHeader current="home" />
         <EscalationsBrowser />

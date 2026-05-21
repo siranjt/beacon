@@ -32,46 +32,53 @@ const config: Config = {
         "zoca-border-2": "var(--zoca-border-2)",
 
         // ─────────────────────────────────────────────────────────────
-        // Escalation Beacon palette (utilitarian) — preserved verbatim
-        // from zoca-escalation-agent during Phase C migration. These
-        // tokens drive the components' existing visual style. A future
-        // polish pass can Watchfire-ify them.
+        // Escalation Beacon palette — REMAPPED to Watchfire during the
+        // Phase C polish. Token names preserved so the 1194-line
+        // EscalationsBrowser and the 5 chart components don't need
+        // class-by-class edits — they just inherit the new colors.
         // ─────────────────────────────────────────────────────────────
-        bg: "#fafbfc",
-        panel: "#ffffff",
-        panel2: "#f7f8fb",
-        panel3: "#f0f1f5",
-        border: "#e5e7eb",
-        border2: "#d8dde6",
-        text: "#0d1117",
-        text2: "#1f2937",
-        muted: "#838d9d",
-        muted2: "#5a6371",
-        brand: "#ff5aa0",
-        brandDeep: "#ff3d8a",
-        brandSoft: "#fff5fa",
-        cobalt: "#3b5bff",
-        cobaltSoft: "#eef2ff",
-        violet: "#8b4dff",
-        violetSoft: "#f3eefc",
-        accent: "#3b5bff",
-        accentSoft: "#eef2ff",
-        ok: "#15803d",
-        okSoft: "#e6f7ec",
-        warn: "#92400e",
-        warnSoft: "#fffbeb",
-        err: "#b91c1c",
-        errSoft: "#fef2f2",
-        chApp: "#3b5bff",
-        chEmail: "#8b4dff",
-        chPhone: "#22c55e",
-        chVideo: "#eab308",
-        chSms: "#ff5aa0",
-        churn: "#ef4444",
-        retention: "#f59e0b",
-        subSupport: "#3b5bff",
-        paidOff: "#8b4dff",
-        subCancel: "#ff5aa0",
+        // Surfaces
+        bg: "#F0E4CC",      // Parchment (page canvas)
+        panel: "#F8EFD7",   // Light Parchment (card surface)
+        panel2: "#EBE0C2",  // Buff (sub-cards)
+        panel3: "#F8EFD7",  // Light Parchment (alt elevated)
+        border: "#D4C29B",  // Aged Brass
+        border2: "#C2A975", // Darker Brass
+        // Text
+        text: "#2B1F14",    // Char
+        text2: "#6E5F50",   // Smoke
+        muted: "#8B7A66",   // Faded Smoke
+        muted2: "#6E5F50",  // Smoke
+        // Brand / accent — Escalation = Deep Crimson primary, Ember warm
+        brand: "#C8431D",       // Ember
+        brandDeep: "#7C2D12",   // Deep Crimson
+        brandSoft: "#FCE4D6",   // Light Ember
+        cobalt: "#2A4D5C",      // Sea Lapis (re-purposed from cobalt)
+        cobaltSoft: "#D8E1E6",  // Lapis soft
+        violet: "#D9A441",      // Brass (re-purposed from violet)
+        violetSoft: "#F5E6BB",  // Pale Brass
+        accent: "#7C2D12",      // Deep Crimson (Escalation card accent)
+        accentSoft: "#F5C9B6",  // Faded Crimson
+        // Semantic
+        ok: "#4A7C59",          // Patina
+        okSoft: "#DAE5DC",      // Pale Patina
+        warn: "#D9A441",        // Brass
+        warnSoft: "#F5E6BB",    // Pale Brass
+        err: "#7C2D12",         // Deep Crimson
+        errSoft: "#F5C9B6",     // Faded Crimson
+        // Channel ramp — distinct hues from Watchfire vocabulary so the
+        // donut + timeline strips stay legible at a glance
+        chApp: "#2A4D5C",       // Sea Lapis
+        chEmail: "#D9A441",     // Brass
+        chPhone: "#4A7C59",     // Patina
+        chVideo: "#C8431D",     // Ember
+        chSms: "#7C2D12",       // Deep Crimson
+        // Classification ramp
+        churn: "#7C2D12",       // Deep Crimson
+        retention: "#D9A441",   // Brass
+        subSupport: "#2A4D5C",  // Sea Lapis
+        paidOff: "#4A7C59",     // Patina
+        subCancel: "#C8431D",   // Ember
       },
       borderRadius: {
         zoca: "10px",
