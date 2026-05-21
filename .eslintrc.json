@@ -1,0 +1,28 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["app/(customer)/**", "**/app/(customer)/**"],
+            "message": "Agent boundary: importing from another agent's private folder is forbidden. Promote shared code into lib/ or components/beacon/ instead."
+          },
+          {
+            "group": ["app/(performance)/**", "**/app/(performance)/**"],
+            "message": "Agent boundary: importing from another agent's private folder is forbidden. Promote shared code into lib/ or components/beacon/ instead."
+          },
+          {
+            "group": ["app/(escalation)/**", "**/app/(escalation)/**"],
+            "message": "Agent boundary: importing from another agent's private folder is forbidden. Promote shared code into lib/ or components/beacon/ instead."
+          },
+          {
+            "group": ["app/(post-payment)/**", "**/app/(post-payment)/**"],
+            "message": "Agent boundary: importing from another agent's private folder is forbidden. Promote shared code into lib/ or components/beacon/ instead."
+          }
+        ]
+      }
+    ]
+  }
+}

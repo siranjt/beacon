@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────
+   Beacon — Watchfire palette (spec: beacon-dashboard-watchfire-spec.md §2)
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --zoca-bg: #F0E4CC;       /* Parchment — page canvas */
+  --zoca-bg-soft: #F8EFD7;  /* Light Parchment — card surfaces */
+  --zoca-bg-tint: #EBE0C2;  /* Buff — sub-cards */
+
+  /* Text */
+  --zoca-text: #2B1F14;     /* Char */
+  --zoca-text-2: #6E5F50;   /* Smoke */
+  --zoca-text-3: #8B7A66;   /* Faded Smoke */
+
+  /* Accents (Tailwind keys preserved for backward-compat — values flipped to Watchfire) */
+  --zoca-pink: #C8431D;          /* Ember */
+  --zoca-pink-bright: #7C2D12;   /* Deep Ember */
+  --zoca-pink-soft: #FCE4D6;     /* Light Ember */
+  --zoca-red: #7C2D12;           /* Deep Crimson */
+  --zoca-red-soft: #F5C9B6;      /* Faded Crimson */
+  --zoca-amber: #D9A441;         /* Brass */
+  --zoca-amber-soft: #F5E6BB;    /* Pale Brass */
+  --zoca-green: #4A7C59;         /* Patina */
+  --zoca-green-deep: #2D4843;    /* Pine */
+  --zoca-green-soft: #DAE5DC;    /* Pale Patina */
+  --zoca-blue: #2A4D5C;          /* Sea Lapis */
+  --zoca-blue-strong: #1A3340;   /* Deep Lapis */
+
+  /* Borders */
+  --zoca-border: #D4C29B;        /* Aged Brass */
+  --zoca-border-2: #C2A975;      /* Darker Brass */
+
+  /* Optional spec tokens */
+  --zoca-lapis-soft: #D8E1E6;
+  --zoca-smoke-soft: #E5DDD3;
+  --zoca-ember-peach: #FBE8D8;
+  --zoca-border-perf: #E4B188;
+
+  /* Flame layer tokens */
+  --zoca-flame-outer:     #C8431D;
+  --zoca-flame-mid:       #E85A2B;
+  --zoca-flame-core:      #D9A441;
+  --zoca-flame-heart-top: #FEF3C7;
+  --zoca-flame-heart-bot: #FBBF24;
+}
+
+html, body {
+  background: var(--zoca-bg);
+  color: var(--zoca-text);
+}
+
+body {
+  background: var(--zoca-bg);
+  color: var(--zoca-text);
+  font-family: Georgia, "Times New Roman", "Times", serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Flame flicker — 4 co-prime durations so the mark never re-syncs
+   ───────────────────────────────────────────────────────────── */
+@keyframes beacon-flame-1 {
+  0%, 100% { transform: scale(1);          }
+  25%      { transform: scale(1.06, 1.12); }
+  60%      { transform: scale(0.97, 0.96); }
+}
+@keyframes beacon-flame-2 {
+  0%, 100% { transform: scale(1);          }
+  25%      { transform: scale(1.10, 1.16); }
+  60%      { transform: scale(0.94, 0.94); }
+}
+@keyframes beacon-flame-3 {
+  0%, 100% { transform: scale(1);          }
+  25%      { transform: scale(1.13, 1.20); }
+  60%      { transform: scale(0.92, 0.92); }
+}
+@keyframes beacon-flame-4 {
+  0%, 100% { transform: scale(1);          }
+  25%      { transform: scale(1.18, 1.25); }
+  60%      { transform: scale(0.88, 0.88); }
+}
+.beacon-flame-1 { animation: beacon-flame-1 2.2s ease-in-out infinite; }
+.beacon-flame-2 { animation: beacon-flame-2 1.7s ease-in-out infinite; }
+.beacon-flame-3 { animation: beacon-flame-3 1.3s ease-in-out infinite; }
+.beacon-flame-4 { animation: beacon-flame-4 0.9s ease-in-out infinite; }
+
+/* ─────────────────────────────────────────────────────────────
+   Rising embers — used by BeaconAmbient
+   ───────────────────────────────────────────────────────────── */
+@keyframes beacon-ember-1 {
+  0%   { transform: translate(0, 0);       opacity: 0;    }
+  15%  { opacity: 0.9; }
+  100% { transform: translate(4px, -160px); opacity: 0;   }
+}
+@keyframes beacon-ember-2 {
+  0%   { transform: translate(0, 0);       opacity: 0;    }
+  15%  { opacity: 0.85; }
+  100% { transform: translate(-5px, -180px); opacity: 0;  }
+}
+@keyframes beacon-ember-3 {
+  0%   { transform: translate(0, 0);       opacity: 0;    }
+  20%  { opacity: 0.95; }
+  100% { transform: translate(5px, -140px); opacity: 0;   }
+}
+@keyframes beacon-ember-4 {
+  0%   { transform: translate(0, 0);       opacity: 0;    }
+  15%  { opacity: 0.7; }
+  100% { transform: translate(-4px, -170px); opacity: 0;  }
+}
+@keyframes beacon-ember-5 {
+  0%   { transform: translate(0, 0);       opacity: 0;    }
+  20%  { opacity: 0.9; }
+  100% { transform: translate(2px, -150px); opacity: 0;   }
+}
+@keyframes beacon-ember-6 {
+  0%   { transform: translate(0, 0);       opacity: 0;    }
+  15%  { opacity: 0.85; }
+  100% { transform: translate(-5px, -160px); opacity: 0;  }
+}
+.beacon-ember-1 { animation: beacon-ember-1 3.2s ease-out 0.0s infinite; transform-box: fill-box; transform-origin: center; }
+.beacon-ember-2 { animation: beacon-ember-2 4.0s ease-out 0.6s infinite; transform-box: fill-box; transform-origin: center; }
+.beacon-ember-3 { animation: beacon-ember-3 2.8s ease-out 1.4s infinite; transform-box: fill-box; transform-origin: center; }
+.beacon-ember-4 { animation: beacon-ember-4 3.6s ease-out 2.1s infinite; transform-box: fill-box; transform-origin: center; }
+.beacon-ember-5 { animation: beacon-ember-5 2.4s ease-out 0.3s infinite; transform-box: fill-box; transform-origin: center; }
+.beacon-ember-6 { animation: beacon-ember-6 3.0s ease-out 1.8s infinite; transform-box: fill-box; transform-origin: center; }
+
+/* ─────────────────────────────────────────────────────────────
+   Launcher card hover lift
+   ───────────────────────────────────────────────────────────── */
+.beacon-card {
+  background: var(--zoca-bg-soft);
+  border: 1px solid var(--zoca-border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  transition: transform 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+  box-shadow: 0 1px 3px rgba(43, 31, 20, 0.04);
+}
+.beacon-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(200, 67, 29, 0.30);
+  box-shadow: 0 12px 28px -8px rgba(43, 31, 20, 0.12);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Reduced motion — kill all flicker + ember loops
+   ───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .beacon-flame-1,
+  .beacon-flame-2,
+  .beacon-flame-3,
+  .beacon-flame-4,
+  .beacon-ember-1,
+  .beacon-ember-2,
+  .beacon-ember-3,
+  .beacon-ember-4,
+  .beacon-ember-5,
+  .beacon-ember-6 {
+    animation: none !important;
+  }
+}
