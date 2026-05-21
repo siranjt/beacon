@@ -7,6 +7,7 @@ import { useRecentReports, type RecentReport } from "./useRecentReports";
 import ClientPreview from "./ClientPreview";
 import ZocaLogo from "@/components/ZocaLogo";
 import { BeaconMark } from "@/components/BeaconMark";
+import { BeaconAmbient } from "@/components/BeaconAmbient";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -60,7 +61,9 @@ export default function PerformanceLanding() {
   const selected = visible.find((r) => r.entityId === selectedId) ?? visible[0] ?? null;
 
   return (
-    <main style={{ maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
+    <main style={{ position: "relative", minHeight: "100vh" }}>
+      <BeaconAmbient />
+      <div style={{ position: "relative", zIndex: 10, maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
       {/* Top bar — ZOCA wordmark | divider | animated flame + Beacon */}
       <header
         style={{
@@ -152,22 +155,56 @@ export default function PerformanceLanding() {
         >
           Report builder · V1
         </div>
-        <h1
+        <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "1.25rem",
             margin: "16px 0 0",
-            fontFamily: SERIF,
-            fontSize: "clamp(32px, 5vw, 48px)",
-            fontWeight: 500,
-            letterSpacing: "-0.015em",
-            background: `linear-gradient(90deg, ${EMBER} 0%, ${BRASS} 100%)`,
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-            lineHeight: 1.1,
           }}
         >
-          Every entity, every signal
-        </h1>
+          <span
+            aria-hidden
+            style={{
+              fontSize: 28,
+              color: "#2A4D5C",
+              opacity: 0.6,
+              userSelect: "none",
+              flexShrink: 0,
+            }}
+          >
+            ✦
+          </span>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: SERIF,
+              fontSize: "clamp(32px, 5vw, 48px)",
+              fontWeight: 500,
+              letterSpacing: "-0.015em",
+              background: `linear-gradient(90deg, ${EMBER} 0%, ${BRASS} 100%)`,
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              lineHeight: 1.1,
+            }}
+          >
+            Every entity, every signal
+          </h1>
+          <span
+            aria-hidden
+            style={{
+              fontSize: 28,
+              color: BRASS,
+              opacity: 0.7,
+              userSelect: "none",
+              flexShrink: 0,
+            }}
+          >
+            ✦
+          </span>
+        </div>
         <p
           style={{
             margin: "10px 0 0",
@@ -286,6 +323,7 @@ export default function PerformanceLanding() {
         entities.location_insights) and Postgres (website.booking_enquiries),
         accessed via the Metabase Dataset API.
       </footer>
+      </div>
     </main>
   );
 }

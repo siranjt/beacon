@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { fetchEntityReportData } from "@/lib/report/fetchers";
 import { composeReport } from "@/lib/report/compose";
+import { BeaconAmbient } from "@/components/BeaconAmbient";
 import ReportPreview from "../../_components/ReportPreview";
 import RecordRecentReport from "../../_components/RecordRecentReport";
 
@@ -56,7 +57,9 @@ export default async function ReportPage({
   const i = report.identity;
 
   return (
-    <main style={{ maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
+    <main style={{ position: "relative", minHeight: "100vh" }}>
+      <BeaconAmbient />
+      <div style={{ position: "relative", zIndex: 10, maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
       {/* Top bar — sticky utility row */}
       <header
         style={{
@@ -157,6 +160,7 @@ export default async function ReportPage({
         vertical={i.verticalDisplay ?? "Report"}
         location={[i.city, i.state].filter(Boolean).join(", ")}
       />
+      </div>
     </main>
   );
 }
