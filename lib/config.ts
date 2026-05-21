@@ -65,8 +65,8 @@ export const AGENTS: Agent[] = [
     name: "Escalation Beacon",
     description: "One search returns triage + Linear tickets + 5-channel comms timeline.",
     accent: "#7C2D12", // Deep Crimson
-    route: "https://zoca-escalation-agent.vercel.app",
-    kind: "external",
+    route: "/escalation",
+    kind: "internal",
   },
   {
     id: "post-payment",

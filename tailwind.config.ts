@@ -30,6 +30,48 @@ const config: Config = {
         "zoca-blue-strong": "var(--zoca-blue-strong)",
         "zoca-border": "var(--zoca-border)",
         "zoca-border-2": "var(--zoca-border-2)",
+
+        // ─────────────────────────────────────────────────────────────
+        // Escalation Beacon palette (utilitarian) — preserved verbatim
+        // from zoca-escalation-agent during Phase C migration. These
+        // tokens drive the components' existing visual style. A future
+        // polish pass can Watchfire-ify them.
+        // ─────────────────────────────────────────────────────────────
+        bg: "#fafbfc",
+        panel: "#ffffff",
+        panel2: "#f7f8fb",
+        panel3: "#f0f1f5",
+        border: "#e5e7eb",
+        border2: "#d8dde6",
+        text: "#0d1117",
+        text2: "#1f2937",
+        muted: "#838d9d",
+        muted2: "#5a6371",
+        brand: "#ff5aa0",
+        brandDeep: "#ff3d8a",
+        brandSoft: "#fff5fa",
+        cobalt: "#3b5bff",
+        cobaltSoft: "#eef2ff",
+        violet: "#8b4dff",
+        violetSoft: "#f3eefc",
+        accent: "#3b5bff",
+        accentSoft: "#eef2ff",
+        ok: "#15803d",
+        okSoft: "#e6f7ec",
+        warn: "#92400e",
+        warnSoft: "#fffbeb",
+        err: "#b91c1c",
+        errSoft: "#fef2f2",
+        chApp: "#3b5bff",
+        chEmail: "#8b4dff",
+        chPhone: "#22c55e",
+        chVideo: "#eab308",
+        chSms: "#ff5aa0",
+        churn: "#ef4444",
+        retention: "#f59e0b",
+        subSupport: "#3b5bff",
+        paidOff: "#8b4dff",
+        subCancel: "#ff5aa0",
       },
       borderRadius: {
         zoca: "10px",

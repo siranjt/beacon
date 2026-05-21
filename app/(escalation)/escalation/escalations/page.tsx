@@ -1,15 +1,19 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import EscalationsBrowser from "./_components/EscalationsBrowser";
-import EscalationHeader from "./_components/EscalationHeader";
+import EscalationsBrowser from "../_components/EscalationsBrowser";
+import EscalationHeader from "../_components/EscalationHeader";
 
 export const metadata = {
-  title: "Escalation Beacon · Zoca",
+  title: "Customer 360 · Zoca",
 };
 
 export const dynamic = "force-dynamic";
 
+/**
+ * /escalation/escalations — alias of /escalation (Customer 360 home).
+ * Kept for backwards compatibility with bookmarks from the standalone deploy.
+ */
 export default async function Page() {
   const session = await getServerSession(authOptions);
   if (!session) {
