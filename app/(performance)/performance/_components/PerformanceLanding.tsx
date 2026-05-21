@@ -60,7 +60,7 @@ export default function PerformanceLanding() {
   const selected = visible.find((r) => r.entityId === selectedId) ?? visible[0] ?? null;
 
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: "0 22px 56px" }}>
+    <main style={{ maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
       {/* Top bar — ZOCA wordmark | divider | animated flame + Beacon */}
       <header
         style={{

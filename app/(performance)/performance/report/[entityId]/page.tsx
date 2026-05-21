@@ -56,7 +56,7 @@ export default async function ReportPage({
   const i = report.identity;
 
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: "0 22px 56px" }}>
+    <main style={{ maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
       {/* Top bar — sticky utility row */}
       <header
         style={{
