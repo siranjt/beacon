@@ -124,9 +124,13 @@ export default function EscalationQueue() {
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-cobalt live-dot" />
           Live · scored from Metabase tickets feed
         </div>
-        <h1 className="mt-5 font-extrabold text-[44px] leading-[1.0] tracking-[-0.04em] text-text">
-          Escalation <span className="brand-gradient-text">Queue</span>
-        </h1>
+        <div className="mt-5 flex items-center justify-center gap-5">
+          <span aria-hidden className="text-2xl select-none" style={{ color: "#2A4D5C", opacity: 0.6 }}>✦</span>
+          <h1 className="brand-gradient-text font-extrabold text-[56px] leading-[1.0] tracking-[-0.02em]">
+            Escalation Queue
+          </h1>
+          <span aria-hidden className="text-2xl select-none" style={{ color: "#D9A441", opacity: 0.7 }}>✦</span>
+        </div>
         <p className="mt-4 max-w-[600px] mx-auto text-[14px] text-muted2 leading-[1.65]">
           Customers ranked by an open-ticket and churn-signal score. Higher = handle sooner.
           Click any row to drop into Customer 360.

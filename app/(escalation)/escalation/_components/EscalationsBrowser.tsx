@@ -510,8 +510,8 @@ export default function EscalationsBrowser() {
           >
             ✦
           </span>
-          <h1 className="font-extrabold text-[56px] leading-[1.0] tracking-[-0.04em] text-text">
-            Customer <span className="brand-gradient-text">360</span> Agent
+          <h1 className="brand-gradient-text font-extrabold text-[64px] leading-[1.0] tracking-[-0.02em]">
+            Customer 360 Agent
           </h1>
           <span
             aria-hidden

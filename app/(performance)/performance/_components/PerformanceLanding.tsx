@@ -63,7 +63,7 @@ export default function PerformanceLanding() {
   return (
     <main style={{ position: "relative", minHeight: "100vh" }}>
       <BeaconAmbient />
-      <div style={{ position: "relative", zIndex: 10, maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
+      <div style={{ position: "relative", zIndex: 10, padding: "32px 40px 56px" }}>
       {/* Top bar — ZOCA wordmark | divider | animated flame + Beacon */}
       <header
         style={{
@@ -180,14 +180,14 @@ export default function PerformanceLanding() {
             style={{
               margin: 0,
               fontFamily: SERIF,
-              fontSize: "clamp(32px, 5vw, 48px)",
+              fontSize: "clamp(40px, 6vw, 64px)",
               fontWeight: 500,
-              letterSpacing: "-0.015em",
-              background: `linear-gradient(90deg, ${EMBER} 0%, ${BRASS} 100%)`,
+              letterSpacing: "-0.02em",
+              background: "linear-gradient(90deg, #2A4D5C 0%, #2B1F14 30%, #7C2D12 65%, #D9A441 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
-              lineHeight: 1.1,
+              lineHeight: 1,
             }}
           >
             Every entity, every signal

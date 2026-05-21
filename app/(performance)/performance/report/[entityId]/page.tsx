@@ -59,7 +59,7 @@ export default async function ReportPage({
   return (
     <main style={{ position: "relative", minHeight: "100vh" }}>
       <BeaconAmbient />
-      <div style={{ position: "relative", zIndex: 10, maxWidth: 1480, margin: "0 auto", padding: "0 28px 56px" }}>
+      <div style={{ position: "relative", zIndex: 10, padding: "32px 40px 56px" }}>
       {/* Top bar — sticky utility row */}
       <header
         style={{
