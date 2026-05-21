@@ -19,6 +19,7 @@ import { getCustomer } from "@/lib/post-payment/db/queries";
 import Link from "next/link";
 import BeaconPageShell from "@/components/BeaconPageShell";
 import { DocxPreviewButton } from "../../_components/DocxPreviewButton";
+import { ReanalyzeButton } from "../../_components/ReanalyzeButton";
 import ReportVisual from "../../_components/ReportVisual";
 
 export const dynamic = "force-dynamic";
@@ -144,13 +145,18 @@ export default async function ReportPage({ params }: { params: { customer_id: st
             )}
           </p>
         </div>
-        <div className="flex gap-2 text-sm flex-shrink-0">
+        <div className="flex gap-2 text-sm flex-shrink-0 flex-wrap items-center">
           {c.report_blob_docx_url && (
             <DocxPreviewButton
               docxUrl={c.report_blob_docx_url}
               filename={`${(c.biz_name ?? c.cb_customer_id).replace(/[^a-zA-Z0-9_-]+/g, "_")}_Post_Payment_Review.docx`}
             />
           )}
+          <ReanalyzeButton
+            customerId={c.cb_customer_id}
+            bizName={c.biz_name}
+            currentStatus={c.status}
+          />
           {c.report_blob_json_url && (
             <a
               href={c.report_blob_json_url}

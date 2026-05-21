@@ -6,6 +6,10 @@
     {
       "path": "/post-payment/api/cron/retry-pending",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/post-payment/api/cron/reap-stuck",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
