@@ -209,14 +209,74 @@ export default async function ReportPage({ params }: { params: { customer_id: st
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-accent-yellow/40 bg-accent-yellow-bg/40 px-5 py-4 text-sm text-accent-yellow anim-rise" style={{ animationDelay: "0.28s" }}>
-          <strong className="text-ink">Visual analysis not yet available.</strong> Status:{" "}
-          <code className="font-mono">{c.status}</code>
-          {c.failure_reason && <p className="mt-2">Reason: {c.failure_reason}</p>}
-          <p className="text-xs text-ink-muted mt-2">
-            The structured JSON couldn&apos;t be fetched. Use the docx preview or the JSON download button above to view the canonical artifacts.
-          </p>
-        </div>
+        // Three sub-cases for the empty state. We disambiguate so the user
+        // knows whether (a) the LLM never ran, (b) it ran but render
+        // failed (most common — verdict + driver in DB but no blob), or
+        // (c) the blob exists but couldn't be fetched.
+        (() => {
+          const hasBlob = !!c.report_blob_json_url;
+          const renderFailed = (c.failure_reason ?? "").startsWith("render_failed:");
+          const renderError = renderFailed
+            ? (c.failure_reason ?? "").replace(/^render_failed:\s*/, "")
+            : null;
+          const hasVerdict = !!c.verdict;
+
+          // Render-failed case: LLM data is valid (verdict pill is showing
+          // above), but the docx/JSON upload broke. Most often a missing or
+          // wrong BLOB_READ_WRITE_TOKEN env in Vercel.
+          if (!hasBlob && renderFailed) {
+            return (
+              <div className="rounded-2xl border border-accent-red/40 bg-accent-red-bg/40 px-5 py-4 text-sm anim-rise" style={{ animationDelay: "0.28s" }}>
+                <strong className="text-ink">Word doc + structured JSON failed to upload.</strong>
+                <p className="text-ink-muted mt-1">
+                  The LLM analysis succeeded — the verdict and key facts above are valid — but the
+                  visual / .docx artifacts couldn&apos;t be persisted to Blob storage.
+                </p>
+                <p className="mt-2">
+                  <span className="text-ink-muted">Error: </span>
+                  <code className="font-mono text-accent-red text-xs">{renderError}</code>
+                </p>
+                <p className="text-xs text-ink-muted mt-2">
+                  Most common cause: <code className="font-mono">BLOB_READ_WRITE_TOKEN</code> missing
+                  or wrong in Vercel env vars. After fixing the env + redeploy, click <strong>↻ Re-analyze</strong> above to regenerate.
+                </p>
+              </div>
+            );
+          }
+
+          // No blob, no render error, status not ready → still processing /
+          // pending / failed for some other reason. Fall back to the
+          // status-driven message.
+          if (!hasBlob) {
+            return (
+              <div className="rounded-2xl border border-accent-yellow/40 bg-accent-yellow-bg/40 px-5 py-4 text-sm anim-rise" style={{ animationDelay: "0.28s" }}>
+                <strong className="text-ink">Visual analysis not yet available.</strong>{" "}
+                <span className="text-ink-muted">Status: </span>
+                <code className="font-mono">{c.status}</code>
+                {c.failure_reason && <p className="mt-2">Reason: {c.failure_reason}</p>}
+                <p className="text-xs text-ink-muted mt-2">
+                  {hasVerdict
+                    ? "The verdict above came from the LLM but the structured artifacts haven't been generated. Click ↻ Re-analyze above to retry."
+                    : "The analysis pipeline hasn't produced a verdict for this customer. Click ↻ Re-analyze above to run it."}
+                </p>
+              </div>
+            );
+          }
+
+          // Blob URL exists but fetch returned null — network blip, expired
+          // signature, or content gone. Suggest reload + re-analyze fallback.
+          return (
+            <div className="rounded-2xl border border-accent-yellow/40 bg-accent-yellow-bg/40 px-5 py-4 text-sm anim-rise" style={{ animationDelay: "0.28s" }}>
+              <strong className="text-ink">Couldn&apos;t load the structured report data.</strong>
+              <p className="text-ink-muted mt-1">
+                The blob URL is set but the fetch failed. Try reloading; if it persists, click <strong>↻ Re-analyze</strong> above to regenerate.
+              </p>
+              <p className="text-xs text-ink-muted mt-2 break-all">
+                Source: <a href={c.report_blob_json_url} className="underline">{c.report_blob_json_url}</a>
+              </p>
+            </div>
+          );
+        })()
       )}
       </div>
     </BeaconPageShell>

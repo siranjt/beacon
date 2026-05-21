@@ -234,6 +234,7 @@ async function runPipeline(customerId: string, modelOverride?: string) {
   // ===== Step 3: Render docx + upload ==================================
   await logEvent(customerId, "render_starting", {});
   let render: { docxUrl: string; jsonUrl: string; mdUrl: string; bytes: number } | null = null;
+  let renderError: string | null = null;
   try {
     render = await renderAndUpload({
       cbCustomerId: customerId,
@@ -242,7 +243,8 @@ async function runPipeline(customerId: string, modelOverride?: string) {
     });
     await logEvent(customerId, "render_done", { bytes: render.bytes });
   } catch (e: any) {
-    await logEvent(customerId, "render_failed", { error: e.message });
+    renderError = e?.message ?? String(e);
+    await logEvent(customerId, "render_failed", { error: renderError });
     // continue — render is non-fatal, we still post to Slack with markdown
   }
 
@@ -251,7 +253,14 @@ async function runPipeline(customerId: string, modelOverride?: string) {
     report_blob_json_url: render?.jsonUrl ?? null,
     report_blob_md_url: render?.mdUrl ?? null,
     status: "ready",
-    failure_reason: null,
+    // Surface the render error in failure_reason so the report page can
+    // explain to the user why the visual + .docx aren't available. The LLM
+    // output is still valid (verdict, key facts, exec summary), but the
+    // structured artifacts upload failed — most commonly because
+    // BLOB_READ_WRITE_TOKEN is missing/wrong in Vercel envs. Without this
+    // line the UI just says "Visual analysis not yet available" with no
+    // explanation — which is exactly the symptom we hit.
+    failure_reason: renderError ? `render_failed: ${renderError}` : null,
   });
 
   // ===== Step 4: Slack post ============================================
