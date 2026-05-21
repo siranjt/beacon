@@ -57,8 +57,8 @@ export const AGENTS: Agent[] = [
     name: "Performance Beacon",
     description: "Per-customer growth and local-SEO reports. GBP, keywords, leads, reviews.",
     accent: "#D9A441", // Brass
-    route: "https://zoca-performance-report.vercel.app",
-    kind: "external",
+    route: "/performance",
+    kind: "internal",
   },
   {
     id: "escalation",
