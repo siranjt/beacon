@@ -272,7 +272,8 @@ export default async function ReportPage({ params }: { params: { customer_id: st
                 The blob URL is set but the fetch failed. Try reloading; if it persists, click <strong>↻ Re-analyze</strong> above to regenerate.
               </p>
               <p className="text-xs text-ink-muted mt-2 break-all">
-                Source: <a href={c.report_blob_json_url} className="underline">{c.report_blob_json_url}</a>
+                {/* hasBlob check above guarantees report_blob_json_url is non-null, but TS still narrows it to string | null because the check is in an outer scope. Coalesce to undefined so <a href> accepts it. */}
+                Source: <a href={c.report_blob_json_url ?? undefined} className="underline">{c.report_blob_json_url}</a>
               </p>
             </div>
           );
