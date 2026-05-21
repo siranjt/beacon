@@ -78,7 +78,13 @@ export type CustomerScope =
   | "pre_floor"
   | "pending";
 
-export type CustomerStatus = "pending" | "processing" | "ready" | "failed" | "out_of_scope";
+export type CustomerStatus =
+  | "pending"          // never analyzed yet (initial state after webhook)
+  | "processing"       // analyze pipeline currently running
+  | "ready"            // LLM eval complete, report rendered + Slack posted
+  | "failed"           // pipeline error — see failure_reason for stage + message
+  | "out_of_scope"     // skipped: pre-floor, no subs, or first sub not discovery
+  | "pending_entity";  // deferred: BaseSheet hasn't synced entity_id yet — retry hourly via cron
 
 export type Customer = {
   cb_customer_id: string;

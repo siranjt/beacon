@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/post-payment/api/cron/retry-pending",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

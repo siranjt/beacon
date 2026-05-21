@@ -34,9 +34,20 @@ import {
   upsertCustomerStub, getCustomer,
 } from "@/lib/post-payment/db/queries";
 
-async function requireAuth(): Promise<NextResponse | null> {
+/**
+ * Auth gate: accepts EITHER a valid NextAuth session OR a matching
+ * `x-zoca-cron-secret` header (used by the retry-pending cron to re-trigger
+ * analyze for `pending_entity` customers without a user session). The cron
+ * secret must match CRON_SECRET env var.
+ */
+async function requireAuth(req?: NextRequest): Promise<NextResponse | null> {
   const session = await getServerSession(authOptions);
-  return session ? null : NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (session) return null;
+  const cronSecret = req?.headers.get("x-zoca-cron-secret");
+  if (cronSecret && process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET) {
+    return null;
+  }
+  return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 }
 
 export const runtime = "nodejs";
@@ -161,6 +172,25 @@ async function runPipeline(customerId: string) {
     return;
   }
 
+  // Entity-id deferred: BaseSheet hasn't synced this customer yet AND Chargebee's
+  // cf_entity_id custom field is empty. Without an entity_id, the comms fetch
+  // returns 0 rows across all 5 channels, which makes the LLM hallucinate from
+  // billing data alone — every such report came back garbage. Defer the LLM
+  // call, mark the customer as pending_entity, and let the hourly retry cron
+  // (/api/cron/retry-pending) pick it back up once BaseSheet has caught up.
+  if (bundle.entity_id_pending) {
+    await setCustomerReport(customerId, {
+      status: "pending_entity",
+      failure_reason: "entity_id_pending: BaseSheet has not synced this customer yet, and cf_entity_id on the Chargebee record is empty. Retrying hourly.",
+    });
+    await logEvent(customerId, "deferred_pending_entity", {
+      cb_customer_id: customerId,
+      cf_entity_id: bundle.chargebee_customer?.cf_entity_id ?? null,
+      basesheet_rows: bundle.entities.length,
+    });
+    return;
+  }
+
   // ===== Step 2: LLM evaluation ========================================
   await logEvent(customerId, "llm_starting", {
     model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
@@ -257,7 +287,7 @@ async function runPipeline(customerId: string) {
 }
 
 export async function POST(req: NextRequest, ctx: { params: { customer_id: string } }) {
-  const authFail = await requireAuth();
+  const authFail = await requireAuth(req);
   if (authFail) return authFail;
   const customerId = ctx.params.customer_id;
   if (!customerId) {

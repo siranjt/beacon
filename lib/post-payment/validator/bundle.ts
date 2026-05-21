@@ -39,6 +39,13 @@ export type Bundle = {
   // sanity flags
   pre_floor: boolean;
   skip_reason: string | null;
+  /**
+   * True when entity_id couldn't be resolved (BaseSheet hasn't synced this
+   * customer yet AND Chargebee's cf_entity_id custom field is empty). The
+   * analyze pipeline checks this and defers the LLM run via a "pending_entity"
+   * status; an hourly cron retries.
+   */
+  entity_id_pending: boolean;
 };
 
 const FLOOR_DATE = process.env.CUSTOMER_FLOOR_DATE ?? "2026-05-01";
@@ -180,5 +187,6 @@ async function buildBundleInternal(customerId: string, includeComms: boolean): P
     review_metrics: reviewMetrics,
     pre_floor: preFloor,
     skip_reason: skipReason,
+    entity_id_pending: entityIds.length === 0 && !preFloor && !!earliestSub && isDiscovery,
   };
 }

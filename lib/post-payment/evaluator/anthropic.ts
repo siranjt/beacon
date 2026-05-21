@@ -10,9 +10,8 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import fs from "node:fs";
-import path from "node:path";
 import type { Bundle } from "@/lib/post-payment/validator/bundle";
+import { PROMPT_MD } from "./prompt";
 
 // Default to Haiku — finishes this analysis in 15–30s and stays comfortably
 // within Vercel's function budget even on cold starts. Sonnet routinely hits
@@ -24,14 +23,15 @@ import type { Bundle } from "@/lib/post-payment/validator/bundle";
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 12_000;
 
-// CRITICAL: disable SDK retries. The default is 2 retries, which on a
-// timeout-triggered retry burns 3× the per-request timeout (we saw 151s for a
-// "50s timeout" because the SDK silently retried twice). Fail fast instead —
-// our eval-level retry on JSON-parse failure handles transient errors at a
-// higher level.
+// SDK retries: 4 attempts with exponential backoff. Anthropic's CDN
+// (Cloudflare) intermittently returns 502/503 (we saw "502 Bad Gateway" on a
+// real Satori run that lost a customer's analysis). The SDK retries those
+// transient errors transparently. Prior config of maxRetries:0 was a
+// pre-Fluid-Compute hack to prevent retry-on-timeout cascades; with the
+// per-request `timeout` we now pass explicitly, retries are safe again.
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY ?? "",
-  maxRetries: 0,
+  maxRetries: 4,
 });
 
 export type EvalResult = {
@@ -41,9 +41,12 @@ export type EvalResult = {
 };
 
 function loadPrompt(): string {
-  // prompt.md is co-located in the repo root for easy editing
-  const promptPath = path.join(process.cwd(), "prompt.md");
-  return fs.readFileSync(promptPath, "utf8");
+  // Prompt is now bundled at build time via `import { PROMPT_MD } from
+  // "./prompt"`. Previously read via fs.readFileSync(process.cwd() + "/prompt.md"),
+  // which broke on Vercel (ENOENT /var/task/prompt.md — the file wasn't in
+  // the function bundle). Edit lib/post-payment/evaluator/prompt.ts directly
+  // to change the prompt.
+  return PROMPT_MD;
 }
 
 /**
