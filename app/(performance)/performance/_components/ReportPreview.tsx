@@ -466,13 +466,39 @@ function KeywordRankingsCard({ report }: { report: ComposedReport }) {
   return (
     <Card eyebrow="Top keyword rankings" badge={`${top3} at #1–3`} badgeTone="patina">
       <div style={{ fontFamily: SERIF, fontSize: 14, fontWeight: 600, marginTop: 6 }}>
-        Best position achieved
+        Best position achieved · current rank
       </div>
-      <div style={{ marginTop: 10 }}>
+
+      {/* Column headers */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "8px 0 4px",
+          marginTop: 8,
+          borderBottom: `1px solid ${SURFACE_TINT}`,
+          fontFamily: SANS,
+          fontSize: 10,
+          letterSpacing: "0.1em",
+          color: FADED,
+          fontWeight: 600,
+          textTransform: "uppercase",
+        }}
+      >
+        <div style={{ flex: "0 0 32%" }}>Keyword</div>
+        <div style={{ flex: 1 }} />
+        <div style={{ flex: "0 0 50px", textAlign: "right" }}>Best</div>
+        <div style={{ flex: "0 0 50px", textAlign: "right" }}>Now</div>
+      </div>
+
+      <div>
         {all.map((k, idx) => {
-          const rank = k.rankBest ?? 100;
+          const best = k.rankBest ?? 100;
           // Bar fills proportional to inverse rank — #1 ≈ 98%, #50 ≈ 50%, #100 ≈ 5%.
-          const width = Math.max(8, Math.min(98, 100 - (rank - 1) * 1.0));
+          const width = Math.max(8, Math.min(98, 100 - (best - 1) * 1.0));
+          const matchesBest =
+            k.rankBest != null && k.rankCurrent != null && k.rankBest === k.rankCurrent;
           return (
             <div
               key={`${k.keyword}-${idx}`}
@@ -480,7 +506,7 @@ function KeywordRankingsCard({ report }: { report: ComposedReport }) {
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: "5px 0",
+                padding: "7px 0",
                 fontFamily: SANS,
                 fontSize: 12,
                 borderTop: idx === 0 ? undefined : `1px solid ${SURFACE_TINT}`,
@@ -488,7 +514,7 @@ function KeywordRankingsCard({ report }: { report: ComposedReport }) {
             >
               <div
                 style={{
-                  flex: "0 0 38%",
+                  flex: "0 0 32%",
                   color: TEXT,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -520,17 +546,54 @@ function KeywordRankingsCard({ report }: { report: ComposedReport }) {
               </div>
               <div
                 style={{
-                  flex: "0 0 38px",
+                  flex: "0 0 50px",
                   color: BRASS_DEEP,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   textAlign: "right",
                 }}
               >
                 {k.rankBest != null ? `#${k.rankBest}` : "—"}
               </div>
+              <div
+                style={{
+                  flex: "0 0 50px",
+                  color: matchesBest ? BRASS_DEEP : MUTED,
+                  fontWeight: 600,
+                  textAlign: "right",
+                }}
+                title={
+                  matchesBest
+                    ? "Currently holding the best rank"
+                    : "Latest observed rank (lower than best)"
+                }
+              >
+                {k.rankCurrent != null ? `#${k.rankCurrent}` : "—"}
+              </div>
             </div>
           );
         })}
+      </div>
+
+      {/* Legend */}
+      <div
+        style={{
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: `1px solid ${SURFACE_TINT}`,
+          fontFamily: SANS,
+          fontSize: 11,
+          color: FADED,
+          display: "flex",
+          gap: 18,
+          flexWrap: "wrap",
+        }}
+      >
+        <span>
+          <strong style={{ color: BRASS_DEEP }}>Best</strong> · best rank ever observed
+        </span>
+        <span>
+          <strong style={{ color: MUTED }}>Now</strong> · latest observed rank
+        </span>
       </div>
     </Card>
   );

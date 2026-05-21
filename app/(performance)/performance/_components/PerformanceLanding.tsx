@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRecentReports, type RecentReport } from "./useRecentReports";
 import ClientPreview from "./ClientPreview";
+import ZocaLogo from "@/components/ZocaLogo";
+import { BeaconMark } from "@/components/BeaconMark";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -59,13 +61,13 @@ export default function PerformanceLanding() {
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "0 22px 56px" }}>
-      {/* Top bar */}
+      {/* Top bar — ZOCA wordmark | divider | animated flame + Beacon */}
       <header
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "14px 0",
+          padding: "16px 0",
           marginBottom: 8,
           borderBottom: `1px solid ${BORDER}`,
         }}
@@ -73,15 +75,37 @@ export default function PerformanceLanding() {
         <Link
           href="/"
           style={{
-            fontFamily: SERIF,
-            fontWeight: 600,
-            fontSize: 17,
-            letterSpacing: "0.04em",
-            color: TEXT,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
             textDecoration: "none",
+            color: "inherit",
           }}
         >
-          B E A C O N
+          <ZocaLogo height={22} />
+          <span
+            style={{
+              width: 1,
+              height: 22,
+              background: BORDER,
+              display: "inline-block",
+            }}
+            aria-hidden
+          />
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <BeaconMark size={26} flicker />
+            <span
+              style={{
+                fontFamily: SERIF,
+                fontWeight: 500,
+                fontSize: 18,
+                letterSpacing: 0,
+                color: TEXT,
+              }}
+            >
+              Beacon
+            </span>
+          </span>
         </Link>
         <div
           style={{
@@ -142,7 +166,7 @@ export default function PerformanceLanding() {
             lineHeight: 1.1,
           }}
         >
-          A signal worth following
+          Every entity, every signal
         </h1>
         <p
           style={{
