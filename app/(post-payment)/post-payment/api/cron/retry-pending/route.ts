@@ -20,6 +20,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/post-payment/db/queries";
+// Phase E-7 — shared cron-auth helper. See reap-stuck/route.ts for the
+// rationale (consistent error codes + refuse-to-run when CRON_SECRET unset).
+import { requireCronAuth } from "@/lib/customer/cron-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,12 +40,11 @@ function getBaseUrl(req: NextRequest): string {
 }
 
 export async function GET(req: NextRequest) {
-  // Vercel cron sends a bearer token equal to CRON_SECRET (if set). Verify.
-  const authz = req.headers.get("authorization") ?? "";
-  const expected = process.env.CRON_SECRET;
-  if (expected && authz !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  // Phase E-7 — use shared requireCronAuth helper. Matches reap-stuck and
+  // refuses to run when CRON_SECRET is unset (vs. the old inline check which
+  // silently let unauthenticated calls through in that case).
+  const denied = requireCronAuth(req);
+  if (denied) return denied;
 
   let pending: { cb_customer_id: string; biz_name: string | null; created_at: string }[];
   try {

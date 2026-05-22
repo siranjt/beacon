@@ -31,6 +31,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/post-payment/db/queries";
+// Shared cron-auth helper (Phase E-7 standardization). Previously this
+// route inlined its own CRON_SECRET check, which produced different error
+// codes from customer-beacon crons when the secret was unset (401 vs 503).
+// Centralizing the check makes the auth shape identical across the
+// umbrella and refuses to run if CRON_SECRET is missing rather than
+// silently accepting unauthenticated traffic.
+import { requireCronAuth } from "@/lib/customer/cron-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,12 +46,8 @@ export const maxDuration = 30;
 const STUCK_THRESHOLD_MINUTES = Number(process.env.STUCK_THRESHOLD_MINUTES ?? 20);
 
 export async function GET(req: NextRequest) {
-  // Vercel cron sends `Authorization: Bearer ${CRON_SECRET}`. Verify.
-  const authz = req.headers.get("authorization") ?? "";
-  const expected = process.env.CRON_SECRET;
-  if (expected && authz !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const denied = requireCronAuth(req);
+  if (denied) return denied;
 
   // Find + flip stuck rows in a single statement; RETURNING gives us the list
   // for the response body + audit logging. We also stamp a failure_reason that
