@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72.0" height="192" viewBox="-6 -32 12 32" role="img" aria-label="Beacon">
+  <!-- Tower base — full 4-tier stepped lighthouse at 192px. -->
+  <rect x="-6" y="-4"  width="12" height="4" fill="#0b051d" />
+  <rect x="-5" y="-10" width="10" height="4" fill="#0b051d" />
+  <rect x="-4" y="-16" width="8"  height="4" fill="#0b051d" />
+  <rect x="-3" y="-22" width="6"  height="4" fill="#0b051d" />
+
+  <!-- Outer ember flame. SMIL animate flicker (Firefox/Safari render
+       the animation; Chrome shows the static frame). -->
+  <path d="M 0 -32 C 4 -28 5 -23 3 -21 L -3 -21 C -5 -23 -4 -28 0 -32 Z" fill="#dc2626">
+    <animate attributeName="opacity" values="1;0.85;1" dur="1.4s" repeatCount="indefinite" />
+  </path>
+
+  <!-- Inner gold flame, faster flicker for organic feel. -->
+  <path d="M 0 -27 C 2 -24 3 -21 2 -19 L -2 -19 C -3 -21 -2 -24 0 -27 Z" fill="#facc15">
+    <animate attributeName="opacity" values="1;0.7;1" dur="0.9s" repeatCount="indefinite" />
+  </path>
+</svg>
