@@ -25,9 +25,9 @@
 //       ts TIMESTAMPTZ NOT NULL DEFAULT NOW()
 //     );
 
-import { getSql } from "@/lib/customer/postgres";
 import type { UserRole } from "@/lib/customer/config";
 import { postRealtimeAmActivity } from "./slack-am-activity";
+import { logUmbrellaActivity } from "@/lib/activity/log";
 
 export type ActivityEvent =
   | "sign_in"
@@ -70,40 +70,23 @@ export interface LogActivityInput {
  * Fire-and-forget activity logger. Never throws.
  * Use `await` if you want to make sure it lands before the response, but it's
  * safe to ignore the promise — failures are logged to console only.
+ *
+ * Phase E-8: now delegates to lib/activity/log.ts and sets agent: 'customer'
+ * on every insert. The real-time Slack post for high-signal events still
+ * fires here because the slack-am-activity formatter is Customer Beacon-
+ * specific (depends on am_name + customer metadata).
  */
 export async function logActivity(input: LogActivityInput): Promise<void> {
-  try {
-    const {
-      email,
-      role,
-      am_name = null,
-      event_name,
-      surface = null,
-      entity_id = null,
-      metadata = null,
-    } = input;
-
-    const sql = getSql();
-    if (!sql) {
-      // POSTGRES_URL not configured — silently skip. Local dev without DB
-      // shouldn't bring the app down just because we can't log.
-      return;
-    }
-    await sql`
-      INSERT INTO am_activity_log (email, role, am_name, event_name, surface, entity_id, metadata)
-      VALUES (${email}, ${role}, ${am_name}, ${event_name}, ${surface}, ${entity_id}, ${metadata ? JSON.stringify(metadata) : null}::jsonb)
-    `;
-    // Phase Beacon — fire-and-forget real-time Slack post (high-signal events only)
-    postRealtimeAmActivity(input).catch(() => {});
-  } catch (err) {
-    // Never throw — logging failures should not affect the request.
-    console.warn(
-      "[logActivity] failed to write activity row:",
-      err instanceof Error ? err.message : String(err),
-      "event:",
-      input.event_name,
-      "email:",
-      input.email,
-    );
-  }
+  await logUmbrellaActivity({
+    email: input.email,
+    role: input.role,
+    am_name: input.am_name ?? null,
+    agent: "customer",
+    event_name: input.event_name,
+    surface: input.surface ?? null,
+    entity_id: input.entity_id ?? null,
+    metadata: input.metadata ?? null,
+  });
+  // Fire-and-forget real-time Slack post (high-signal events only).
+  postRealtimeAmActivity(input).catch(() => {});
 }

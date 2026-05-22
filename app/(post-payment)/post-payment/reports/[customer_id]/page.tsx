@@ -21,6 +21,7 @@ import BeaconPageShell from "@/components/BeaconPageShell";
 import { DocxPreviewButton } from "../../_components/DocxPreviewButton";
 import { ReanalyzeButton } from "../../_components/ReanalyzeButton";
 import ReportVisual from "../../_components/ReportVisual";
+import PageViewLogger from "@/components/PageViewLogger";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,11 @@ export default async function ReportPage({ params }: { params: { customer_id: st
 
   return (
     <BeaconPageShell>
+      <PageViewLogger
+        agent="post-payment"
+        surface="post_payment_report"
+        metadata={{ customer_id: params.customer_id }}
+      />
       <div className="space-y-6">
         <div className="anim-rise">
           <Link href="/post-payment" className="text-sm underline hover:opacity-70 transition">

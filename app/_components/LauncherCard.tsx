@@ -1,9 +1,13 @@
 "use client";
 
 import type { Agent } from "@/lib/config";
+import { useActivityLogger } from "@/components/hooks/use-activity-logger";
 
 export default function LauncherCard({ agent }: { agent: Agent }) {
   const isExternal = agent.kind === "external";
+  // Phase E-8 — log every launcher card click. Tagged as 'umbrella' since
+  // the click happens before the user enters an agent's route group.
+  const log = useActivityLogger("umbrella");
 
   return (
     <a
@@ -20,6 +24,10 @@ export default function LauncherCard({ agent }: { agent: Agent }) {
         overflow: "hidden",
       }}
       onClick={() => {
+        log("launcher_card_clicked", {
+          surface: "launcher",
+          metadata: { agent_id: agent.id, agent_name: agent.name, kind: agent.kind },
+        });
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("beacon:mark-flare"));
         }

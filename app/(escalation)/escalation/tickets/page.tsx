@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import TicketsBrowser from "../_components/TicketsBrowser";
 import BeaconPageShell from "@/components/BeaconPageShell";
 import EscalationHeader from "../_components/EscalationHeader";
+import PageViewLogger from "@/components/PageViewLogger";
 
 export const metadata = {
   title: "All tickets · Zoca",
@@ -19,6 +20,7 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
+        <PageViewLogger agent="escalation" surface="escalation_tickets" />
         <EscalationHeader current="tickets" />
         <div className="text-center mb-10">
           {/*

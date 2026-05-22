@@ -9,6 +9,8 @@ import ZocaLogo from "@/components/ZocaLogo";
 import { BeaconMark } from "@/components/BeaconMark";
 import BeaconPageShell from "@/components/BeaconPageShell";
 import AgentHeader from "@/components/AgentHeader";
+import PageViewLogger from "@/components/PageViewLogger";
+import { useActivityLogger } from "@/components/hooks/use-activity-logger";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -39,6 +41,9 @@ export default function PerformanceLanding() {
   const [entityId, setEntityId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Phase E-8 — umbrella activity logger. page_view fires via PageViewLogger
+  // below; click events use this hook.
+  const log = useActivityLogger("performance");
 
   // Auto-select the most recent on first render after hydration.
   useEffect(() => {
@@ -55,6 +60,10 @@ export default function PerformanceLanding() {
       return;
     }
     setError(null);
+    log("customer_searched", {
+      surface: "performance_landing",
+      entity_id: id,
+    });
     router.push(`/performance/report/${id}`);
   };
 
@@ -73,6 +82,7 @@ export default function PerformanceLanding() {
         gained the umbrella's user menu chrome.
       */}
       <AgentHeader agentName="Performance" />
+      <PageViewLogger agent="performance" surface="performance_landing" />
 
       {/* Hero */}
       <section style={{ padding: "44px 0 28px", textAlign: "center" }} className="pp-fade-in-up">
@@ -220,7 +230,13 @@ export default function PerformanceLanding() {
       <RecentReportsRow
         items={visible}
         selectedId={selected?.entityId ?? null}
-        onSelect={(id) => setSelectedId(id)}
+        onSelect={(id) => {
+          log("recent_report_clicked", {
+            surface: "performance_landing",
+            entity_id: id,
+          });
+          setSelectedId(id);
+        }}
       />
 
       {/* Preview header */}

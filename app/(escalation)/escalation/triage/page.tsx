@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import BeaconPageShell from "@/components/BeaconPageShell";
 import EscalationHeader from "../_components/EscalationHeader";
 import TriageClient from "../_components/TriageClient";
+import PageViewLogger from "@/components/PageViewLogger";
 
 export const metadata = {
   title: "Triage · Escalation Beacon · Zoca",
@@ -19,6 +20,7 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
+        <PageViewLogger agent="escalation" surface="escalation_triage" />
         <EscalationHeader current="triage" />
         <div className="text-center mb-10">
           {/* Unified Watchfire heraldic hero — see /tickets/page.tsx for rationale. */}

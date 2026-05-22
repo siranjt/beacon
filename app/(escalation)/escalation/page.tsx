@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import BeaconPageShell from "@/components/BeaconPageShell";
 import EscalationsBrowser from "./_components/EscalationsBrowser";
 import EscalationHeader from "./_components/EscalationHeader";
+import PageViewLogger from "@/components/PageViewLogger";
 
 export const metadata = {
   title: "Escalation Beacon · Zoca",
@@ -19,6 +20,7 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
+        <PageViewLogger agent="escalation" surface="escalation_home" />
         <EscalationHeader current="home" />
         <EscalationsBrowser />
     </BeaconPageShell>
