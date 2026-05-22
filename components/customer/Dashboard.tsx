@@ -20,7 +20,7 @@ import type { ScoredCustomer, Snapshot } from "@/lib/customer/types";
 import type { Tier } from "@/lib/customer/config";
 import { TIER_COLORS, TIER_ORDER, CHANNEL_COLORS } from "@/lib/customer/config";
 
-import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement, PointElement,
   ArcElement, Filler, Title, Tooltip, Legend,

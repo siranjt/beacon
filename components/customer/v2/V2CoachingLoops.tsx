@@ -4,7 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import type { CoachingRow, CoachingMetric } from "@/lib/customer/coaching";
 
-import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 type Mode = "manager" | "am";
 
 type Props = {

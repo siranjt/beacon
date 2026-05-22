@@ -12,7 +12,7 @@ import V2TicketsPanel from "./V2TicketsPanel";
 import V2HubspotPanel from "./V2HubspotPanel";
 import V2CommsThreadPanel from "./V2CommsThreadPanel";
 
-import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 type TrendPoint = { date: string; composite: number };
 
 type Props = {

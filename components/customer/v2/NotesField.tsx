@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 
 /**
  * Phase 18.B — private notes per (AM, customer).

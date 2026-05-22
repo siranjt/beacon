@@ -27,7 +27,7 @@ import { CursorGlow } from "./CursorGlow";
 import { BookHealthDonut } from "./charts/BookHealthDonut";
 import { SignalMixPie } from "./charts/SignalMixPie";
 import { RedTrendLine } from "./charts/RedTrendLine";
-import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 import {
   SIGNAL_LABELS,
   isSignalKey,

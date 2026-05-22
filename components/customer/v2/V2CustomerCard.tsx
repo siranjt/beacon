@@ -17,7 +17,7 @@ import {
 import type { SignalKey } from "@/lib/customer/signal-taxonomy";
 import { useMagnetic } from "@/lib/customer/hooks/useMagnetic";
 
-import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 import { normalizeHealthTier, HEALTH_TIER_COLORS, HEALTH_TIER_LABELS } from "@/lib/customer/config";
 type CompositeTrendPoint = { date: string; composite: number };
 
