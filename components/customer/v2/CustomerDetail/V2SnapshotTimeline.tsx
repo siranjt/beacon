@@ -14,7 +14,7 @@
 //   - inline: ~140px tall, no axis labels — drops into the customer-detail
 //             header, replacing the tiny sparkline
 //   - full:   ~480px tall, full axes, time-range pill toggle (7/30/90),
-//             icon legend — drives the standalone /customer/customer/[id]/timeline
+//             icon legend — drives the standalone /customer/[id]/timeline
 //             page
 // ---------------------------------------------------------------------------
 

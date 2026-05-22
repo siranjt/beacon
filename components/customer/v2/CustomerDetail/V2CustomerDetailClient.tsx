@@ -20,7 +20,7 @@ type Props = {
 };
 
 /**
- * Phase 28 — Top-level client component for /customer/customer/[entityId].
+ * Phase 28 — Top-level client component for /customer/[entityId].
  *
  * Fan-out on mount: three parallel fetches for the customer record, trend,
  * and action log. The comms thread is owned by V2CommsThreadPanel which

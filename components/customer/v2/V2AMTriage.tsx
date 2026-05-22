@@ -614,7 +614,7 @@ export default function V2AMTriage({ amName, pod, customers, generatedAt, pinned
 
   const openFocusedDetail = useCallback(() => {
     if (!focusedEntityId) return;
-    const url = `/customer/customer/${encodeURIComponent(focusedEntityId)}`;
+    const url = `/customer/${encodeURIComponent(focusedEntityId)}`;
     if (typeof window !== "undefined") window.location.assign(url);
   }, [focusedEntityId]);
 

@@ -498,7 +498,7 @@ function V2CustomerCardInner({
             </BiznameLink>
             {/* Phase 28 — Open detail page link */}
             <a
-              href={`/customer/customer/${encodeURIComponent(customer.entity_id)}`}
+              href={`/customer/${encodeURIComponent(customer.entity_id)}`}
               className="text-[10px] font-medium text-zoca-text-2 hover:text-zoca-pink-cta transition-colors"
               title="Open full detail page for this customer"
               onClick={(e) => {
@@ -588,7 +588,7 @@ function V2CustomerCardInner({
                 priority column. Deep-links into the detail page #tickets. */}
             {customer.tickets?.open_count !== undefined && customer.tickets.open_count > 0 && (
               <a
-                href={`/customer/customer/${encodeURIComponent(customer.entity_id)}#tickets`}
+                href={`/customer/${encodeURIComponent(customer.entity_id)}#tickets`}
                 onClick={(e) => e.stopPropagation()}
                 className={`rounded-zoca-pill inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium ${
                   (customer.tickets.open_stale_count ?? 0) > 0

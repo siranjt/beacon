@@ -192,7 +192,7 @@ function V2SnapshotTimelinePageClient({ entityId }: Props) {
         className="flex flex-wrap items-baseline gap-1 text-[12px] text-zoca-text-2"
       >
         <a
-          href={`/customer/customer/${encodeURIComponent(entityId)}`}
+          href={`/customer/${encodeURIComponent(entityId)}`}
           className="inline-flex items-center gap-1 rounded-zoca-pill px-2 py-0.5 hover:bg-zoca-bg-tint hover:text-zoca-text"
         >
           ← Back to detail

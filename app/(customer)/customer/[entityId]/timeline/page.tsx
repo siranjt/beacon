@@ -3,7 +3,7 @@ import V2SnapshotTimelinePageClient from "@/components/customer/v2/CustomerDetai
 /**
  * Phase 30 — Standalone snapshot-timeline page.
  *
- * Route: /customer/customer/[entityId]/timeline
+ * Route: /customer/[entityId]/timeline
  *
  * Server shell — does NO fetching itself. Hands off to the client component
  * which fetches the customer record + timeline payload and renders the

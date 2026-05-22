@@ -469,7 +469,7 @@ function V2DetailHeader({ customer, trend }: Props) {
             Composite over last 90 days
           </span>
           <a
-            href={`/customer/customer/${encodeURIComponent(customer.entity_id)}/timeline`}
+            href={`/customer/${encodeURIComponent(customer.entity_id)}/timeline`}
             className="text-[11px] font-medium text-zoca-pink-cta hover:underline"
             title="Open the full-page timeline view"
           >

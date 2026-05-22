@@ -54,7 +54,7 @@ export default function V2OneOnOneWins({ wins }: Props) {
               className="flex items-center justify-between gap-3 py-2 text-[12.5px]"
             >
               <a
-                href={`/customer/customer/${encodeURIComponent(w.entity_id)}`}
+                href={`/customer/${encodeURIComponent(w.entity_id)}`}
                 className="font-semibold text-zoca-text hover:text-zoca-blue"
                 style={{ textDecoration: "none" }}
               >
