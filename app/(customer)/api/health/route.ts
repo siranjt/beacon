@@ -52,11 +52,19 @@ async function probeChargebee(): Promise<ProbeResult> {
 
 async function probeMetabase(): Promise<ProbeResult> {
   const t0 = Date.now();
-  // Cheap probe: HEAD against a public CSV endpoint. If Metabase is up, the
-  // endpoint returns 200 even if the user isn't logged in.
+  // Probe Metabase's root URL. Previously hit a /public/question/<id>.csv
+  // endpoint with HEAD, which Metabase 302-redirects to its API CSV endpoint
+  // that only supports GET — so the followed HEAD returned 404 even when
+  // Metabase was healthy. False negatives every health check.
+  //
+  // Hitting the root with HEAD is cheaper (no redirect chain, no CSV body)
+  // and answers the more useful question: "is Metabase reachable?". The
+  // CSV endpoints are exercised at runtime by lib/customer/metabase.ts via
+  // GET (which works fine and is the right method for downloading data).
+  // Decoupling the probe from any specific card also means renaming or
+  // archiving a Metabase question doesn't break the health route.
   try {
-    const url =
-      "https://metabase.zoca.ai/public/question/87763e8c-8084-442e-891a-df1b11e81b47.csv";
+    const url = "https://metabase.zoca.ai/";
     const res = await fetch(url, {
       method: "HEAD",
       signal: AbortSignal.timeout(5_000),
