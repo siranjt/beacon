@@ -92,19 +92,31 @@ export default async function LauncherPage() {
             <LauncherCard key={agent.id} agent={agent} />
           ))}
         </div>
+      </div>
 
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: "3rem",
-            fontFamily: "-apple-system, Inter, system-ui, sans-serif",
-            fontSize: 11,
-            letterSpacing: "3px",
-            color: "var(--zoca-text-3)",
-          }}
-        >
-          B E A C O N &nbsp; &middot; &nbsp; B U I L T &nbsp; F O R &nbsp; Z O C A
-        </div>
+      {/*
+        Phase E-7 polish — "BEACON · BUILT FOR ZOCA" tagline pinned to the
+        bottom of the viewport so it reads as a footer instead of floating
+        between the cards and the BeaconAmbient lockup. Stays above the
+        ambient backdrop (zIndex 2) and ignores pointer events so it
+        doesn't intercept clicks meant for the lockup.
+      */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "1.5rem",
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          fontFamily: "-apple-system, Inter, system-ui, sans-serif",
+          fontSize: 11,
+          letterSpacing: "3px",
+          color: "var(--zoca-text-3)",
+          pointerEvents: "none",
+          zIndex: 2,
+        }}
+      >
+        B E A C O N &nbsp; &middot; &nbsp; B U I L T &nbsp; F O R &nbsp; Z O C A
       </div>
     </main>
   );
