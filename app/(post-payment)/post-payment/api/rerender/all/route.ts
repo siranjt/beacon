@@ -10,21 +10,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { sql } from "@/lib/post-payment/db/queries";
+// Phase E-7 — dual auth (NextAuth session OR CRON_SECRET bearer). See
+// lib/post-payment/admin-auth.ts. Lets ops scripts bulk-rerender via curl.
+import { requireAdminAuth } from "@/lib/post-payment/admin-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-async function requireAuth(): Promise<NextResponse | null> {
-  const session = await getServerSession(authOptions);
-  return session ? null : NextResponse.json({ error: "unauthorized" }, { status: 401 });
-}
-
 export async function POST(req: NextRequest) {
-  const authFail = await requireAuth();
+  const authFail = await requireAdminAuth(req);
   if (authFail) return authFail;
   const url = new URL(req.url);
   const dryRun = url.searchParams.get("dry_run") === "true";

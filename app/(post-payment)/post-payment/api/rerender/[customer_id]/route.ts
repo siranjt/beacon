@@ -13,24 +13,21 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { fetchJson } from "@/lib/post-payment/stage-store";
 import { renderAndUpload } from "@/lib/post-payment/render/render";
 import { postCustomerReport } from "@/lib/post-payment/slack";
 import { setCustomerReport, getCustomer, logEvent } from "@/lib/post-payment/db/queries";
+// Phase E-7 — dual auth (NextAuth session OR CRON_SECRET bearer). See
+// lib/post-payment/admin-auth.ts for the rationale. Lets ops scripts re-
+// render docx via curl without a browser session.
+import { requireAdminAuth } from "@/lib/post-payment/admin-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-async function requireAuth(): Promise<NextResponse | null> {
-  const session = await getServerSession(authOptions);
-  return session ? null : NextResponse.json({ error: "unauthorized" }, { status: 401 });
-}
-
 export async function POST(req: NextRequest, ctx: { params: { customer_id: string } }) {
-  const authFail = await requireAuth();
+  const authFail = await requireAdminAuth(req);
   if (authFail) return authFail;
   const customerId = ctx.params.customer_id;
   if (!customerId) {
