@@ -147,9 +147,29 @@ export default function V2MondayBriefing() {
 
       <main className="mx-auto max-w-[920px] px-4 pb-24 pt-6 md:px-6">
         <header className="mb-5">
-          <h1 className="font-display text-2xl font-bold text-zoca-text-primary">
-            Your Monday brief
-          </h1>
+          {/*
+            Heraldic-register hero — matches the AM book + Manager dashboard
+            visual standard (Customer Beacon's "gold standard" per Phase E-7
+            audit). Brand gradient + Georgia serif + sparkle bookends, sized
+            slightly smaller than the dashboard hero since Monday brief is a
+            condensed digest surface, not a top-level landing.
+          */}
+          <div className="relative inline-flex items-center gap-3">
+            <span aria-hidden style={{ fontSize: 20, color: "#2A4D5C", opacity: 0.6 }}>✦</span>
+            <h1
+              className="brand-gradient-text m-0"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", "Times", serif',
+                fontSize: "clamp(28px, 3.5vw, 40px)",
+                fontWeight: 500,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.05,
+              }}
+            >
+              Your Monday brief
+            </h1>
+            <span aria-hidden style={{ fontSize: 20, color: "#D9A441", opacity: 0.7 }}>✦</span>
+          </div>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zoca-text-muted">
             <span>{selectedAm}</span>
             <span className="inline-flex items-center gap-1 text-[11px] text-zoca-text-soft">
