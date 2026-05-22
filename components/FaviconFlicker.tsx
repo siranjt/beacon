@@ -1,22 +1,39 @@
 "use client";
 
 /**
- * FaviconFlicker — makes the browser-tab flame actually flicker in Chrome.
+ * FaviconFlicker — makes the browser-tab flame flicker in Chrome.
  *
  * Background: SVG favicons with embedded SMIL `<animate>` render animated
- * in Firefox and Safari, but Chrome explicitly ignores favicon animation
- * (security + perf). To get a flickering tab icon in Chrome, we cycle the
- * `<link rel="icon">` href between four pre-baked data-URL SVG frames at
- * ~140ms cadence. Each frame is the same lighthouse-tower-plus-flame mark
- * with slightly different opacity values on the outer ember + inner gold
- * flame, giving an organic candle-flicker feel.
+ * in Firefox and Safari, but Chrome explicitly ignores favicon animation.
+ * To get a flickering tab icon in Chrome, we cycle a `<link rel="icon">`
+ * href between four pre-baked data-URL SVG frames at ~140ms cadence. Each
+ * frame is the same lighthouse-tower-plus-flame mark with different
+ * opacity values on the outer ember + inner gold flame, giving an organic
+ * candle-flicker feel.
  *
- * Mounted once at the root layout. Pauses while the tab isn't visible
- * (page Visibility API) so we don't waste CPU on background tabs.
+ * IMPORTANT — DOM ownership:
+ *   We APPEND our own <link rel="icon"> node and only mutate THAT one.
+ *   We do NOT touch the favicon links Next.js's metadata system injected
+ *   (favicon-16/32/48/192.svg). Mutating or removing React-managed DOM
+ *   triggered "Cannot read properties of null (reading 'removeChild')"
+ *   when Next.js's reconciler ran during route transitions — the earlier
+ *   version of this component caused that crash. By owning a separate
+ *   link element flagged with data-favicon-flicker, we leave Next.js's
+ *   icons alone and the reconciler can't get confused.
  *
- * Falls back gracefully: if the browser doesn't support `<link rel=icon>`
- * mutation (very old engines), the static favicon-32.svg metadata icon
- * stays in place.
+ *   Browser favicon selection: our link has `sizes="any"` + type="image/
+ *   svg+xml". Per HTML spec, "any" means scalable — modern browsers
+ *   (Chrome, Firefox, Safari) prefer it when rendering favicons at any
+ *   target size. The static sized links from Next.js remain as a fallback
+ *   for legacy / non-data-URL contexts (Apple Touch, manifest, etc.).
+ *
+ * Lifecycle:
+ *   - Mounted once at root layout
+ *   - Idempotent: if a previous flicker link is still in the head (e.g.
+ *     React fast-refresh in dev), we reuse it instead of stacking duplicates
+ *   - Pauses ticking while the tab is hidden (Visibility API) so background
+ *     tabs don't burn CPU
+ *   - On unmount, removes only its own link
  */
 
 import { useEffect } from "react";
@@ -37,8 +54,6 @@ const FRAMES = [
 ];
 
 function buildFrame(outerOpacity: number, innerOpacity: number): string {
-  // Inline SVG. Same viewBox as favicon-192.svg so it rasterizes cleanly
-  // at any size the browser asks for (16/32/48/192).
   const svg = [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -32 12 32" role="img" aria-label="Beacon">',
     '<rect x="-6" y="-4" width="12" height="4" fill="#0b051d"/>',
@@ -56,44 +71,64 @@ function buildFrame(outerOpacity: number, innerOpacity: number): string {
 const FRAME_URLS = FRAMES.map((f) => buildFrame(f.outer, f.inner));
 
 const TICK_MS = 140;
+const MARKER_ATTR = "data-favicon-flicker";
 
 export default function FaviconFlicker() {
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    // Locate (or create) the favicon link. Next.js metadata.icons typically
-    // emits multiple <link rel="icon"> tags; we drive the largest one and
-    // remove the rest so the browser doesn't oscillate between sources.
-    const head = document.head;
-    const existing = Array.from(
-      head.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'),
-    );
-    let link: HTMLLinkElement;
-    if (existing.length > 0) {
-      link = existing[0];
-      // Drop sibling icons so the browser binds to ours.
-      existing.slice(1).forEach((el) => el.remove());
-    } else {
-      link = document.createElement("link");
-      link.rel = "icon";
-      link.type = "image/svg+xml";
-      head.appendChild(link);
-    }
-    link.type = "image/svg+xml";
-
-    let frame = 0;
+    let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
+    let link: HTMLLinkElement | null = null;
+
+    try {
+      // Reuse any prior flicker link (dev fast-refresh, double-mount in
+      // React Strict Mode); otherwise create our own. Never reuse / remove
+      // Next.js's metadata-managed icon links — those belong to React.
+      const existing = document.querySelector<HTMLLinkElement>(
+        `link[${MARKER_ATTR}]`,
+      );
+      if (existing) {
+        link = existing;
+      } else {
+        const el = document.createElement("link");
+        el.rel = "icon";
+        el.type = "image/svg+xml";
+        el.setAttribute("sizes", "any");
+        el.setAttribute(MARKER_ATTR, "true");
+        document.head.appendChild(el);
+        link = el;
+      }
+    } catch {
+      // If the DOM rejects (extremely rare), bail silently. Static SVG
+      // favicons from Next.js metadata still render fine.
+      return;
+    }
 
     const tick = () => {
-      frame = (frame + 1) % FRAME_URLS.length;
-      link.href = FRAME_URLS[frame];
+      if (cancelled || !link) return;
+      try {
+        // Cycle by reading current href + finding next frame. Cheap closure
+        // over `frame` would also work; this is just stateless on `link`.
+        const next = (frameIndex.current + 1) % FRAME_URLS.length;
+        frameIndex.current = next;
+        link.href = FRAME_URLS[next];
+      } catch {
+        /* swallow — never crash the page if favicon mutation throws */
+      }
     };
+
+    // Use a ref-like object so the closure over `tick` reads the latest
+    // value without React re-renders.
+    const frameIndex = { current: 0 };
 
     const start = () => {
       if (timer !== null) return;
-      // Set frame 0 immediately so the icon swaps from the static file to
-      // our animated stream on mount.
-      link.href = FRAME_URLS[0];
+      try {
+        if (link) link.href = FRAME_URLS[0];
+      } catch {
+        /* ignore */
+      }
       timer = setInterval(tick, TICK_MS);
     };
 
@@ -112,8 +147,20 @@ export default function FaviconFlicker() {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
+      cancelled = true;
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
+      // Remove ONLY our own link on unmount. Use a defensive check —
+      // never call removeChild on a node that's not in the head, otherwise
+      // we re-introduce the crash this whole component was rewritten to
+      // avoid.
+      try {
+        if (link && link.parentNode === document.head) {
+          document.head.removeChild(link);
+        }
+      } catch {
+        /* ignore */
+      }
     };
   }, []);
 
