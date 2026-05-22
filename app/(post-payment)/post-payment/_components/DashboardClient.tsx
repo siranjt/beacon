@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ManualAnalysisButton } from "./ManualAnalysisButton";
 import AmbientSparkles from "./AmbientSparkles";
-import ZocaLogo from "@/components/ZocaLogo";
-import { BeaconMark } from "@/components/BeaconMark";
+import AgentHeader from "@/components/AgentHeader";
 
 // Lockup typography + colors — match Performance / Escalation exactly so the
 // brand bar is visually identical across all three beacons.
@@ -522,82 +521,14 @@ export default function DashboardClient({ customers }: { customers: Customer[] }
       <AmbientSparkles />
 
       {/*
-        Top brand bar — ZOCA wordmark | divider | animated flame + Beacon.
-        Mirrors the lockup used on Performance and Escalation so all three
-        beacons share an identical top edge. Lives inside DashboardClient
-        because we want the visual signature on the landing page; the single
-        report page has its own "← All reports" back link.
+        Phase E-7 visual unification — Customer Beacon's v1 register is now
+        the umbrella standard. AgentHeader (lifted from V2Header) replaces
+        the inline ZOCA + flame + status block. Gained V2UserMenu (admin
+        pill avatar + sign-out) on the right; lost the all-caps "POST-PAYMENT
+        BEACON · LIVE" string in favor of the cleaner "Live" + relative
+        timestamp pattern from Customer Beacon.
       */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "16px 0",
-          marginBottom: 8,
-          borderBottom: `1px solid ${LOCKUP_BORDER}`,
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            textDecoration: "none",
-            color: "inherit",
-          }}
-        >
-          <ZocaLogo height={22} />
-          <span
-            style={{
-              width: 1,
-              height: 22,
-              background: LOCKUP_BORDER,
-              display: "inline-block",
-            }}
-            aria-hidden
-          />
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <BeaconMark size={26} flicker />
-            <span
-              style={{
-                fontFamily: LOCKUP_SERIF,
-                fontWeight: 500,
-                fontSize: 18,
-                letterSpacing: 0,
-                color: LOCKUP_TEXT,
-              }}
-            >
-              Beacon
-            </span>
-          </span>
-        </Link>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontFamily: LOCKUP_SANS,
-            fontSize: 11,
-            letterSpacing: "0.12em",
-            color: LOCKUP_MUTED,
-            textTransform: "uppercase",
-          }}
-        >
-          <span
-            className="pp-pulse-dot"
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 999,
-              background: LOCKUP_BRASS,
-            }}
-            aria-hidden
-          />
-          Post-Payment Beacon · Live
-        </div>
-      </header>
+      <AgentHeader agentName="Post-Payment" />
 
       {/* HERO */}
       <section className="anim-rise pt-8 sm:pt-12 relative flex flex-col items-center text-center">

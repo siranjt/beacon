@@ -8,6 +8,7 @@ import ClientPreview from "./ClientPreview";
 import ZocaLogo from "@/components/ZocaLogo";
 import { BeaconMark } from "@/components/BeaconMark";
 import BeaconPageShell from "@/components/BeaconPageShell";
+import AgentHeader from "@/components/AgentHeader";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -63,77 +64,15 @@ export default function PerformanceLanding() {
   return (
     <BeaconPageShell>
       <>
-      {/* Top bar — ZOCA wordmark | divider | animated flame + Beacon */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "16px 0",
-          marginBottom: 8,
-          borderBottom: `1px solid ${BORDER}`,
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            textDecoration: "none",
-            color: "inherit",
-          }}
-        >
-          <ZocaLogo height={22} />
-          <span
-            style={{
-              width: 1,
-              height: 22,
-              background: BORDER,
-              display: "inline-block",
-            }}
-            aria-hidden
-          />
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <BeaconMark size={26} flicker />
-            <span
-              style={{
-                fontFamily: SERIF,
-                fontWeight: 500,
-                fontSize: 18,
-                letterSpacing: 0,
-                color: TEXT,
-              }}
-            >
-              Beacon
-            </span>
-          </span>
-        </Link>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontFamily: SANS,
-            fontSize: 11,
-            letterSpacing: "0.12em",
-            color: MUTED,
-            textTransform: "uppercase",
-          }}
-        >
-          <span
-            className="pp-pulse-dot"
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 999,
-              background: BRASS,
-            }}
-            aria-hidden
-          />
-          Performance Beacon · Live
-        </div>
-      </header>
+      {/*
+        Top bar replaced with the umbrella standard AgentHeader (Phase E-7
+        visual unification — Customer Beacon's v1 register is the standard).
+        Same sticky Parchment bar across all 4 agents + admin pill avatar +
+        V2UserMenu sign-out. The previous Performance-specific header lived
+        here inline; lift kept the agent-name suffix and live indicator,
+        gained the umbrella's user menu chrome.
+      */}
+      <AgentHeader agentName="Performance" />
 
       {/* Hero */}
       <section style={{ padding: "44px 0 28px", textAlign: "center" }} className="pp-fade-in-up">

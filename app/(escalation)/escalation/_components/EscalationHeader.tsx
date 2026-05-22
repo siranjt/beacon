@@ -1,6 +1,12 @@
 import Link from "next/link";
 import ZocaLogo from "@/components/ZocaLogo";
 import { BeaconMark } from "@/components/BeaconMark";
+// V2UserMenu lifted into Escalation's existing header as part of the Phase
+// E-7 umbrella-standard visual unification. EscalationHeader keeps its own
+// sub-nav (Customer 360 / Queue / Triage / All tickets) because those are
+// agent-specific — but the right-side chrome now matches Customer Beacon
+// (live indicator + admin pill avatar dropdown with sign-out).
+import { V2UserMenu } from "@/components/customer/v2/V2UserMenu";
 import HealthBadge from "./HealthBadge";
 
 /**
@@ -41,6 +47,8 @@ export default function EscalationHeader({
         <NavLink href="/escalation/triage" label="Triage" active={current === "triage"} />
         <NavLink href="/escalation/tickets" label="All tickets" active={current === "tickets"} />
         <HealthBadge />
+        {/* Umbrella standard — admin pill avatar + sign-out menu. */}
+        <V2UserMenu />
       </div>
     </header>
   );
