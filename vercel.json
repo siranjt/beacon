@@ -10,6 +10,112 @@
     {
       "path": "/post-payment/api/cron/reap-stuck",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh/stage-a",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh/stage-b",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/refresh/stage-c",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/refresh/stage-d",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/refresh/compose",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/prune",
+      "schedule": "30 0 * * *"
+    },
+    {
+      "path": "/api/cron/outcome-backfill",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/health-alert",
+      "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/digest",
+      "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-hubspot-locations",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-health-card",
+      "schedule": "10 22 * * *"
+    },
+    {
+      "path": "/api/cron/slack-activity-digest",
+      "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/(customer)/api/cron/refresh/stage-a/route.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/refresh/stage-b/route.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/refresh/stage-c/route.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/refresh/stage-d/route.ts": {
+      "memory": 2048,
+      "maxDuration": 300
+    },
+    "app/(customer)/api/cron/refresh/compose/route.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/refresh/route.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/outcome-backfill/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/health-alert/route.ts": {
+      "memory": 512,
+      "maxDuration": 30
+    },
+    "app/(customer)/api/cron/digest/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/sync-hubspot-locations/route.ts": {
+      "memory": 512,
+      "maxDuration": 60
+    },
+    "app/(customer)/api/cron/sync-health-card/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
+    },
+    "app/(customer)/api/v2/snapshot/route.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "app/(customer)/api/v2/am/[amName]/monday-brief/route.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "app/(customer)/api/v2/actions/escalate/route.ts": {
+      "memory": 512,
+      "maxDuration": 15
+    }
+  }
 }

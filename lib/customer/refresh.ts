@@ -1,0 +1,1419 @@
+import { fetchAllLiveSubsWithEntityMap } from "./chargebee";
+import { fetchPlaceIdsForEntities } from "./metabase-place-id";
+import { fetchUnpaidInvoices, fetchRecentTransactions, buildBillingMetrics, scoreBilling } from "./billing";
+import { fetchBaseSheet, fetchAllCommsSequential, groupCommsByEntity } from "./metabase";
+import { fetchUsageMetrics, scoreUsage } from "./mixpanel";
+import { fetchPerformanceMetrics } from "./performance";
+import { computeMetrics, scoreCustomer, computeTicketsFlag, composeHybridSignals } from "./scoring";
+import { writeSnapshotV2, readSnapshotByDate, writeCustomerTrendRows } from "./postgres";
+import { enrichRedNarratives } from "./narrative-enrich";
+import {
+  fetchActiveHubspotCompanies,
+  type HubspotCompanyRow,
+} from "./hubspot-companies";
+import { fetchDealsForCompanies, type DealsForCompany } from "./hubspot-deals";
+import { fetchCallsForCompanies, type CallsForCompany } from "./hubspot-calls";
+import { fetchContactsForCompanies, type CompanyContact } from "./hubspot-contacts";
+import { fetchEnrichedNotesPerCompany, type LastCallSummary } from "./hubspot-notes";
+import { readNoteEnrichments, writeNoteEnrichments, type CachedNoteEnrichment } from "./postgres";
+import { readPipelineStage } from "./pipeline-state";
+import {
+  writePipelineStage,
+  readAllPipelineStages,
+  todaySnapshotDate,
+} from "./pipeline-state";
+import {
+  TIER_ORDER,
+  EXCLUDED_ENTITIES,
+  POD_MAP,
+  TICKETS_MAX_RECORDS_PER_CUSTOMER,
+  pgConfigured,
+} from "./config";
+// Phase 31.v2 — single Metabase CSV per nightly refresh (replaces v1 HubSpot
+// Service Hub + Linear GraphQL adapters).
+import { fetchTicketsFromMetabase } from "./tickets-from-metabase";
+import type { UnifiedTicket } from "./tickets-unified";
+import type {
+  ScoredCustomer,
+  ScoredCustomerV2,
+  Snapshot,
+  SnapshotV2,
+  CommsEvent,
+  BaseSheetRow,
+  AmTierRow,
+  PodTierRow,
+  DataHealth,
+  ChargebeeSub,
+  ChargebeeInvoice,
+  ChargebeeTransaction,
+  CustomerMetrics,
+  UsageMetrics,
+  PerformanceMetrics,
+  BillingMetrics,
+  TicketsMetrics,
+} from "./types";
+import type { Tier, Stoplight } from "./config";
+
+import { getHealthCardMap } from "@/lib/customer/health-card";
+const todayMs = () => Date.now();
+
+// ---------------------------------------------------------------------------
+// Stage data shapes — what gets serialized to Postgres pipeline_state.data
+// ---------------------------------------------------------------------------
+
+export type StageAData = {
+  todayMs: number;
+  todayIso: string;
+  activeEntityIds: string[];
+  customerToEntities: Record<string, string[]>;
+  entityMeta: Record<string, {
+    customer_id: string;
+    subscription_id: string;
+    sub_status: string;
+    plan_amount_cents: number;
+    auto_collection: string | null;
+    company_from_chargebee: string;
+    // Phase 33.scope-fix7 — entity-specific name from Chargebee sub.cf_entity_name.
+    entity_name_from_chargebee: string;
+    email: string;
+    phone: string;
+    activated_at: string | null;
+    place_id: string | null;
+  }>;
+  baseSheetByEntityId: Record<string, BaseSheetRow>;
+  /** Phase 33.scope — Chargebee subs cancelled within last 30d, keyed by customer_id. */
+  recentlyChurnedByCustomer?: Record<string, { subscription_id: string; cancelled_at: string | null; activated_at: string | null; }>;
+  billingMetrics: Record<string, BillingMetrics>;
+  stats: {
+    totalSubs: number;
+    totalInvoices: number;
+    totalTransactions: number;
+    baseSheetRowCount: number;
+    excludedCount: number;
+    multiEntityExpansion: number;
+    placeIdsResolved: number;
+  };
+};
+
+export type StageBData = {
+  commsMetricsByEntity: Record<string, CustomerMetrics>;
+  /**
+   * Phase 14B: per-entity, per-channel event count for the last 30 days.
+   * Used by compose to derive HubSpot vs. Metabase calls drift on phone.
+   * Shape: entityId -> { chat, email, phone, video, sms }.
+   */
+  channelCounts30dByEntity: Record<string, Record<string, number>>;
+  commsStats: {
+    rawRows: Record<string, number>;
+    eventsKept: Record<string, number>;
+    eventsDeduped: Record<string, number>;
+    totalDuplicatesRemoved: number;
+  };
+  perSourceEventCount: Record<string, number>;
+  perDirectionCount: { in: number; out: number };
+  channelCounts: { d30: Record<string, number>; d90: Record<string, number> };
+};
+
+export type StageCData = {
+  usageMetricsByEntity: Record<string, UsageMetrics>;
+  performanceMetricsByEntity: Record<string, PerformanceMetrics>;
+  diagnostics: {
+    mixpanelRowCount: number;
+    performanceRowCounts: {
+      gbpClicksMonthly: number;
+      rankings: number;
+      reviews12w: number;
+      locationInsights: number;
+      bookingEnquiries: number;
+    };
+  };
+};
+
+export type HubspotCompanyByPlaceId = {
+  place_id: string;
+  hubspot_company_id: string;
+  name: string;
+  icp_tier: "Tier 1" | "Tier 2" | "Tier 3" | null;
+  lifecycle_stage: string;
+  business_category: string | null;
+};
+
+export type StageDData = {
+  companiesByPlaceId: Record<string, HubspotCompanyByPlaceId>;
+  dealsByHubspotCompanyId: Record<string, DealsForCompany>;
+  notesByHubspotCompanyId: Record<string, LastCallSummary>;
+  /** Phase 14B (Tier C) — 30d call counts per HubSpot company */
+  callsByHubspotCompanyId?: Record<string, CallsForCompany>;
+  /** Phase 14C (Tier E) — top contacts per HubSpot company */
+  contactsByHubspotCompanyId?: Record<string, CompanyContact[]>;
+  diagnostics: {
+    totalCompanies: number;
+    companiesWithDeals: number;
+    companiesWithRecentNotes: number;
+    companiesWithCalls: number;
+    companiesWithContacts: number;
+    notesEnrichedNew: number;
+    notesEnrichedCached: number;
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Memory checkpoint helper
+// ---------------------------------------------------------------------------
+
+function memSnap(label: string): void {
+  const m = process.memoryUsage();
+  const mb = (n: number) => Math.round(n / 1024 / 1024);
+  console.log(
+    `[mem ${label}] rss=${mb(m.rss)}MB heapUsed=${mb(m.heapUsed)}MB heapTotal=${mb(m.heapTotal)}MB external=${mb(m.external)}MB`,
+  );
+}
+
+/**
+ * Phase 14.2 — per-fetcher timing wrapper for Stage D.
+ * Logs `[stageD] <label> OK in Xms` on success and `FAILED in Xms` on error,
+ * then re-throws so existing .catch() handlers (which translate errors into
+ * empty Maps + push to errors[]) still run. This gives us per-call visibility
+ * inside the Promise that previously failed silently inside the catch block.
+ */
+async function timed<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = Date.now();
+  try {
+    const result = await fn();
+    console.log(`[stageD] ${label} OK in ${Date.now() - t0}ms`);
+    return result;
+  } catch (e) {
+    console.warn(
+      `[stageD] ${label} FAILED in ${Date.now() - t0}ms:`,
+      e instanceof Error ? e.message : String(e),
+    );
+    throw e;
+  }
+}
+
+// ===========================================================================
+// STAGE A — Chargebee subs/invoices/transactions + BaseSheet + billing
+// ===========================================================================
+
+export async function runStageA(today: number = todayMs()): Promise<{
+  data: StageAData;
+  durationMs: number;
+  errors: string[];
+}> {
+  const started = Date.now();
+  const errors: string[] = [];
+  memSnap("A start");
+
+  // Stage A fetches in parallel — these are all small payloads.
+  const [cbResult, invoicesResult, transactionsResult, baseSheetResult] = await Promise.all([
+    fetchAllLiveSubsWithEntityMap().catch((e: Error) => {
+      errors.push(`Chargebee subs: ${e.message}`);
+      // Phase 33.scope-fix7-hotfix — keep the success and failure return shapes identical
+      // so the destructure below doesn't hit a TS union-type error.
+      return { subs: [] as ChargebeeSub[], customerToEntities: new Map<string, string[]>(), entityNameById: new Map<string, string>() };
+    }),
+    fetchUnpaidInvoices().catch((e: Error) => {
+      errors.push(`Chargebee invoices: ${e.message}`);
+      return [] as ChargebeeInvoice[];
+    }),
+    fetchRecentTransactions().catch((e: Error) => {
+      errors.push(`Chargebee transactions: ${e.message}`);
+      return [] as ChargebeeTransaction[];
+    }),
+    fetchBaseSheet().catch((e: Error) => {
+      errors.push(`BaseSheet: ${e.message}`);
+      return {
+        rows: [] as BaseSheetRow[],
+        byCustomerId: {} as Record<string, BaseSheetRow>,
+        byCustomerIdMulti: {} as Record<string, BaseSheetRow[]>,
+        byEntityId: {} as Record<string, BaseSheetRow>,
+        byBizName: {} as Record<string, BaseSheetRow>,
+      };
+    }),
+  ]);
+  memSnap("A after fetch");
+
+  // Phase 33.scope-fix7 — also pick up the per-entity name map.
+  const { subs, customerToEntities, entityNameById } = cbResult;
+  const customerToEntitiesObj: Record<string, string[]> = {};
+  for (const [k, v] of customerToEntities) customerToEntitiesObj[k] = v;
+
+  // Build active-entity universe — Chargebee cf_entity_id, minus exclude list
+  const activeEntityIds = new Set<string>();
+  let excludedCount = 0;
+  for (const [, entIds] of customerToEntities) {
+    for (const eid of entIds) {
+      if (EXCLUDED_ENTITIES[eid]) excludedCount++;
+      else activeEntityIds.add(eid);
+    }
+  }
+
+  // Multi-entity expansion count (informational)
+  let multiEntityExpansion = 0;
+  for (const [, entIds] of customerToEntities) {
+    if (entIds.length > 1) multiEntityExpansion += entIds.length - 1;
+  }
+
+  // Per-entity metadata (joining Chargebee sub fields)
+  const entityMeta: StageAData["entityMeta"] = {};
+  const entityToCustomer = new Map<string, string>();
+  for (const [cid, entIds] of customerToEntities) {
+    for (const eid of entIds) entityToCustomer.set(eid, cid);
+  }
+  const subsByCustomer = new Map<string, ChargebeeSub>();
+  for (const s of subs) {
+    if (!s.customer_id) continue;
+    // Phase 33.scope-fix2 — prefer live subs over cancelled, and prefer
+    // "active" over other live statuses (non_renewing, in_trial, future).
+    const existing = subsByCustomer.get(s.customer_id);
+    if (!existing) {
+      subsByCustomer.set(s.customer_id, s);
+    } else if (existing.status === "cancelled" && s.status !== "cancelled") {
+      subsByCustomer.set(s.customer_id, s);
+    } else if (s.status === "active" && existing.status !== "active") {
+      subsByCustomer.set(s.customer_id, s);
+    }
+  }
+  // Resolve entity_id -> place_id via Aurora (Phase 14A). When METABASE_API_KEY
+  // is unset (dev/CI), this returns an empty Map and every entityMeta entry
+  // gets place_id: null — the HubSpot join falls back to bizname cleanly.
+  const placeIdByEntity = await fetchPlaceIdsForEntities(Array.from(activeEntityIds)).catch(
+    (e: Error) => {
+      errors.push(`Metabase place_id: ${e.message}`);
+      return new Map<string, string>();
+    },
+  );
+
+  for (const eid of activeEntityIds) {
+    const cid = entityToCustomer.get(eid) || "";
+    const sub = subsByCustomer.get(cid);
+    entityMeta[eid] = {
+      customer_id: cid,
+      subscription_id: sub?.subscription_id || "",
+      sub_status: sub?.status || "",
+      plan_amount_cents: sub?.plan_amount || 0,
+      auto_collection: sub?.auto_collection || null,
+      company_from_chargebee: sub?.company || "",
+      // Phase 33.scope-fix7 — fall back to entity-specific Chargebee name for the UI/Slack bizname.
+      entity_name_from_chargebee: entityNameById.get(eid) || "",
+      email: sub?.email || "",
+      phone: sub?.phone || "",
+      activated_at: sub?.activated_at ? new Date(sub.activated_at).toISOString() : null,
+      place_id: placeIdByEntity.get(eid) || null,
+    };
+  }
+
+  // Billing metrics keyed by entity_id
+  const billingMap = buildBillingMetrics(invoicesResult, transactionsResult, subs, customerToEntities);
+  const billingMetrics: Record<string, BillingMetrics> = {};
+  for (const [eid, m] of billingMap) billingMetrics[eid] = m;
+
+  // BaseSheet by entity_id (only active entities — drop rest)
+  const baseSheetByEntityId: Record<string, BaseSheetRow> = {};
+  for (const eid of activeEntityIds) {
+    const row = baseSheetResult.byEntityId[eid];
+    if (row) baseSheetByEntityId[eid] = row;
+  }
+
+  memSnap("A end");
+  // Phase 33.scope — separate the cancelled-<30d bag from the live universe.
+  const recentlyChurnedByCustomer: Record<string, { subscription_id: string; cancelled_at: string | null; activated_at: string | null }> = {};
+  const liveCustomerIds = new Set<string>();
+  for (const s of subs) {
+    if (!(s as any).recently_cancelled && s.customer_id) liveCustomerIds.add(s.customer_id);
+  }
+  for (const s of subs) {
+    if (!(s as any).recently_cancelled) continue;
+    if (!s.customer_id) continue;
+    // Phase 33.scope-fix5 — DO NOT skip resurrected here. We need their
+    // cancelled_at to flow into recentlyChurnedByCustomer so the lifecycle
+    // derivation can tag them as "resurrected" (was "active" until now).
+    const existing = recentlyChurnedByCustomer[s.customer_id];
+    const cancelledMs = (s as any).cancelled_at as number | null | undefined;
+    if (!existing || (cancelledMs && (!existing.cancelled_at || Date.parse(existing.cancelled_at) < cancelledMs))) {
+      recentlyChurnedByCustomer[s.customer_id] = {
+        subscription_id: s.subscription_id || "",
+        cancelled_at: cancelledMs ? new Date(cancelledMs).toISOString() : null,
+        activated_at: s.activated_at ? new Date(s.activated_at).toISOString() : null,
+      };
+    }
+  }
+
+  const data: StageAData = {
+    todayMs: today,
+    todayIso: new Date(today).toISOString(),
+    activeEntityIds: Array.from(activeEntityIds).sort(),
+    customerToEntities: customerToEntitiesObj,
+    entityMeta,
+    baseSheetByEntityId,
+    recentlyChurnedByCustomer,
+    billingMetrics,
+    stats: {
+      totalSubs: subs.length,
+      totalInvoices: invoicesResult.length,
+      totalTransactions: transactionsResult.length,
+      baseSheetRowCount: baseSheetResult.rows.length,
+      excludedCount,
+      multiEntityExpansion,
+      placeIdsResolved: placeIdByEntity.size,
+    },
+  };
+  return { data, durationMs: Date.now() - started, errors };
+}
+
+// ===========================================================================
+// STAGE B — Comms (5 CSVs) → per-entity comms metrics
+// ===========================================================================
+
+export async function runStageB(today: number = todayMs()): Promise<{
+  data: StageBData;
+  durationMs: number;
+  errors: string[];
+}> {
+  const started = Date.now();
+  const errors: string[] = [];
+  memSnap("B start");
+
+  const commsResult = await fetchAllCommsSequential(today).catch((e: Error) => {
+    errors.push(`Comms: ${e.message}`);
+    return {
+      events: [] as CommsEvent[],
+      stats: {
+        rawRows: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+        eventsKept: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+        eventsDeduped: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+        totalDuplicatesRemoved: 0,
+      },
+    };
+  });
+  memSnap("B after fetch");
+
+  const events = commsResult.events;
+  const byEntity = groupCommsByEntity(events);
+  memSnap("B after group");
+
+  // Compute per-entity comms metrics. The raw events array can be GC'd after this.
+  const commsMetricsByEntity: Record<string, CustomerMetrics> = {};
+  // Phase 14B: per-entity, per-channel 30d counts (built in the same pass over
+  // grouped events so we don't have to retain the raw events array).
+  const channelCounts30dByEntity: Record<string, Record<string, number>> = {};
+  const cutoff30d = today - 30 * 86400 * 1000;
+  for (const [eid, evs] of byEntity) {
+    commsMetricsByEntity[eid] = computeMetrics(evs, today);
+    const perCh: Record<string, number> = { chat: 0, email: 0, phone: 0, video: 0, sms: 0 };
+    for (const e of evs) {
+      if (e.ts >= cutoff30d) perCh[e.channel] = (perCh[e.channel] || 0) + 1;
+    }
+    channelCounts30dByEntity[eid] = perCh;
+  }
+  memSnap("B after metrics");
+
+  // Diagnostic aggregates from raw events (computed in one pass)
+  const perSourceEventCount = { chat: 0, email: 0, phone: 0, video: 0, sms: 0 } as Record<string, number>;
+  const perDirectionCount = { in: 0, out: 0 };
+  for (const e of events) {
+    perSourceEventCount[e.channel]++;
+    perDirectionCount[e.direction]++;
+  }
+
+  // Channel counts across active book (d30/d90 distinct customers per channel)
+  const channelCounts = { d30: {} as Record<string, number>, d90: {} as Record<string, number> };
+  for (const m of Object.values(commsMetricsByEntity)) {
+    for (const ch of (m.channels_used_30d || "").split(",").filter(Boolean)) {
+      channelCounts.d30[ch] = (channelCounts.d30[ch] || 0) + 1;
+    }
+    for (const ch of (m.channels_used_90d || "").split(",").filter(Boolean)) {
+      channelCounts.d90[ch] = (channelCounts.d90[ch] || 0) + 1;
+    }
+  }
+
+  memSnap("B end");
+  const data: StageBData = {
+    commsMetricsByEntity,
+    channelCounts30dByEntity,
+    commsStats: commsResult.stats,
+    perSourceEventCount,
+    perDirectionCount,
+    channelCounts,
+  };
+  return { data, durationMs: Date.now() - started, errors };
+}
+
+// ===========================================================================
+// STAGE C — Mixpanel + performance cards → per-entity usage + perf metrics
+// ===========================================================================
+
+export async function runStageC(today: number = todayMs()): Promise<{
+  data: StageCData;
+  durationMs: number;
+  errors: string[];
+}> {
+  const started = Date.now();
+  const errors: string[] = [];
+  memSnap("C start");
+
+  const [usageResult, perfResult] = await Promise.all([
+    fetchUsageMetrics(today).catch((e: Error) => {
+      errors.push(`Mixpanel: ${e.message}`);
+      return { metrics: new Map<string, UsageMetrics>(), rowCount: 0 };
+    }),
+    fetchPerformanceMetrics().catch((e: Error) => {
+      errors.push(`Performance: ${e.message}`);
+      return {
+        metrics: new Map<string, PerformanceMetrics>(),
+        rowCounts: { gbpClicksMonthly: 0, rankings: 0, reviews12w: 0, locationInsights: 0, bookingEnquiries: 0 },
+      };
+    }),
+  ]);
+  memSnap("C after fetch");
+
+  const usageMetricsByEntity: Record<string, UsageMetrics> = {};
+  for (const [eid, m] of usageResult.metrics) usageMetricsByEntity[eid] = m;
+
+  const performanceMetricsByEntity: Record<string, PerformanceMetrics> = {};
+  for (const [eid, m] of perfResult.metrics) performanceMetricsByEntity[eid] = m;
+
+  memSnap("C end");
+  const data: StageCData = {
+    usageMetricsByEntity,
+    performanceMetricsByEntity,
+    diagnostics: {
+      mixpanelRowCount: usageResult.rowCount,
+      performanceRowCounts: perfResult.rowCounts,
+    },
+  };
+  return { data, durationMs: Date.now() - started, errors };
+}
+
+// ===========================================================================
+// STAGE D — HubSpot companies + deals + Fireflies note enrichment
+// Optional stage: silently no-ops when HUBSPOT_ACCESS_TOKEN is unset.
+// ===========================================================================
+
+export async function runStageD(_today: number = todayMs()): Promise<{
+  data: StageDData;
+  durationMs: number;
+  errors: string[];
+}> {
+  const started = Date.now();
+  const errors: string[] = [];
+  memSnap("D start");
+
+  // 1. Active customer companies from HubSpot
+  const companiesMap = await timed("companies", () => fetchActiveHubspotCompanies()).catch(
+    (e: Error) => {
+      errors.push(`HubSpot companies: ${e.message}`);
+      return new Map<string, HubspotCompanyRow>();
+    },
+  );
+  memSnap("D after companies");
+
+  // Build canonical map keyed by place_id
+  const companiesByPlaceId: Record<string, HubspotCompanyByPlaceId> = {};
+  const hubspotCompanyIds: string[] = [];
+  for (const [placeId, c] of companiesMap) {
+    companiesByPlaceId[placeId] = {
+      place_id: placeId,
+      hubspot_company_id: c.id,
+      name: c.name,
+      icp_tier: c.icp_tier,
+      lifecycle_stage: c.lifecycle_stage,
+      business_category: c.business_category,
+    };
+    hubspotCompanyIds.push(c.id);
+  }
+
+  // 2. Deals per company
+  const dealsMap = await timed("deals", () => fetchDealsForCompanies(hubspotCompanyIds)).catch(
+    (e: Error) => {
+      errors.push(`HubSpot deals: ${e.message}`);
+      return new Map<string, DealsForCompany>();
+    },
+  );
+  memSnap("D after deals");
+  const dealsByHubspotCompanyId: Record<string, DealsForCompany> = {};
+  for (const [cid, d] of dealsMap) dealsByHubspotCompanyId[cid] = d;
+
+  // 3. Notes — read cache first, then enrich the rest
+  let notesByHubspotCompanyId: Record<string, LastCallSummary> = {};
+  let notesEnrichedNew = 0;
+  let notesEnrichedCached = 0;
+  try {
+    const { perCompany: peek } = await fetchEnrichedNotesPerCompany(
+      hubspotCompanyIds.slice(0, 0),
+      new Map<string, CachedNoteEnrichment>(),
+    );
+    void peek;
+
+    const discovered = await timed("notes", () =>
+      fetchEnrichedNotesPerCompany(
+        hubspotCompanyIds,
+        new Map<string, CachedNoteEnrichment>(),
+      ),
+    );
+    const discoveredNoteIds: string[] = [];
+    for (const v of discovered.perCompany.values()) discoveredNoteIds.push(v.note_id);
+    const cache = await readNoteEnrichments(discoveredNoteIds);
+    if (discovered.toCache.size > 0) {
+      await writeNoteEnrichments(discovered.toCache);
+    }
+    notesByHubspotCompanyId = Object.fromEntries(discovered.perCompany);
+    notesEnrichedNew = discovered.toCache.size;
+    notesEnrichedCached = discoveredNoteIds.length - notesEnrichedNew;
+    void cache;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push(`HubSpot notes: ${msg}`);
+  }
+  memSnap("D after notes");
+
+  // 4. Calls per company (Phase 14B — Tier C: comms drift)
+  const callsMap = await timed("calls", () => fetchCallsForCompanies(hubspotCompanyIds)).catch(
+    (e: Error) => {
+      errors.push(`HubSpot calls: ${e.message}`);
+      return new Map<string, CallsForCompany>();
+    },
+  );
+  memSnap("D after calls");
+  const callsByHubspotCompanyId: Record<string, CallsForCompany> = {};
+  for (const [cid, c] of callsMap) callsByHubspotCompanyId[cid] = c;
+
+  // 5. Contacts per company (Phase 14C — Tier E: buyer-side org chart)
+  const contactsMap = await timed("contacts", () =>
+    fetchContactsForCompanies(hubspotCompanyIds),
+  ).catch((e: Error) => {
+    errors.push(`HubSpot contacts: ${e.message}`);
+    return new Map<string, CompanyContact[]>();
+  });
+  memSnap("D after contacts");
+  const contactsByHubspotCompanyId: Record<string, CompanyContact[]> = {};
+  for (const [cid, cs] of contactsMap) contactsByHubspotCompanyId[cid] = cs;
+
+  const data: StageDData = {
+    companiesByPlaceId,
+    dealsByHubspotCompanyId,
+    notesByHubspotCompanyId,
+    callsByHubspotCompanyId,
+    contactsByHubspotCompanyId,
+    diagnostics: {
+      totalCompanies: Object.keys(companiesByPlaceId).length,
+      companiesWithDeals: Object.keys(dealsByHubspotCompanyId).length,
+      companiesWithRecentNotes: Object.keys(notesByHubspotCompanyId).length,
+      companiesWithCalls: Object.keys(callsByHubspotCompanyId).length,
+      companiesWithContacts: Object.keys(contactsByHubspotCompanyId).length,
+      notesEnrichedNew,
+      notesEnrichedCached,
+    },
+  };
+  console.log(
+    `[stageD] summary: ${Object.keys(companiesByPlaceId).length} companies, ` +
+      `deals=${Object.keys(dealsByHubspotCompanyId).length}, ` +
+      `notes=${Object.keys(notesByHubspotCompanyId).length}, ` +
+      `calls=${Object.keys(callsByHubspotCompanyId).length}, ` +
+      `contacts=${Object.keys(contactsByHubspotCompanyId).length}`,
+  );
+  return { data, durationMs: Date.now() - started, errors };
+}
+
+// ===========================================================================
+// COMPOSE — read all 3 stage states, score, build snapshot, write
+// ===========================================================================
+
+/**
+ * Compose final snapshot from the 3 stage states in Postgres.
+ * Throws if any stage is missing. Caller is expected to handle this and
+ * report the missing stage clearly.
+ */
+export async function composeSnapshot(
+  snapshotDate: string = todaySnapshotDate(),
+  options: { autoRunMissingStages?: boolean } = { autoRunMissingStages: true },
+): Promise<SnapshotV2> {
+  const started = Date.now();
+  const errors: string[] = [];
+  memSnap("compose start");
+
+  // -------------------------------------------------------------------------
+  // 1. Load all 3 stage states
+  // -------------------------------------------------------------------------
+  let { a, b, c, d, missing, staleStages } = await readAllPipelineStages(snapshotDate);
+
+  if (missing.length && options.autoRunMissingStages !== false) {
+    console.log(`[compose] auto-running missing stages: ${missing.join(", ")}`);
+    for (const stage of missing) {
+      try {
+        if (stage === "A") await runStageAAndStore(snapshotDate);
+        if (stage === "B") await runStageBAndStore(snapshotDate);
+        if (stage === "C") await runStageCAndStore(snapshotDate);
+        if (stage === "D") await runStageDAndStore(snapshotDate);
+        errors.push(`auto-ran stage ${stage}`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errors.push(`auto-run stage ${stage} failed: ${msg}`);
+      }
+    }
+    ({ a, b, c, d, missing, staleStages } = await readAllPipelineStages(snapshotDate));
+  }
+
+  if (missing.length) {
+    throw new Error(
+      `[compose] missing stage(s): ${missing.join(", ")} for ${snapshotDate}. ` +
+        `Run /api/cron/refresh/stage-${missing[0].toLowerCase()} first.`,
+    );
+  }
+  if (staleStages.length) {
+    errors.push(`stale stages (>6h old): ${staleStages.join(", ")}`);
+  }
+  memSnap("compose after reads");
+
+  const stageA = a!.data as StageAData;
+  const stageB = b!.data as StageBData;
+  const stageC = c!.data as StageCData;
+  const stageD = (d?.data as StageDData | undefined) ?? null;
+  const today = stageA.todayMs;
+
+  // -------------------------------------------------------------------------
+  // Phase 31.v2 — Single Metabase CSV fetch for tickets, BEFORE the scoring
+  // loop. Soft-fails to an empty Map on any error so the entire compose stays
+  // resilient. Aggregates are derived per-customer inside the loop below.
+  // -------------------------------------------------------------------------
+  const ticketsResult = await fetchTicketsFromMetabase();
+  let ticketsCustomersMatched = 0;
+  let ticketsCustomersWithStale = 0;
+
+  // Pre-build HubSpot lookups if Stage D landed
+  const hubspotByPlaceId: Map<string, HubspotCompanyByPlaceId> = new Map();
+  const hubspotByNormalizedName: Map<string, HubspotCompanyByPlaceId> = new Map();
+  if (stageD) {
+    const { normalizeName } = await import("./hubspot-companies");
+    for (const c of Object.values(stageD.companiesByPlaceId)) {
+      if (c.place_id) hubspotByPlaceId.set(c.place_id, c);
+      hubspotByNormalizedName.set(normalizeName(c.name), c);
+    }
+    console.log(
+      `[compose] stageD shape: companies=${Object.keys(stageD?.companiesByPlaceId ?? {}).length}, ` +
+        `deals=${Object.keys(stageD?.dealsByHubspotCompanyId ?? {}).length}, ` +
+        `notes=${Object.keys(stageD?.notesByHubspotCompanyId ?? {}).length}, ` +
+        `calls=${Object.keys(stageD?.callsByHubspotCompanyId ?? {}).length}, ` +
+        `contacts=${Object.keys(stageD?.contactsByHubspotCompanyId ?? {}).length}`,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // 2. Score every active entity by combining the 3 stages' data
+  // -------------------------------------------------------------------------
+  const scored: ScoredCustomerV2[] = [];
+  let mixpanelCoverage = 0;
+  let matchedByPlaceId = 0;
+  let matchedByBizname = 0;
+  let hubspotUnmatched = 0;
+
+  // Cutoff used for closed_last_30d_count below.
+  const cutoff30d = today - 30 * 86400 * 1000;
+
+  for (const entityId of stageA.activeEntityIds) {
+    const meta = stageA.entityMeta[entityId];
+    const bs = stageA.baseSheetByEntityId[entityId];
+    const billing = stageA.billingMetrics[entityId] || null;
+
+    // Comms — if not in B's map (zero-comms entity), build empty metrics
+    const cMetrics: CustomerMetrics =
+      stageB.commsMetricsByEntity[entityId] || computeMetrics([], today);
+    const v1Signals = scoreCustomer(cMetrics);
+
+    // Usage
+    const usage = stageC.usageMetricsByEntity[entityId] || null;
+    if (usage) mixpanelCoverage++;
+    const usageScore = scoreUsage(usage);
+
+    // Billing
+    const billingScore = scoreBilling(billing);
+
+    // Performance + tickets flags. The flag itself is still derived from the
+    // BaseSheet counts so the existing scoring math doesn't move; Phase 31.v2
+    // merges the Metabase records + aggregates onto the same object below.
+    const perf = stageC.performanceMetricsByEntity[entityId] || null;
+    const ticketsFlag = computeTicketsFlag(
+      entityId,
+      Number(bs?.open_tickets_30d || 0),
+      Number(bs?.unresolved_issues_last_30_days || 0),
+    );
+
+    // ---------------------------------------------------------------------
+    // Phase 31.v2 — Per-customer tickets enrichment from Metabase records.
+    // Preserves the existing BaseSheet-derived `open_tickets_30d` and
+    // `unresolved_issues_last_30_days` (legacy counters) and adds the new
+    // per-record + aggregate fields. If no Metabase records exist for this
+    // entity, all new aggregates default to zero / empty.
+    // ---------------------------------------------------------------------
+    const entityTickets: UnifiedTicket[] = ticketsResult.byEntityId.get(entityId) ?? [];
+    if (entityTickets.length > 0) ticketsCustomersMatched += 1;
+    let openCount = 0;
+    let openStaleCount = 0;
+    let closedLast30dCount = 0;
+    let oldestOpenAgeDays: number | null = null;
+    const byCategory: Record<string, number> = {};
+    for (const t of entityTickets) {
+      byCategory[t.category] = (byCategory[t.category] ?? 0) + 1;
+      if (t.is_closed) {
+        const closedIso = t.completed_at || t.canceled_at;
+        if (closedIso) {
+          const closedMs = Date.parse(closedIso);
+          if (Number.isFinite(closedMs) && closedMs >= cutoff30d) {
+            closedLast30dCount += 1;
+          }
+        }
+      } else {
+        openCount += 1;
+        if (t.is_stale) openStaleCount += 1;
+        if (oldestOpenAgeDays === null || t.age_days > oldestOpenAgeDays) {
+          oldestOpenAgeDays = t.age_days;
+        }
+      }
+    }
+    if (openStaleCount > 0) ticketsCustomersWithStale += 1;
+    const tickets: TicketsMetrics = {
+      ...ticketsFlag,
+      records: entityTickets.slice(0, TICKETS_MAX_RECORDS_PER_CUSTOMER),
+      open_count: openCount,
+      open_stale_count: openStaleCount,
+      closed_last_30d_count: closedLast30dCount,
+      by_category: byCategory,
+      oldest_open_age_days: oldestOpenAgeDays,
+    };
+
+    // Detect pre-launch: Chargebee sub status is "future" OR activated_at
+    // is null/in-the-future. These customers haven't started using the
+    // product yet, so they shouldn't be scored as churning.
+    const nowMs = stageA.todayMs;
+    const activatedMs = meta?.activated_at ? Date.parse(meta.activated_at) : NaN;
+    const preLaunch =
+      meta?.sub_status === "future" ||
+      !meta?.activated_at ||
+      (Number.isFinite(activatedMs) && activatedMs > nowMs);
+
+    // Compose hybrid signals
+    const signalsV2 = composeHybridSignals({
+      commsSignals: v1Signals,
+      usageScore,
+      billingScore,
+      billing,
+      performance: perf,
+      tickets,
+      commsMetrics: cMetrics,
+      mixpanelHasData: usage !== null,
+      preLaunch,
+    });
+
+    // Phase 33.scope — recently churned customers are already gone;
+    // don't let them clog the at-risk stack. Override stoplight to GREEN
+    // (neutral) so existing math is preserved while UI uses lifecycle_state.
+    {
+      const _cidNeutral = meta?.customer_id || "";
+      const _churn = stageA.recentlyChurnedByCustomer?.[_cidNeutral];
+      const _hasLive = !!meta?.subscription_id;
+      if (!_hasLive && _churn) {
+        (signalsV2 as any).stoplight = "GREEN";
+        (signalsV2 as any).tier = "HEALTHY";
+      }
+    }
+    // Pod from AM
+    const amName = bs?.am_name || "";
+    const pod = POD_MAP[amName] || "";
+
+    // HubSpot join (Phase 14A) — place_id first, bizname fallback.
+    let hubspotJoin: ScoredCustomerV2["hubspot"] = null;
+    if (stageD) {
+      const { normalizeName } = await import("./hubspot-companies");
+      let hsCo: HubspotCompanyByPlaceId | undefined;
+      let matchedVia: "place_id" | "bizname" | null = null;
+      const placeId = meta?.place_id || "";
+      if (placeId) {
+        hsCo = hubspotByPlaceId.get(placeId);
+        if (hsCo) matchedVia = "place_id";
+      }
+      if (!hsCo) {
+        // Phase 33.scope-fix7 — same fallback chain as scored.push.
+        const lookupName = (bs?.bizname || meta?.entity_name_from_chargebee || meta?.company_from_chargebee || "").trim();
+        if (lookupName) {
+          hsCo = hubspotByNormalizedName.get(normalizeName(lookupName));
+          if (hsCo) matchedVia = "bizname";
+        }
+      }
+      if (hsCo) {
+        if (matchedVia === "place_id") matchedByPlaceId++;
+        else if (matchedVia === "bizname") matchedByBizname++;
+        const deals = stageD?.dealsByHubspotCompanyId?.[hsCo.hubspot_company_id];
+        const note = stageD?.notesByHubspotCompanyId?.[hsCo.hubspot_company_id];
+        const lifecycleDrift =
+          !!hsCo.lifecycle_stage && hsCo.lifecycle_stage.toLowerCase() !== "customer";
+
+        const hubspotCalls =
+          stageD?.callsByHubspotCompanyId?.[hsCo.hubspot_company_id]?.call_count_30d ?? 0;
+        const metabaseCalls =
+          stageB.channelCounts30dByEntity[entityId]?.phone ?? 0;
+        const driftDelta = hubspotCalls - metabaseCalls;
+        const commsDrift =
+          Math.abs(driftDelta) >= 3
+            ? {
+                hubspot_calls_30d: hubspotCalls,
+                metabase_calls_30d: metabaseCalls,
+                delta: driftDelta,
+              }
+            : null;
+
+        const contacts =
+          stageD?.contactsByHubspotCompanyId?.[hsCo.hubspot_company_id] ?? [];
+
+        hubspotJoin = {
+          hubspot_company_id: hsCo.hubspot_company_id,
+          icp_tier: hsCo.icp_tier,
+          lifecycle_drift: lifecycleDrift,
+          open_deal_count: deals?.open_deal_count ?? 0,
+          open_deal_stages: deals?.open_deal_stages ?? [],
+          total_open_amount: deals?.total_open_amount ?? 0,
+          last_call: note
+            ? {
+                note_id: note.note_id,
+                date: note.date,
+                sentiment: note.sentiment,
+                topics: note.topics,
+                action_items: note.action_items,
+                fireflies_url: note.fireflies_url,
+              }
+            : null,
+          comms_drift: commsDrift,
+          contacts,
+        };
+      } else {
+        hubspotUnmatched++;
+      }
+    }
+
+    // Phase 33.scope — derive lifecycle_state for this customer.
+    const _cidForLifecycle = meta?.customer_id || "";
+    const _recentlyChurned = stageA.recentlyChurnedByCustomer?.[_cidForLifecycle] || null;
+    // Phase 33.scope-fix1 — pure-churn customers have subscription_id set
+    // (subsByCustomer stores any sub if no live sub overrode it), so we must
+    // also require sub_status !== "cancelled" to call them a live sub.
+    const _subStatus = meta?.sub_status || "";
+    const _hasLiveSub = !!meta?.subscription_id && _subStatus !== "cancelled";
+    const _activatedIso = meta?.activated_at || null;
+    const _activatedMs = _activatedIso ? Date.parse(_activatedIso) : NaN;
+    const _thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const _isNewlyOnboarded = _hasLiveSub && Number.isFinite(_activatedMs) && (stageA.todayMs - _activatedMs) <= _thirtyDaysMs && !_recentlyChurned;
+    const _isResurrected = _hasLiveSub && !!_recentlyChurned;
+    const _isRecentlyChurned = !_hasLiveSub && !!_recentlyChurned;
+    let _lifecycle_state: "active" | "recently_churned" | "newly_onboarded" | "resurrected" = "active";
+    if (_isRecentlyChurned) _lifecycle_state = "recently_churned";
+    else if (_isResurrected) _lifecycle_state = "resurrected";
+    else if (_isNewlyOnboarded) _lifecycle_state = "newly_onboarded";
+    const _churnedOn = _recentlyChurned?.cancelled_at || null;
+    const _onboardedOn = _activatedIso;
+    scored.push({
+      customer_id: meta?.customer_id || "",
+      entity_id: entityId,
+      subscription_id: meta?.subscription_id || "",
+      // Phase 33.scope-fix7 — prefer entity-specific Chargebee name over customer-level company.
+      company: bs?.bizname || meta?.entity_name_from_chargebee || meta?.company_from_chargebee || "",
+      email: bs?.app_email || meta?.email || "",
+      phone: bs?.phone_number || meta?.phone || "",
+      am_name: amName,
+      ae_name: bs?.ae_name || "",
+      sp_name: bs?.sp_name || "",
+      cb_status: meta?.sub_status || "",
+      auto_collection: meta?.auto_collection || null,
+      plan_amount: (meta?.plan_amount_cents || 0) / 100,
+      mrr_basesheet: bs?.total_monthly_revenue || "",
+      zoca_status: bs?.chrone_zoca_status || "",
+      churn_potential_flag: bs?.churn_potential_flag || "",
+      activated_at: meta?.activated_at || null,
+      ob_date: bs?.ob_date || "",
+      match_source: bs ? "customer_id" : "unmatched",
+      in_chrone: ((bs?.chrone_zoca_status || "").toUpperCase() === "ZOCA"),
+      metrics: cMetrics,
+      signals: v1Signals,
+      pod,
+      usage,
+      billing,
+      performance: perf,
+      tickets,
+      signals_v2: signalsV2,
+      hubspot: hubspotJoin,
+      lifecycle_state: _lifecycle_state,
+      churned_on: _churnedOn,
+      onboarded_on: _onboardedOn,
+    });
+  }
+
+  memSnap("compose after score");
+  console.log(
+    `[phase31v2] tickets refresh: ${ticketsResult.totalRows} rows, ` +
+      `${ticketsCustomersMatched} customers matched, ` +
+      `${ticketsResult.parseErrors} rows skipped (no entity_id or bad row), ` +
+      `${ticketsCustomersWithStale} customers with stale tickets >7d`,
+  );
+  if (stageD) {
+    console.log(
+      `[compose] hubspot join: ${matchedByPlaceId} via place_id, ${matchedByBizname} via bizname, ${hubspotUnmatched} unmatched`,
+    );
+  }
+
+  // Sort by composite desc, then comms volume desc
+  scored.sort((a, b) => {
+    if (b.signals_v2.composite !== a.signals_v2.composite) return b.signals_v2.composite - a.signals_v2.composite;
+    return b.metrics.total_90d - a.metrics.total_90d;
+  });
+
+  // -------------------------------------------------------------------------
+  // 3. Aggregates (tier counts, breakdowns, etc.)
+  // -------------------------------------------------------------------------
+  const tierCounts: Record<Tier, number> = { HIGH: 0, MEDIUM: 0, LOW: 0, HEALTHY: 0 };
+  const stoplightCounts: Record<Stoplight, number> = { RED: 0, YELLOW: 0, GREEN: 0 };
+  for (const c of scored) {
+    // Phase 33.scope optionB — exclude recently_churned from tier/stoplight totals.
+    if (c.lifecycle_state === "recently_churned") continue;
+    tierCounts[c.signals_v2.tier]++;
+    stoplightCounts[c.signals_v2.stoplight]++;
+  }
+
+  const signalCountsV2 = {
+    we_silent_any: scored.filter((r) => r.signals_v2.sig_we_silent >= 30).length,
+    client_silent_any: scored.filter((r) => r.signals_v2.sig_client_silent >= 30).length,
+    response_drop_any: scored.filter((r) => r.signals_v2.sig_response_drop >= 30).length,
+    volume_collapse_any: scored.filter((r) => r.signals_v2.sig_volume_collapse >= 30).length,
+    usage_dormant: scored.filter((r) => r.signals_v2.sig_usage >= 65).length,
+    billing_crisis: scored.filter((r) => r.signals_v2.sig_billing >= 50).length,
+    performance_flagged: scored.filter((r) => r.signals_v2.flag_performance).length,
+    tickets_flagged: scored.filter((r) => r.signals_v2.flag_tickets).length,
+  };
+  const signalCounts = {
+    we_silent_any: signalCountsV2.we_silent_any,
+    client_silent_any: signalCountsV2.client_silent_any,
+    response_drop_any: signalCountsV2.response_drop_any,
+    volume_collapse_any: signalCountsV2.volume_collapse_any,
+  };
+
+  // AM breakdown
+  const amMap = new Map<string, { high: number; total: number }>();
+  const amBreakdownMap = new Map<string, AmTierRow>();
+  for (const c of scored) {
+    // Phase 33.scope optionB — exclude recently_churned from AM breakdown.
+    if (c.lifecycle_state === "recently_churned") continue;
+    const am = c.am_name || "(unassigned)";
+    const cur = amMap.get(am) || { high: 0, total: 0 };
+    cur.total++;
+    if (c.signals_v2.tier === "HIGH") cur.high++;
+    amMap.set(am, cur);
+    const row = amBreakdownMap.get(am) || { am, HIGH: 0, MEDIUM: 0, LOW: 0, HEALTHY: 0, total: 0 };
+    row[c.signals_v2.tier]++;
+    row.total++;
+    amBreakdownMap.set(am, row);
+  }
+  const amExposure = Array.from(amMap, ([am, v]) => ({ am, ...v }))
+    .sort((a, b) => (b.high - a.high) || (b.total - a.total));
+  const amTierBreakdown = Array.from(amBreakdownMap.values())
+    .sort((a, b) => (b.HIGH - a.HIGH) || (b.total - a.total));
+
+  // Pod breakdown
+  const podMap = new Map<string, PodTierRow>();
+  for (const c of scored) {
+    // Phase 33.scope optionB — exclude recently_churned from pod breakdown.
+    if (c.lifecycle_state === "recently_churned") continue;
+    const pod = c.pod || "(unassigned)";
+    const row = podMap.get(pod) || { pod, HIGH: 0, MEDIUM: 0, LOW: 0, HEALTHY: 0, total: 0, ams: [] };
+    row[c.signals_v2.tier]++;
+    row.total++;
+    if (c.am_name && !row.ams.includes(c.am_name)) row.ams.push(c.am_name);
+    podMap.set(pod, row);
+  }
+  const podBreakdown = Array.from(podMap.values())
+    .sort((a, b) => (b.HIGH - a.HIGH) || (b.total - a.total));
+
+  // Score distribution
+  const scoreDistribution: number[] = new Array(10).fill(0);
+  for (const c of scored) {
+    const s = Math.max(0, Math.min(99, c.signals_v2.composite));
+    scoreDistribution[Math.floor(s / 10)]++;
+  }
+
+  // Book-wide numeric stats
+  const t30 = scored.map((c) => c.metrics.total_30d).sort((a, b) => a - b);
+  const t90 = scored.map((c) => c.metrics.total_90d).sort((a, b) => a - b);
+  const med = (arr: number[]) => (arr.length ? arr[Math.floor(arr.length / 2)] : 0);
+  const mean = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+  const totalComms90d = scored.reduce((a, c) => a + c.metrics.total_90d, 0);
+
+  const matchBreakdown = {
+    byCustomerId: scored.filter((c) => c.match_source === "customer_id").length,
+    byBizName: scored.filter((c) => c.match_source === "bizname").length,
+    unmatched: scored.filter((c) => c.match_source === "unmatched").length,
+    notInChrone: scored.filter((c) => !c.in_chrone).length,
+  };
+
+  const health: DataHealth = {
+    totalSubsFetched: stageA.stats.totalSubs,
+    customersWithEntityId: scored.filter((c) => c.entity_id).length,
+    customersWithAnyComms90d: scored.filter((c) => c.metrics.total_90d > 0).length,
+    customersWithMixpanelData: mixpanelCoverage,
+    customersWithBillingIssues: scored.filter((c) => c.billing && c.billing.unpaid_invoice_count > 0).length,
+    customersWithPerformanceFlag: signalCountsV2.performance_flagged,
+    customersWithTicketsFlag: signalCountsV2.tickets_flagged,
+    matchBreakdown,
+    perSourceEventCount: stageB.perSourceEventCount as DataHealth["perSourceEventCount"],
+    perSourceRawRows: stageB.commsStats.rawRows as DataHealth["perSourceRawRows"],
+    perDirectionCount: stageB.perDirectionCount,
+    duplicateEventsRemoved: stageB.commsStats.totalDuplicatesRemoved,
+    baseSheetRowCount: stageA.stats.baseSheetRowCount,
+    mixpanelRowCount: stageC.diagnostics.mixpanelRowCount,
+    performanceRowCounts: stageC.diagnostics.performanceRowCounts,
+    chargebeeInvoiceCount: stageA.stats.totalInvoices,
+    chargebeeTransactionCount: stageA.stats.totalTransactions,
+    excludedEntities: stageA.stats.excludedCount,
+    multiEntityExpansion: stageA.stats.multiEntityExpansion,
+    fetchErrors: errors,
+    refreshDurationMs: Date.now() - started,
+  };
+
+  const snapshot: SnapshotV2 = {
+    version: "v2",
+    generatedAt: new Date().toISOString(),
+    todayIso: stageA.todayIso,
+    totalActive: scored.length,
+    tierCounts,
+    stoplightCounts,
+    signalCounts,
+    signalCountsV2,
+    channelCounts: stageB.channelCounts,
+    amExposure,
+    amTierBreakdown,
+    podBreakdown,
+    scoreDistribution,
+    customers: scored,
+    activeEntityIds: stageA.activeEntityIds,
+    mixpanelCoverage: {
+      activeWithMixpanel: mixpanelCoverage,
+      activeWithoutMixpanel: scored.length - mixpanelCoverage,
+    },
+    stats: {
+      total_comms_90d: totalComms90d,
+      median_30d: med(t30),
+      mean_30d: Number(mean(t30).toFixed(2)),
+      median_90d: med(t90),
+      mean_90d: Number(mean(t90).toFixed(2)),
+      fetch_duration_ms: Date.now() - started,
+    },
+    health,
+    errors: errors.length ? errors : undefined,
+  };
+
+  for (const t of TIER_ORDER) {
+    if (snapshot.tierCounts[t] == null) snapshot.tierCounts[t] = 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // 2.4  LLM narrative enrichment for RED customers (Phase 11)
+  // -------------------------------------------------------------------------
+  try {
+    const result = await enrichRedNarratives(snapshot);
+    console.log(
+      `[compose] narrative enrichment: enriched=${result.enriched} skipped=${result.skipped} took ${result.durationMs}ms`,
+    );
+    if (result.enriched > 0) errors.push(`narrative enrichment ran on ${result.enriched} customers`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[compose] narrative enrichment failed:", msg);
+    errors.push(`narrative enrichment: ${msg}`);
+  }
+
+  // -------------------------------------------------------------------------
+  // 2.5  Trajectory backfill
+  // -------------------------------------------------------------------------
+  try {
+    const sevenDaysAgo = new Date(snapshotDate + "T00:00:00Z");
+    sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
+    const ymd7 = sevenDaysAgo.toISOString().slice(0, 10);
+    let prevSnap = await readSnapshotByDate(ymd7);
+    let prevWindowDays = 7;
+    if (!prevSnap) {
+      const yesterday = new Date(snapshotDate + "T00:00:00Z");
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      prevSnap = await readSnapshotByDate(yesterday.toISOString().slice(0, 10));
+      prevWindowDays = 1;
+    }
+    if (prevSnap) {
+      const prevByEntity = new Map<string, number>();
+      for (const c of prevSnap.customers || []) {
+        if (c.entity_id && typeof c.signals_v2?.composite === "number") {
+          prevByEntity.set(c.entity_id, c.signals_v2.composite);
+        }
+      }
+      const STABLE_DELTA = 5;
+      let patched = 0;
+      for (const c of snapshot.customers) {
+        const prev = prevByEntity.get(c.entity_id);
+        if (prev === undefined) continue;
+        c.signals_v2.composite_7d_ago = prev;
+        const delta = c.signals_v2.composite - prev;
+        if (Math.abs(delta) < STABLE_DELTA) c.signals_v2.trajectory_7d = "stable";
+        else if (delta > 0) c.signals_v2.trajectory_7d = "improving";
+        else c.signals_v2.trajectory_7d = "worsening";
+        patched += 1;
+      }
+      console.log(
+        `[compose] trajectory backfilled ${patched}/${snapshot.customers.length} via ${prevWindowDays}d-ago snapshot`,
+      );
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[compose] trajectory backfill failed:", msg);
+    errors.push(`trajectory backfill: ${msg}`);
+  }
+
+  // -------------------------------------------------------------------------
+  // 2.6  Phase 13.1: scope meta + status-guard assertion.
+  // -------------------------------------------------------------------------
+  {
+    const allowedStatuses = new Set(["active", "non_renewing", "in_trial", "future"]);
+    // Phase 33.scope-fix4 — recently_churned customers intentionally have
+    // cb_status="cancelled" (30-day retention window). Allow them through
+    // the guard; still block any other unexpected status.
+    const invalid = scored.filter((c) => !allowedStatuses.has(c.cb_status) && c.lifecycle_state !== "recently_churned");
+    if (invalid.length > 0) {
+      const examples = invalid
+        .slice(0, 3)
+        .map((c) => `${c.company}=${c.cb_status}`)
+        .join(", ");
+      throw new Error(
+        `Phase 13.1 scope guard: ${invalid.length} customers in snapshot have subscription_status outside ` +
+          `the active-sub universe. Examples: ${examples}. Refusing to write snapshot to prevent dashboard drift.`,
+      );
+    }
+    const byCid = new Map<string, number>();
+    for (const c of scored) {
+      const cid = c.customer_id;
+      if (!cid) continue;
+      byCid.set(cid, (byCid.get(cid) ?? 0) + 1);
+    }
+    let multiLocCount = 0;
+    for (const n of byCid.values()) if (n > 1) multiLocCount += 1;
+    snapshot.scope = {
+      universe: "chargebee_active_sub",
+      statuses: ["active", "non_renewing", "in_trial", "future"],
+      customer_count: scored.length,
+      customer_id_count: byCid.size,
+      multi_location_count: multiLocCount,
+      recently_churned_count: scored.filter((c) => c.lifecycle_state === "recently_churned").length,
+      newly_onboarded_count: scored.filter((c) => c.lifecycle_state === "newly_onboarded").length,
+      resurrected_count: scored.filter((c) => c.lifecycle_state === "resurrected").length,
+    };
+  }
+
+  memSnap("compose before write");
+  if (pgConfigured()) {
+    try {
+
+      // Phase G2 — enrich snapshot with metabase health tier before persisting.
+
+      // Defensive: any downstream consumer that reads dashboard_snapshots directly
+
+      // (vs. through /api/v2/snapshot's read-time enrichment) gets the tier for free.
+
+      try {
+
+        const _hcMap = await getHealthCardMap();
+
+        if (_hcMap.size > 0) {
+
+          for (const _c of (snapshot as any)?.customers || [] as any[]) {
+
+            const _eid = (_c?.entity_id || "").toLowerCase();
+
+            const _row: any = _hcMap.get(_eid);
+
+            if (_row) {
+
+              (_c as any).metabase_health = _row;
+
+            }
+
+          }
+
+        }
+
+      } catch (_e) {
+
+        console.warn("[compose] health-card enrichment skipped:", _e instanceof Error ? _e.message : String(_e));
+
+      }
+
+      await writeSnapshotV2(snapshot);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[compose] Postgres write failed:", msg);
+      errors.push(`Postgres write: ${msg}`);
+    }
+    try {
+      // Phase 33.scope-optionZ — exclude recently_churned from the
+      // historical trend. They're forced GREEN by compose and would
+      // pad the trend's healthy count over time as the universe shifts.
+      const trendRows = snapshot.customers
+        .filter((c) => c.lifecycle_state !== "recently_churned")
+        .map((c) => ({
+        entity_id: c.entity_id,
+        am_name: c.am_name || "",
+        pod: c.pod || "",
+        composite: c.signals_v2.composite,
+        stoplight: c.signals_v2.stoplight,
+        plan_amount: c.plan_amount || 0,
+        perf_flagged: !!c.performance?.flag,
+      }));
+      const written = await writeCustomerTrendRows(snapshotDate, trendRows);
+      console.log(`[compose] customer_trends rows written: ${written}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[compose] customer_trends write failed:", msg);
+      errors.push(`customer_trends write: ${msg}`);
+    }
+  }
+  memSnap("compose end");
+
+  console.log(
+    "[compose] active:", scored.length,
+    "tiers:", tierCounts,
+    "stoplight:", stoplightCounts,
+    "duration:", health.refreshDurationMs + "ms",
+  );
+  return snapshot;
+}
+
+// ===========================================================================
+// Helpers used by stage API routes
+// ===========================================================================
+
+export async function runStageAAndStore(snapshotDate?: string): Promise<{
+  durationMs: number;
+  errors: string[];
+  rowCount: number;
+}> {
+  const date = snapshotDate ?? todaySnapshotDate();
+  const { data, durationMs, errors } = await runStageA();
+  await writePipelineStage("A", date, data, {
+    durationMs,
+    errors,
+    rowCount: data.activeEntityIds.length,
+  });
+  return { durationMs, errors, rowCount: data.activeEntityIds.length };
+}
+
+export async function runStageBAndStore(snapshotDate?: string): Promise<{
+  durationMs: number;
+  errors: string[];
+  rowCount: number;
+}> {
+  const date = snapshotDate ?? todaySnapshotDate();
+  const stageA = await readPipelineStage<StageAData>("A", date);
+  const anchorToday = stageA?.data?.todayMs ?? todayMs();
+  const { data, durationMs, errors } = await runStageB(anchorToday);
+  await writePipelineStage("B", date, data, {
+    durationMs,
+    errors,
+    rowCount: Object.keys(data.commsMetricsByEntity).length,
+  });
+  return { durationMs, errors, rowCount: Object.keys(data.commsMetricsByEntity).length };
+}
+
+export async function runStageCAndStore(snapshotDate?: string): Promise<{
+  durationMs: number;
+  errors: string[];
+  rowCount: number;
+}> {
+  const date = snapshotDate ?? todaySnapshotDate();
+  const stageA = await readPipelineStage<StageAData>("A", date);
+  const anchorToday = stageA?.data?.todayMs ?? todayMs();
+  const { data, durationMs, errors } = await runStageC(anchorToday);
+  await writePipelineStage("C", date, data, {
+    durationMs,
+    errors,
+    rowCount: Object.keys(data.usageMetricsByEntity).length,
+  });
+  return { durationMs, errors, rowCount: Object.keys(data.usageMetricsByEntity).length };
+}
+
+export async function runStageDAndStore(snapshotDate?: string): Promise<{
+  durationMs: number;
+  errors: string[];
+  rowCount: number;
+}> {
+  const date = snapshotDate ?? todaySnapshotDate();
+  const stageA = await readPipelineStage<StageAData>("A", date);
+  const anchorToday = stageA?.data?.todayMs ?? todayMs();
+  const { data, durationMs, errors } = await runStageD(anchorToday);
+  await writePipelineStage("D", date, data, {
+    durationMs,
+    errors,
+    rowCount: Object.keys(data.companiesByPlaceId).length,
+  });
+  return { durationMs, errors, rowCount: Object.keys(data.companiesByPlaceId).length };
+}
+
+// ===========================================================================
+// Legacy single-shot orchestrator
+// ===========================================================================
+
+export async function buildSnapshotV2(): Promise<SnapshotV2> {
+  const date = todaySnapshotDate();
+  await runStageAAndStore(date);
+  await runStageBAndStore(date);
+  await runStageCAndStore(date);
+  return composeSnapshot(date);
+}
+
+/**
+ * v1 wrapper — kept so the existing /api/snapshot endpoint and v1 UI keep
+ * rendering. Returns the v1-shaped subset of the v2 snapshot.
+ */
+export async function buildSnapshot(): Promise<Snapshot> {
+  const v2 = await buildSnapshotV2();
+  const customersV1: ScoredCustomer[] = v2.customers.map((c) => ({
+    customer_id: c.customer_id,
+    entity_id: c.entity_id,
+    subscription_id: c.subscription_id,
+    company: c.company,
+    email: c.email,
+    phone: c.phone,
+    am_name: c.am_name,
+    ae_name: c.ae_name,
+    sp_name: c.sp_name,
+    cb_status: c.cb_status,
+    auto_collection: c.auto_collection,
+    plan_amount: c.plan_amount,
+    mrr_basesheet: c.mrr_basesheet,
+    zoca_status: c.zoca_status,
+    churn_potential_flag: c.churn_potential_flag,
+    activated_at: c.activated_at,
+    ob_date: c.ob_date,
+    match_source: c.match_source,
+    in_chrone: c.in_chrone,
+    metrics: c.metrics,
+    signals: c.signals,
+  }));
+  return {
+    generatedAt: v2.generatedAt,
+    todayIso: v2.todayIso,
+    totalActive: v2.totalActive,
+    tierCounts: v2.tierCounts,
+    signalCounts: v2.signalCounts,
+    channelCounts: v2.channelCounts,
+    amExposure: v2.amExposure,
+    amTierBreakdown: v2.amTierBreakdown,
+    scoreDistribution: v2.scoreDistribution,
+    customers: customersV1,
+    stats: v2.stats,
+    health: v2.health,
+    errors: v2.errors,
+  };
+}
+
+export { buildBillingMetrics, fetchUnpaidInvoices, fetchRecentTransactions } from "./billing";
+export { fetchUsageMetrics } from "./mixpanel";
+export { fetchPerformanceMetrics } from "./performance";
