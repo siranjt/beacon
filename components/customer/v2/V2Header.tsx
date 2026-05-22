@@ -96,13 +96,23 @@ export function V2Header(props: Props) {
     >
       {/* Left side — branding + (AM picker for AM mode, page name for manager mode) */}
       <div className="flex items-center gap-3 flex-wrap">
+        {/* Phase E-7 polish — ZOCA wordmark routes to the umbrella launcher
+            ("/"). The Beacon flame + label routes to the Customer Beacon hub.
+            Splitting the lockup gives users one click back to "home" (the
+            umbrella) and a separate click back to the agent's landing. */}
+        <a
+          href="/"
+          className="flex items-center no-underline"
+          aria-label="Zoca — umbrella home"
+        >
+          <ZocaLogo height={20} fill="var(--zoca-text)" />
+        </a>
+        <span className="text-zoca-text-3 text-xs">|</span>
         <a
           href="/customer"
           className="flex items-center gap-3 no-underline"
-          aria-label="Zoca Beacon home"
+          aria-label="Customer Beacon home"
         >
-          <ZocaLogo height={20} fill="var(--zoca-text)" />
-          <span className="text-zoca-text-3 text-xs">|</span>
           {/* Phase 33.brand-PR1 — Beacon mark slotted into the lockup at logo-height. */}
           {/* Phase 33.brand-watchfire-T11 — nav flame blazes (4 co-prime layers). */}
           <BeaconMark size={20} flicker />
