@@ -6,7 +6,9 @@ import { BeaconAmbient } from "./BeaconAmbient";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import V2Header from "./V2Header";
 import V2ManagerHero from "./V2ManagerHero";
-import { ZocaLogo } from "./ZocaLogo";
+// ZocaLogo unified — repointed at beacon's root after Phase E-7 cleanup.
+// Root component uses default export + `fill` prop instead of `color`.
+import ZocaLogo from "@/components/ZocaLogo";
 import type { SnapshotV2, ScoredCustomerV2 } from "@/lib/customer/types";
 import { POD_MAP } from "@/lib/customer/config";
 import V2PodSummaryGrid from "./V2PodSummaryGrid";
@@ -1297,7 +1299,7 @@ function V2ManagerDashboardInner() {
         style={{ borderTop: "1px solid var(--zoca-border)" }}
       >
         <div className="flex flex-col items-center gap-2 opacity-80">
-          <ZocaLogo height={18} color="var(--zoca-text)" />
+          <ZocaLogo height={18} fill="var(--zoca-text)" />
           <p className="text-xs text-zoca-text-2">
             Customer Health · v2 manager view · refreshed daily at 22:00 UTC
           </p>
