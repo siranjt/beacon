@@ -75,7 +75,12 @@ export type DigestResult = {
 async function loadSnoozedEntityIds(amName: string): Promise<Set<string>> {
   try {
     const modulePath = "./snooze";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Dropped @typescript-eslint/no-explicit-any disable directive — that
+    // rule is provided by @typescript-eslint/eslint-plugin, which v1 had
+    // installed but beacon does not (it sticks to eslint-config-next).
+    // The `any` annotation passes beacon's looser ESLint config without
+    // a disable comment; the comment itself causes "rule definition not
+    // found" build errors.
     const mod: any = await import(/* webpackIgnore: true */ modulePath).catch(
       () => null,
     );
