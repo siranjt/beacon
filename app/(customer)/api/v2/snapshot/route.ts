@@ -14,12 +14,21 @@ import { buildSnapshotV2 } from "@/lib/customer/refresh";
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { getLocationRecordIdMap } from "@/lib/customer/hubspot-locations";
 import { getHealthCardMap } from "@/lib/customer/health-card";
+import { getApiUser, requireRole } from "@/lib/customer/api-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
+  // Auth gate — the snapshot blob contains every customer's billing, comms,
+  // and signals data. Previously the route had no check at all, meaning an
+  // unauthenticated visitor could pull the full book. All three roles
+  // (admin/manager/am) read this route from the dashboard.
+  const user = await getApiUser();
+  const denied = requireRole(user, "admin", "manager", "am");
+  if (denied) return denied;
+
   const url = new URL(req.url);
   const wantRebuild = url.searchParams.get("rebuild") === "1";
 

@@ -187,43 +187,11 @@ function V2DashboardInner() {
     window.history.replaceState({}, "", url.toString());
   }, [podFilter]);
 
-  // Phase 33.D — mirror tierFilter into ?tier= URL param (shareable links)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    const current = url.searchParams.get("tier");
-    const next = tierFilter ?? null;
-    if (next === current) return;
-    if (next === null) url.searchParams.delete("tier");
-    else url.searchParams.set("tier", next);
-    window.history.replaceState({}, "", url.toString());
-  }, [tierFilter]);
-
-  // Phase 33.D — mirror tierFilter into ?tier= URL param (shareable links)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    const current = url.searchParams.get("tier");
-    const next = tierFilter ?? null;
-    if (next === current) return;
-    if (next === null) url.searchParams.delete("tier");
-    else url.searchParams.set("tier", next);
-    window.history.replaceState({}, "", url.toString());
-  }, [tierFilter]);
-
-  // Phase 33.D — mirror tierFilter into ?tier= URL param (shareable links)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    const current = url.searchParams.get("tier");
-    const next = tierFilter ?? null;
-    if (next === current) return;
-    if (next === null) url.searchParams.delete("tier");
-    else url.searchParams.set("tier", next);
-    window.history.replaceState({}, "", url.toString());
-  }, [tierFilter]);
-
-  // Phase 33.D — mirror tierFilter into ?tier= URL param (shareable links)
+  // Phase 33.D — mirror tierFilter into ?tier= URL param (shareable links).
+  // Note: this block was duplicated 4× in v1 (a copy-paste accident during
+  // a refactor). Deduped here — single effect, single history write per
+  // tierFilter change. The other three were no-ops on re-fire (they bail
+  // when `next === current`) but each still scheduled a render.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
