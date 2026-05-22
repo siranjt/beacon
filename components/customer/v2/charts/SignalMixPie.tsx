@@ -217,7 +217,6 @@ export function SignalMixPie({ customers, amName }: Props) {
             No active signals in scope
           </div>
         ) : (
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           <Pie data={data} options={options as any} />
         )}
       </div>

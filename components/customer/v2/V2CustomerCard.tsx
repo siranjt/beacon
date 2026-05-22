@@ -142,7 +142,6 @@ function V2CustomerCardInner({
     const prev = seen[eid];
     const currTier = s.stoplight;
     const currLastTouch = customer.metrics?.last_any_iso ?? null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mh = (customer as any).metabase_health;
     const currChurnOpen: number = mh?.churn?.open_count ?? 0;
 

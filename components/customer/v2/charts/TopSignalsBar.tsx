@@ -192,7 +192,6 @@ export function TopSignalsBar({ customers }: Props) {
             No active signals across team
           </div>
         ) : (
-          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
           <Bar data={data} options={options as any} />
         )}
       </div>

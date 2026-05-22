@@ -160,7 +160,6 @@ export function BookHealthDonut({
         <LegendChip color={HEALTH_TIER_COLORS.HEALTHY} label="Healthy" value={healthyCount} />
       </div>
       <div style={{ position: "relative", width: "100%", height: "180px" }}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <Doughnut data={data} options={options as any} />
         {/* Phase 33.brand-watchfire-PR4-deferred — center label per spec §7. */}
         <div

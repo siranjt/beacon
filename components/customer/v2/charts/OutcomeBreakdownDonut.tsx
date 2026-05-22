@@ -215,7 +215,6 @@ export function OutcomeBreakdownDonut({ daysBack = 7 }: Props) {
             {loading ? "Catching signals…" : `No actions logged in last ${daysBack} days`}
           </div>
         ) : (
-          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
           <Doughnut data={data} options={options as any} />
         )}
       </div>

@@ -46,7 +46,6 @@ ChartJS.register(
 // Phase 33.brand-watchfire-PR6-final — current-point Ember halo per spec §11 row 26.
 // Draws a halo behind the last data point that pulses 1.5s loop. Runs on every
 // requestAnimationFrame after the entry animation settles (~2s in).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const emberTrendPulsePlugin: any = {
   id: "ember-trend-pulse",
   afterDatasetsDraw(chart: any) {
@@ -324,7 +323,6 @@ export function RedTrendLine({ currentRed, amName }: Props) {
         </span>
       </div>
       <div style={{ position: "relative", width: "100%", height: "180px" }}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <Line data={data} options={options as any} plugins={[emberTrendPulsePlugin]} />
         {/* Phase 33.brand-watchfire-PR6-final — area-fill breathe overlay per spec §11 row 27. */}
         <div className="beacon-trend-breath" aria-hidden />

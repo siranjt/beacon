@@ -201,7 +201,6 @@ export function AmStoplightStack({ rows }: Props) {
         </span>
       </div>
       <div style={{ position: "relative", width: "100%", height: "240px" }}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <Bar data={data} options={options as any} />
       </div>
     </div>
