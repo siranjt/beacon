@@ -618,14 +618,21 @@ export default function DashboardClient({ customers }: { customers: Customer[] }
             and Escalation use — Georgia serif + clamp() responsive sizing +
             heraldic gradient (Sea Lapis → Char → Crimson → Brass).
           */}
+          {/*
+            Hero font cap aligned to 64px (Customer + Performance + Escalation
+            standard). Previously 80px which made Post-Payment's hero visually
+            larger than the other agents and caused a layout shift when
+            navigating between them. Per the v2 visual register, all four
+            agent landing heros use clamp(40px, 6vw, 64px) for consistency.
+          */}
           <h1
             className="brand-gradient-text m-0"
             style={{
               fontFamily: 'Georgia, "Times New Roman", "Times", serif',
-              fontSize: "clamp(40px, 6vw, 80px)",
+              fontSize: "clamp(40px, 6vw, 64px)",
               fontWeight: 500,
               letterSpacing: "-0.02em",
-              lineHeight: 0.95,
+              lineHeight: 1.02,
             }}
           >
             Post-Payment Reviews

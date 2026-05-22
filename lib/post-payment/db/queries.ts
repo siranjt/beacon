@@ -17,7 +17,15 @@ import { neon } from "@neondatabase/serverless";
 // Pick the unpooled URL by preference — it's a direct connection to Neon's
 // primary compute endpoint, which is what we want for read-after-write
 // consistency.
+//
+// POST_PAYMENT_POSTGRES_URL takes the highest precedence so post-payment can
+// be wired to its own DB independent of the Customer Beacon. When the
+// umbrella's POSTGRES_URL was re-pointed at disengagement-pg (for customer
+// routes), post-payment's `customers`/`events` tables no longer existed at
+// that connection — set POST_PAYMENT_POSTGRES_URL to the original
+// post-payment Neon connection string to restore the original DB.
 const RAW_URL =
+  process.env.POST_PAYMENT_POSTGRES_URL ??
   process.env.DATABASE_URL_UNPOOLED ??
   process.env.STORAGE_DATABASE_URL_UNPOOLED ??
   process.env.POSTGRES_URL_NON_POOLING ??
