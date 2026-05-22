@@ -1,55 +1,11 @@
-import Link from "next/link";
+import V2Dashboard from "@/components/customer/v2/V2Dashboard";
+
+export const dynamic = "force-dynamic";
 
 /**
- * Customer Beacon — placeholder.
- *
- * Phase A: external link. The card on the launcher routes users to
- * https://beacon-zoca.vercel.app (v1 live, unchanged).
- *
- * Phase B (later): the v1 dashboard code lives here under
- * `app/(customer)/`, with route paths like /customer, /customer/manager, etc.
+ * Phase 2.A — AM Triage view (new). Coexists with v1 at /.
+ * Once validated with AMs, this becomes the primary dashboard.
  */
-export default function CustomerBeaconPlaceholder() {
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1.5rem",
-      }}
-    >
-      <h1
-        style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
-          fontSize: 32,
-          color: "var(--zoca-text)",
-          margin: 0,
-        }}
-      >
-        Customer Beacon
-      </h1>
-      <p style={{ color: "var(--zoca-text-2)", maxWidth: 460, textAlign: "center", marginTop: 12 }}>
-        Pending migration into the umbrella (Phase B). The live v1 deployment
-        continues at{" "}
-        <a href="https://beacon-zoca.vercel.app" style={{ color: "var(--zoca-pink)" }}>
-          beacon-zoca.vercel.app
-        </a>
-        .
-      </p>
-      <Link
-        href="/"
-        style={{
-          marginTop: 24,
-          fontSize: 13,
-          color: "var(--zoca-pink)",
-          textDecoration: "none",
-        }}
-      >
-        ← Back to Beacon
-      </Link>
-    </main>
-  );
+export default function V2Page() {
+  return <V2Dashboard />;
 }

@@ -49,8 +49,8 @@ export const AGENTS: Agent[] = [
     name: "Customer Beacon",
     description: "Live disengagement signals across your AM book. Snapshots refreshed hourly.",
     accent: "#C8431D", // Ember
-    route: "https://beacon-zoca.vercel.app",
-    kind: "external",
+    route: "/customer",
+    kind: "internal",
   },
   {
     id: "performance",
