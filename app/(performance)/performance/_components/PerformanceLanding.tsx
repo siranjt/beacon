@@ -502,15 +502,25 @@ function EmptyRecent() {
       <div style={{ fontStyle: "italic" }}>
         No reports yet. Paste an entity ID above to generate your first.
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 12, color: FADED, marginTop: 6 }}>
-        Try the sample:{" "}
-        <Link
-          href="/performance/report/a24bbd56-42ab-4540-9769-7cf65fadeaa6"
-          style={{ color: BRASS_DEEP, textDecoration: "none", fontWeight: 600 }}
-        >
-          Sheila Marie Aesthetics →
-        </Link>
-      </div>
+      {/*
+        Sample link is env-driven so we can swap or remove it without a code
+        change. NEXT_PUBLIC_PERFORMANCE_SAMPLE_ENTITY_ID + _NAME control the
+        suggestion. If either is empty, the sample row is omitted entirely
+        (helps when the prior canonical entity gets renamed or churned).
+        Previously this was a hardcoded entity UUID that would 404 if the
+        underlying customer churned — a small footgun for new users.
+      */}
+      {process.env.NEXT_PUBLIC_PERFORMANCE_SAMPLE_ENTITY_ID && process.env.NEXT_PUBLIC_PERFORMANCE_SAMPLE_ENTITY_NAME && (
+        <div style={{ fontFamily: SANS, fontSize: 12, color: FADED, marginTop: 6 }}>
+          Try the sample:{" "}
+          <Link
+            href={`/performance/report/${process.env.NEXT_PUBLIC_PERFORMANCE_SAMPLE_ENTITY_ID}`}
+            style={{ color: BRASS_DEEP, textDecoration: "none", fontWeight: 600 }}
+          >
+            {process.env.NEXT_PUBLIC_PERFORMANCE_SAMPLE_ENTITY_NAME} →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

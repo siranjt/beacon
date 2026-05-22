@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { AGENTS } from "@/lib/config";
 import BeaconAmbient from "@/components/BeaconAmbient";
 import LauncherCard from "./_components/LauncherCard";
+import LauncherSignOut from "./_components/LauncherSignOut";
 
 /**
  * Beacon umbrella launcher — the gateway screen users land on after sign-in.
@@ -25,6 +26,14 @@ export default async function LauncherPage() {
   return (
     <main style={{ position: "relative", minHeight: "100vh", background: "var(--zoca-bg)" }}>
       <BeaconAmbient />
+
+      {/*
+        Sign-out control. Pinned top-right inside the main relative box so it
+        sits above the BeaconAmbient backdrop but doesn't shift the centered
+        hero layout. Client component — uses NextAuth's signOut(), redirects
+        to /auth/signin after token revocation.
+      */}
+      <LauncherSignOut />
 
       <div
         style={{

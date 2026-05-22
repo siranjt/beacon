@@ -55,12 +55,20 @@ type ReportData = {
    Helpers — status colors + count-up tween
    ────────────────────────────────────────────── */
 function statusColor(status: Status): { bg: string; border: string; text: string; dot: string } {
+  // Watchfire status palette — replaces v2 emerald/red/amber/purple hex codes
+  // that were leaking into the report visual. Each tier maps to a Watchfire
+  // hue: PASS=Patina, FAIL=Deep Crimson, WARN=Brass, GAP=Smoke, default=Buff.
+  // Backgrounds are 10-12% tints, borders 35-40% to stay on-palette.
   const s = (status ?? "").toUpperCase();
-  if (s === "PASS") return { bg: "rgba(16, 185, 129, 0.10)", border: "rgba(16, 185, 129, 0.35)", text: "#047857", dot: "#10B981" };
-  if (s === "FAIL" || s === "AUTOFAIL") return { bg: "rgba(239, 68, 68, 0.10)", border: "rgba(239, 68, 68, 0.35)", text: "#991B1B", dot: "#EF4444" };
-  if (s === "WARN") return { bg: "rgba(245, 158, 11, 0.10)", border: "rgba(245, 158, 11, 0.35)", text: "#92400E", dot: "#F59E0B" };
-  if (s === "GAP") return { bg: "rgba(139, 92, 246, 0.08)", border: "rgba(139, 92, 246, 0.30)", text: "#6D28D9", dot: "#8B5CF6" };
-  return { bg: "#F9FAFC", border: "#E3E8EE", text: "#424553", dot: "#94A3B8" };
+  if (s === "PASS")
+    return { bg: "rgba(74, 124, 89, 0.10)", border: "rgba(74, 124, 89, 0.35)", text: "#2D5A3A", dot: "#4A7C59" };
+  if (s === "FAIL" || s === "AUTOFAIL")
+    return { bg: "rgba(124, 45, 18, 0.10)", border: "rgba(124, 45, 18, 0.35)", text: "#7C2D12", dot: "#7C2D12" };
+  if (s === "WARN")
+    return { bg: "rgba(217, 164, 65, 0.12)", border: "rgba(217, 164, 65, 0.40)", text: "#8C6A1F", dot: "#D9A441" };
+  if (s === "GAP")
+    return { bg: "rgba(110, 95, 80, 0.10)", border: "rgba(110, 95, 80, 0.30)", text: "#5A4C3E", dot: "#8B7A66" };
+  return { bg: "#EBE0C2", border: "#D4C29B", text: "#6E5F50", dot: "#8B7A66" };
 }
 
 function statusIcon(status: Status): string {
@@ -236,10 +244,13 @@ function TabBar({
    Overview — three-column driver / flags / mitigants
    ────────────────────────────────────────────── */
 function Overview({ exec, qualitative }: { exec: ReportData["exec"]; qualitative: ReportData["qualitative_flags"] }) {
+  // Watchfire overview cards — Driver = Deep Crimson (decisive cause),
+  // Reinforcing flags = Brass (signals to corroborate), Mitigating = Patina
+  // (the green-on-green Watchfire stand-in for "looks OK").
   const cards = [
-    { label: "Driving factor", body: exec?.driver, accent: "#EF4444", bg: "rgba(239, 68, 68, 0.06)" },
-    { label: "Reinforcing flags", body: exec?.reinforcing_flags, accent: "#F59E0B", bg: "rgba(245, 158, 11, 0.06)" },
-    { label: "Mitigating factors", body: exec?.mitigating_factors, accent: "#10B981", bg: "rgba(16, 185, 129, 0.06)" },
+    { label: "Driving factor", body: exec?.driver, accent: "#7C2D12", bg: "rgba(124, 45, 18, 0.06)" },
+    { label: "Reinforcing flags", body: exec?.reinforcing_flags, accent: "#D9A441", bg: "rgba(217, 164, 65, 0.08)" },
+    { label: "Mitigating factors", body: exec?.mitigating_factors, accent: "#4A7C59", bg: "rgba(74, 124, 89, 0.08)" },
   ].filter((c) => c.body);
 
   return (
@@ -348,11 +359,13 @@ function Framework({ framework }: { framework: ReportData["section4_framework"] 
     warn: allStatuses.filter((s) => (s ?? "").toUpperCase() === "WARN").length,
     gap: allStatuses.filter((s) => (s ?? "").toUpperCase() === "GAP").length,
   };
+  // Donut wedges in Watchfire — same hues as the status pills above so the
+  // chart and table cross-reference visually.
   const donutData = [
-    { label: "Pass", value: counts.pass, color: "#10B981" },
-    { label: "Fail", value: counts.fail, color: "#EF4444" },
-    { label: "Warn", value: counts.warn, color: "#F59E0B" },
-    { label: "Gap", value: counts.gap, color: "#8B5CF6" },
+    { label: "Pass", value: counts.pass, color: "#4A7C59" },     // Patina
+    { label: "Fail", value: counts.fail, color: "#7C2D12" },     // Deep Crimson
+    { label: "Warn", value: counts.warn, color: "#D9A441" },     // Brass
+    { label: "Gap", value: counts.gap, color: "#8B7A66" },       // Faded Smoke
   ];
 
   return (
@@ -573,7 +586,9 @@ function RiskCard({ risk, idx }: { risk: Risk; idx: number }) {
   const combinedSev = [risk.likelihood, risk.impact].some((s) => ["FAIL", "AUTOFAIL"].includes((s ?? "").toUpperCase())) ? "fail"
     : [risk.likelihood, risk.impact].some((s) => (s ?? "").toUpperCase() === "WARN") ? "warn"
     : "gap";
-  const sevAccent = combinedSev === "fail" ? "#EF4444" : combinedSev === "warn" ? "#F59E0B" : "#8B5CF6";
+  // Risk card severity stripe — Watchfire palette: Deep Crimson for fail,
+  // Brass for warn, Smoke for gap/info. Replaces v2 red/amber/purple hex.
+  const sevAccent = combinedSev === "fail" ? "#7C2D12" : combinedSev === "warn" ? "#D9A441" : "#8B7A66";
   return (
     <div
       onClick={() => setOpen(!open)}

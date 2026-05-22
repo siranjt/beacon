@@ -2,7 +2,10 @@
 
 import { useEffect, useRef } from 'react';
 
-const COLORS = ['#EC4899', '#8B5CF6', '#F59E0B', '#10B981', '#2D5BFF'];
+// Watchfire sparkle palette. Replaces v2 pink/purple/amber/emerald/indigo
+// with the five canonical Watchfire hues — Ember, Deep Crimson, Brass,
+// Patina, Sea Lapis — so ambient micro-decorations stay on-palette.
+const COLORS = ['#C8431D', '#7C2D12', '#D9A441', '#4A7C59', '#2A4D5C'];
 
 /**
  * Floating colored particles drifting up from the bottom of the host element.

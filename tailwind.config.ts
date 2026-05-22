@@ -79,6 +79,43 @@ const config: Config = {
         subSupport: "#2A4D5C",  // Sea Lapis
         paidOff: "#4A7C59",     // Patina
         subCancel: "#C8431D",   // Ember
+
+        // ─────────────────────────────────────────────────────────────
+        // Post-Payment Reviews tokens — REMAPPED to Watchfire. The
+        // component tree references `text-ink`, `bg-surface`, `border-line`,
+        // `bg-elevated`, `text-accent-{color}` etc., and before this remap
+        // those classes resolved to nothing (no CSS rule emitted, since
+        // they weren't declared in either Tailwind config or globals.css).
+        // Defining them as flat color tokens here makes every existing
+        // class reference render Watchfire colors without rewriting the
+        // ~1500 lines of post-payment JSX. Pattern matches the Escalation
+        // remap block above.
+        // ─────────────────────────────────────────────────────────────
+        // Text + surfaces
+        ink: "#2B1F14",            // Char (primary text)
+        "ink-muted": "#6E5F50",    // Smoke (muted text)
+        "ink-dim": "#8B7A66",      // Faded Smoke (dim text)
+        surface: "#F8EFD7",        // Light Parchment (card surface)
+        elevated: "#EBE0C2",       // Buff (hover/elevated surface)
+        line: "#D4C29B",           // Aged Brass (default border)
+        // Accent ramp — flat tokens (used as text-/bg-/border- prefixes).
+        // Pair each hue with a -bg companion that's a 6-8% tint for badge
+        // backgrounds. Hex picks: green = Patina, yellow = Brass, red =
+        // Ember, blue = Sea Lapis, purple = Deep Crimson, pink = Deep
+        // Crimson (purple/pink are visually adjacent in Watchfire).
+        "accent-line": "#C2A975",
+        "accent-green": "#4A7C59",
+        "accent-green-bg": "#DAE5DC",
+        "accent-yellow": "#D9A441",
+        "accent-yellow-bg": "#F5E6BB",
+        "accent-red": "#C8431D",
+        "accent-red-bg": "#F5C9B6",
+        "accent-blue": "#2A4D5C",
+        "accent-blue-bg": "#D8E1E6",
+        "accent-purple": "#7C2D12",
+        "accent-purple-bg": "#F5C9B6",
+        "accent-pink": "#7C2D12",
+        "accent-pink-bg": "#F5C9B6",
       },
       borderRadius: {
         zoca: "10px",

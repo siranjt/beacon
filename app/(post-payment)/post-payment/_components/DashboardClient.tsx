@@ -220,7 +220,9 @@ function AMBarChart({
                 style={{
                   width: `${pct}%`,
                   height: "100%",
-                  background: isSelected ? "#2D5BFF" : "#8B5CF6",
+                  // Selected = Sea Lapis, unselected = Smoke. Replaces v2
+                  // indigo/purple to keep the AM filter chip on Watchfire.
+                  background: isSelected ? "#2A4D5C" : "#8B7A66",
                   borderRadius: 3,
                   transition: "background 200ms ease",
                   animationDelay: `${0.40 + idx * 0.08}s`,
@@ -423,9 +425,12 @@ export default function DashboardClient({ customers }: { customers: Customer[] }
   // Donut data
   const donutData = useMemo(
     () => [
-      { key: "icp" as const, label: "ICP", value: totals.icp, color: "#10B981", ringColor: "#D1FAE5" },
-      { key: "review" as const, label: "Review", value: totals.review, color: "#F59E0B", ringColor: "#FEF3C7" },
-      { key: "not_icp" as const, label: "Not ICP", value: totals.not_icp, color: "#EF4444", ringColor: "#FEE2E2" },
+      // Verdict ring colors in Watchfire. ICP = Patina (good), Review = Brass
+      // (caution), Not ICP = Deep Crimson (stop). RingColor is a 12-15% tint
+      // for the donut background.
+      { key: "icp" as const, label: "ICP", value: totals.icp, color: "#4A7C59", ringColor: "#DAE5DC" },
+      { key: "review" as const, label: "Review", value: totals.review, color: "#D9A441", ringColor: "#F5E6BB" },
+      { key: "not_icp" as const, label: "Not ICP", value: totals.not_icp, color: "#7C2D12", ringColor: "#F5C9B6" },
       { key: "pending" as const, label: "Pending", value: totals.pending, color: "#94A3B8", ringColor: "#F1F5F9" },
       { key: "failed" as const, label: "Failed", value: totals.failed, color: "#BE185D", ringColor: "#FCE7F3" },
       { key: "out_of_scope" as const, label: "Out of scope", value: totals.out_of_scope, color: "#CBD5E1", ringColor: "#F1F5F9" },
@@ -471,9 +476,11 @@ export default function DashboardClient({ customers }: { customers: Customer[] }
       }
     }
     const data = [
-      { key: "autofail", label: "Autofail (<30)", value: buckets.autofail, color: "#EF4444" },
-      { key: "possible", label: "Possible (30–60)", value: buckets.possible, color: "#F59E0B" },
-      { key: "likely", label: "Likely (>60)", value: buckets.likely, color: "#10B981" },
+      // Lead-prediction bucket colors in Watchfire — same hue assignment
+      // as the verdict donut so the two charts read consistently.
+      { key: "autofail", label: "Autofail (<30)", value: buckets.autofail, color: "#7C2D12" },  // Deep Crimson
+      { key: "possible", label: "Possible (30–60)", value: buckets.possible, color: "#D9A441" }, // Brass
+      { key: "likely", label: "Likely (>60)", value: buckets.likely, color: "#4A7C59" },        // Patina
       { key: "unknown", label: "Unknown", value: buckets.unknown, color: "#CBD5E1" },
     ];
     const avg = n > 0 ? Math.round(sum / n) : null;
@@ -602,7 +609,25 @@ export default function DashboardClient({ customers }: { customers: Customer[] }
           <span aria-hidden className="header-spark text-accent-pink text-sm" style={{ top: "-12px", left: "-22px", animationDelay: "0s" }}>✦</span>
           <span aria-hidden className="header-spark text-accent-purple text-xs" style={{ top: "-4px", right: "-26px", animationDelay: "0.7s" }}>✦</span>
           <span aria-hidden className="header-spark text-accent-yellow text-sm" style={{ bottom: "8px", right: "-12px", animationDelay: "1.4s" }}>✦</span>
-          <h1 className="hero-float text-pink-shimmer text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-extrabold tracking-tight leading-[0.95] m-0">
+          {/*
+            Heraldic hero — Watchfire gradient applied via .brand-gradient-text
+            (defined in app/globals.css). Previously used `hero-float` and
+            `text-pink-shimmer` Tailwind classes that don't exist anywhere
+            in the codebase, so the title rendered flat in default Tailwind
+            font-extrabold. Replaced with the canonical pattern Performance
+            and Escalation use — Georgia serif + clamp() responsive sizing +
+            heraldic gradient (Sea Lapis → Char → Crimson → Brass).
+          */}
+          <h1
+            className="brand-gradient-text m-0"
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", "Times", serif',
+              fontSize: "clamp(40px, 6vw, 80px)",
+              fontWeight: 500,
+              letterSpacing: "-0.02em",
+              lineHeight: 0.95,
+            }}
+          >
             Post-Payment Reviews
           </h1>
         </div>

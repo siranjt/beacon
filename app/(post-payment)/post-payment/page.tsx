@@ -34,9 +34,16 @@ export default async function Page() {
   if (dbError) {
     return (
       <BeaconPageShell>
-        <div className="rounded-2xl border border-red-500/40 bg-red-50/40 px-5 py-4 text-sm text-red-900 mt-8">
-          <strong>Database connection error:</strong> {dbError}
-          <div className="text-xs mt-2 opacity-70">
+        {/*
+          Watchfire-skinned error block. Previously used raw Tailwind red
+          tokens (border-red-500/40 bg-red-50/40 text-red-900) which leaked
+          a v2 hue into an otherwise Parchment-on-Char surface. Replaced
+          with accent-red (Ember) + accent-red-bg tint defined in the
+          Tailwind config remap.
+        */}
+        <div className="rounded-2xl border border-accent-red/40 bg-accent-red-bg/30 px-5 py-4 text-sm text-accent-red mt-8">
+          <strong className="text-ink">Database connection error:</strong> {dbError}
+          <div className="text-xs mt-2 text-ink-muted">
             Run <code className="font-mono">npm run db:migrate</code> against POSTGRES_URL to create the schema, and verify the connection string in Vercel env vars.
           </div>
         </div>
