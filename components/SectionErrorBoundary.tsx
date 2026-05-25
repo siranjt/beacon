@@ -57,27 +57,6 @@ export default class SectionErrorBoundary extends Component<Props, State> {
       info.componentStack,
     );
 
-    // Phase E-9 — also forward to Sentry if it's wired. Lazy import so we
-    // don't pull in the SDK unless it's available; the require lives in a
-    // try/catch so a missing dep never breaks the boundary.
-    try {
-      if (typeof window !== "undefined") {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const Sentry = require("@sentry/nextjs");
-        if (Sentry?.captureException) {
-          Sentry.captureException(error, {
-            tags: {
-              kind: "section_error_boundary",
-              section: this.props.label,
-            },
-            extra: { componentStack: info.componentStack },
-          });
-        }
-      }
-    } catch {
-      /* Sentry not available — fine */
-    }
-
     // Fire telemetry to the umbrella activity log. Fire-and-forget — never
     // throw from inside an error boundary.
     try {
