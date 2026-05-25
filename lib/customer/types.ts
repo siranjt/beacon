@@ -356,6 +356,17 @@ export type ScoredCustomerV2 = ScoredCustomer & {
   churned_on?: string | null;
   /** Phase 33.scope — ISO string of first activated_at across customer's subs. */
   onboarded_on?: string | null;
+  /**
+   * Phase E-11 — per-customer signal freshness.
+   *   "fresh"          — activated <48h ago; daily B/C/D hasn't picked them up yet.
+   *                      Signals will be empty/missing on this card by design.
+   *   "warming"        — activated 48h–7d ago; some signals are landing but not all.
+   *                      Especially comms & performance need a few days of history.
+   *   "ready"          — >7d since activation. Signals are real.
+   *   "stale_signals"  — system-level staleness (Stage B/C/D failed or hasn't run
+   *                      in >25h). Applied at compose time when freshness gates fail.
+   */
+  signal_state?: "fresh" | "warming" | "ready" | "stale_signals";
 };
 
 export type AmTierRow = {
@@ -414,6 +425,24 @@ export type DataHealth = {
   multiEntityExpansion: number;
   fetchErrors: string[];
   refreshDurationMs: number;
+  /**
+   * Phase E-11 — per-stage freshness so the UI can honestly report what's stale.
+   * Key is the stage letter, value is the ISO timestamp the stage last completed.
+   * Stage D is optional; absent when no HubSpot data was loaded.
+   */
+  signal_freshness_per_stage?: {
+    A: string | null;
+    B: string | null;
+    C: string | null;
+    D: string | null;
+  };
+  /**
+   * Phase E-11 — structured degraded states surfaced from compose. Examples:
+   *   "stage_b_stale_25h", "stage_d_unavailable", "stage_a_universe_shrank",
+   *   "stage_d_used_yesterday_fallback".
+   * V2Dashboard reads this to render a staleness banner with concrete reasons.
+   */
+  degraded_reasons?: string[];
 };
 
 /** v1 snapshot — preserved for backward compat */

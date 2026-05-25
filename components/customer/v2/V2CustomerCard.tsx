@@ -520,6 +520,22 @@ function V2CustomerCardInner({
             >
               ↗ Open detail
             </a>
+          {/* Phase E-11 — signal-freshness chip. Tells AMs "this customer just
+              joined, their signals haven't caught up — empty stats are by design,
+              not a problem with the customer". Renders alongside / instead of
+              the lifecycle pill (which surfaces newly_onboarded/resurrected separately). */}
+          {(customer.signal_state === "fresh" || customer.signal_state === "warming") && (
+            <span
+              className="rounded-zoca-pill bg-amber-500/18 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+              title={
+                customer.signal_state === "fresh"
+                  ? "Activated within the last 48 hours. Comms / Mixpanel / performance signals haven't run their first daily refresh yet — empty stats are expected. Signals refresh nightly at 22:00 UTC."
+                  : "Activated within the last 7 days. Some signals are landing, but the full picture takes ~7 days to accumulate. Don't read too much into early-stage scores."
+              }
+            >
+              {customer.signal_state === "fresh" ? "🔥 Fresh — signals warming up" : "✨ Warming — signals settling"}
+            </span>
+          )}
           {/* Phase 33.scope — lifecycle pill (recently_churned | newly_onboarded | resurrected) */}
           {customer.lifecycle_state && customer.lifecycle_state !== "active" && (() => {
             const lc = customer.lifecycle_state;

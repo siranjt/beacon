@@ -604,7 +604,13 @@ function V2DashboardInner() {
         view={view}
         setView={setView}
       />
-      {ready && <FreshnessBanner generatedAt={ready.generatedAt} />}
+      {ready && (
+        <FreshnessBanner
+          generatedAt={ready.generatedAt}
+          health={ready.health ?? null}
+          canForceRefresh={!isAm}
+        />
+      )}
       {/* Phase E-9 — wrap each major section in a SectionErrorBoundary so
           a single component's render failure doesn't blank the entire
           dashboard. Each boundary has a retry button + telemetry. The

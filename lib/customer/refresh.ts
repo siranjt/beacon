@@ -32,6 +32,8 @@ import {
 // Phase 31.v2 — single Metabase CSV per nightly refresh (replaces v1 HubSpot
 // Service Hub + Linear GraphQL adapters).
 import { fetchTicketsFromMetabase } from "./tickets-from-metabase";
+// Phase E-11 — integrity alerting on stage-level failures.
+import { postSlack } from "./slack";
 import type { UnifiedTicket } from "./tickets-unified";
 import type {
   ScoredCustomer,
@@ -339,6 +341,106 @@ export async function runStageA(today: number = todayMs()): Promise<{
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Phase E-11 — Stage A integrity assertions (G4).
+  // Sentinel checks that catch silent-failure modes where Chargebee returns
+  // a partial response (missing recently_cancelled marker, drastically smaller
+  // customer universe than yesterday, etc.). Each finding pushes a structured
+  // "integrity:" error so composeSnapshot lifts it into degraded_reasons →
+  // the UI staleness banner. Severe findings also fire Slack + Sentry.
+  // -------------------------------------------------------------------------
+  const assertions: { token: string; severity: "warn" | "alert"; message: string }[] = [];
+
+  // A.1 — universe shrank suspiciously. Active book is typically 800-1000.
+  // <500 is a strong "something broke" signal.
+  if (activeEntityIds.size < 500 && errors.length === 0) {
+    assertions.push({
+      token: `integrity:stage_a_universe_shrank_to_${activeEntityIds.size}`,
+      severity: "alert",
+      message: `Active customer universe shrank to ${activeEntityIds.size}. Expected 800-1000. Possible Chargebee fetch issue.`,
+    });
+  }
+
+  // A.2 — recently_cancelled marker missing. If we got plenty of live subs but
+  // ZERO recently-churned entries, Chargebee likely dropped the `recently_cancelled`
+  // tag — meaning real churn is invisible right now. This was the exact silent
+  // failure mode from the audit.
+  const recentlyChurnedCount = Object.keys(recentlyChurnedByCustomer).length;
+  if (subs.length >= 100 && recentlyChurnedCount === 0) {
+    assertions.push({
+      token: "integrity:stage_a_recently_cancelled_field_missing",
+      severity: "alert",
+      message:
+        `Stage A returned ${subs.length} subs but ZERO recently_cancelled — Chargebee response shape may have changed. ` +
+        `Churn is currently invisible.`,
+    });
+  }
+
+  // A.3 — BaseSheet collapsed. The match overlay needs BaseSheet; <100 rows
+  // means the public CSV fetch is partial.
+  if (baseSheetResult.rows.length < 100) {
+    assertions.push({
+      token: `integrity:stage_a_basesheet_only_${baseSheetResult.rows.length}_rows`,
+      severity: "warn",
+      message: `BaseSheet returned only ${baseSheetResult.rows.length} rows. Expected 900+. AM/AE/pod mapping will be incomplete.`,
+    });
+  }
+
+  // A.4 — place_id resolution collapsed. <50% coverage on active customers
+  // means HubSpot company joins will whiff. Soft-warn only — the dashboard
+  // still works without HubSpot data.
+  if (placeIdByEntity.size > 0 && placeIdByEntity.size < activeEntityIds.size * 0.5) {
+    assertions.push({
+      token: `integrity:stage_a_place_id_coverage_${Math.floor((placeIdByEntity.size / Math.max(activeEntityIds.size, 1)) * 100)}pct`,
+      severity: "warn",
+      message: `place_id resolved for only ${placeIdByEntity.size} of ${activeEntityIds.size} active customers. HubSpot joins will be partial.`,
+    });
+  }
+
+  // Emit findings → errors[] for composeSnapshot to lift into degraded_reasons.
+  for (const a of assertions) {
+    errors.push(a.token);
+    console.warn(`[stage-a integrity ${a.severity}] ${a.message}`);
+  }
+
+  // Fire-and-forget Slack alert + Sentry capture for severe findings. Never
+  // block the snapshot pipeline on alerting — these are observability outputs.
+  const alerts = assertions.filter((a) => a.severity === "alert");
+  if (alerts.length > 0) {
+    try {
+      // Lazy Sentry — see SectionErrorBoundary for the same pattern. If
+      // @sentry/nextjs isn't installed (local dev), this no-ops cleanly.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Sentry = require("@sentry/nextjs");
+      for (const a of alerts) {
+        if (Sentry?.captureMessage) {
+          Sentry.captureMessage(a.message, {
+            level: "error",
+            tags: { kind: "stage_a_integrity", token: a.token },
+          });
+        }
+      }
+    } catch {
+      /* Sentry not installed — fine */
+    }
+    // Slack post is fire-and-forget; we don't await so we don't slow the cron.
+    postSlack({
+      text: `:rotating_light: *Beacon Stage A integrity*: ${alerts.length} alert(s)`,
+      blocks: [
+        {
+          type: "header",
+          text: { type: "plain_text", text: ":rotating_light: Beacon — Stage A integrity alerts" },
+        },
+        ...alerts.map((a) => ({
+          type: "section",
+          text: { type: "mrkdwn", text: `*${a.token}*\n${a.message}` },
+        })),
+      ],
+    }).catch(() => {
+      /* never crash the pipeline on Slack hiccups */
+    });
+  }
+
   const data: StageAData = {
     todayMs: today,
     todayIso: new Date(today).toISOString(),
@@ -499,13 +601,34 @@ export async function runStageD(_today: number = todayMs()): Promise<{
   const errors: string[] = [];
   memSnap("D start");
 
+  // Phase E-11 (G5) — Stage D atomicity. Two layers of failure handling:
+  //
+  //   1. If `fetchActiveHubspotCompanies` succeeds but returns zero rows OR
+  //      throws, Stage D cannot meaningfully proceed. We throw — composeSnapshot
+  //      reads yesterday's Stage D as a fallback (degraded_reason emitted).
+  //
+  //   2. Secondary fetches (deals/notes/calls/contacts) run in Promise.all
+  //      under a single try/catch. Any one failure throws and aborts the
+  //      stage — we do NOT publish a partial Stage D where some customers
+  //      have HubSpot data and others don't. That inconsistency is the bug
+  //      this guard prevents.
+  //
+  // When HUBSPOT_ACCESS_TOKEN isn't configured at all, the underlying helpers
+  // return empty maps cleanly — that's the legacy "optional stage" behavior
+  // and produces zero companies + no errors. Compose treats that as
+  // "stage_d_hubspot_unavailable" via the degraded_reason path.
+
   // 1. Active customer companies from HubSpot
-  const companiesMap = await timed("companies", () => fetchActiveHubspotCompanies()).catch(
-    (e: Error) => {
-      errors.push(`HubSpot companies: ${e.message}`);
-      return new Map<string, HubspotCompanyRow>();
-    },
-  );
+  let companiesMap: Map<string, HubspotCompanyRow>;
+  try {
+    companiesMap = await timed("companies", () => fetchActiveHubspotCompanies());
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push(`hubspot:companies_fetch_failed:${msg.slice(0, 100)}`);
+    // Re-throw so the cron route catches it and composeSnapshot falls back to
+    // yesterday's Stage D instead of writing a broken partial.
+    throw new Error(`Stage D aborted — HubSpot companies fetch failed: ${msg}`);
+  }
   memSnap("D after companies");
 
   // Build canonical map keyed by place_id
@@ -523,13 +646,15 @@ export async function runStageD(_today: number = todayMs()): Promise<{
     hubspotCompanyIds.push(c.id);
   }
 
-  // 2. Deals per company
-  const dealsMap = await timed("deals", () => fetchDealsForCompanies(hubspotCompanyIds)).catch(
-    (e: Error) => {
-      errors.push(`HubSpot deals: ${e.message}`);
-      return new Map<string, DealsForCompany>();
-    },
-  );
+  // 2. Deals per company — atomic with notes/calls/contacts below.
+  let dealsMap: Map<string, DealsForCompany>;
+  try {
+    dealsMap = await timed("deals", () => fetchDealsForCompanies(hubspotCompanyIds));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push(`hubspot:deals_fetch_failed:${msg.slice(0, 100)}`);
+    throw new Error(`Stage D aborted — HubSpot deals fetch failed: ${msg}`);
+  }
   memSnap("D after deals");
   const dealsByHubspotCompanyId: Record<string, DealsForCompany> = {};
   for (const [cid, d] of dealsMap) dealsByHubspotCompanyId[cid] = d;
@@ -563,29 +688,32 @@ export async function runStageD(_today: number = todayMs()): Promise<{
     void cache;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    errors.push(`HubSpot notes: ${msg}`);
+    errors.push(`hubspot:notes_fetch_failed:${msg.slice(0, 100)}`);
+    // Phase E-11 — notes is the most LLM-heavy fetch; if it breaks we still
+    // have meaningful HubSpot data from companies/deals. Keep notes as a soft
+    // failure (empty map) but mark the structured error so the UI banner shows
+    // "notes unavailable" without nuking the rest of Stage D.
   }
   memSnap("D after notes");
 
-  // 4. Calls per company (Phase 14B — Tier C: comms drift)
-  const callsMap = await timed("calls", () => fetchCallsForCompanies(hubspotCompanyIds)).catch(
-    (e: Error) => {
-      errors.push(`HubSpot calls: ${e.message}`);
-      return new Map<string, CallsForCompany>();
-    },
-  );
-  memSnap("D after calls");
+  // 4 + 5. Calls + Contacts — atomic. Either both land, or we throw and let
+  // composeSnapshot fall back to yesterday's Stage D. Wrapped together because
+  // they're both small companion fetches and the failure mode is identical.
+  let callsMap: Map<string, CallsForCompany>;
+  let contactsMap: Map<string, CompanyContact[]>;
+  try {
+    [callsMap, contactsMap] = await Promise.all([
+      timed("calls", () => fetchCallsForCompanies(hubspotCompanyIds)),
+      timed("contacts", () => fetchContactsForCompanies(hubspotCompanyIds)),
+    ]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push(`hubspot:calls_or_contacts_fetch_failed:${msg.slice(0, 100)}`);
+    throw new Error(`Stage D aborted — HubSpot calls/contacts fetch failed: ${msg}`);
+  }
+  memSnap("D after calls + contacts");
   const callsByHubspotCompanyId: Record<string, CallsForCompany> = {};
   for (const [cid, c] of callsMap) callsByHubspotCompanyId[cid] = c;
-
-  // 5. Contacts per company (Phase 14C — Tier E: buyer-side org chart)
-  const contactsMap = await timed("contacts", () =>
-    fetchContactsForCompanies(hubspotCompanyIds),
-  ).catch((e: Error) => {
-    errors.push(`HubSpot contacts: ${e.message}`);
-    return new Map<string, CompanyContact[]>();
-  });
-  memSnap("D after contacts");
   const contactsByHubspotCompanyId: Record<string, CompanyContact[]> = {};
   for (const [cid, cs] of contactsMap) contactsByHubspotCompanyId[cid] = cs;
 
@@ -668,7 +796,26 @@ export async function composeSnapshot(
   const stageA = a!.data as StageAData;
   const stageB = b!.data as StageBData;
   const stageC = c!.data as StageCData;
-  const stageD = (d?.data as StageDData | undefined) ?? null;
+  // Phase E-11 (G5) — Stage D fallback. If today's Stage D is missing (cron
+  // failed atomically or HubSpot token unset), look back up to 3 days for the
+  // most recent successful Stage D so the dashboard isn't blank for HubSpot
+  // fields. Emit a structured degraded_reason so the UI banner shows what
+  // happened — the AM should know yesterday's HubSpot data is being shown.
+  let stageD = (d?.data as StageDData | undefined) ?? null;
+  if (!stageD) {
+    for (let daysBack = 1; daysBack <= 3; daysBack++) {
+      const dt = new Date(snapshotDate + "T00:00:00Z");
+      dt.setUTCDate(dt.getUTCDate() - daysBack);
+      const ymd = dt.toISOString().slice(0, 10);
+      const fallback = await readPipelineStage<StageDData>("D", ymd);
+      if (fallback) {
+        stageD = fallback.data;
+        errors.push(`stage_d_used_yesterday_fallback:${ymd}_${daysBack}d`);
+        console.warn(`[compose] using Stage D fallback from ${ymd} (${daysBack}d ago)`);
+        break;
+      }
+    }
+  }
   const today = stageA.todayMs;
 
   // -------------------------------------------------------------------------
@@ -909,6 +1056,23 @@ export async function composeSnapshot(
     else if (_isNewlyOnboarded) _lifecycle_state = "newly_onboarded";
     const _churnedOn = _recentlyChurned?.cancelled_at || null;
     const _onboardedOn = _activatedIso;
+
+    // Phase E-11 — per-customer signal freshness. Independent of lifecycle_state
+    // because a "resurrected" customer is also "fresh" in signal terms — they may
+    // have new entity_id w/o history yet.
+    //   <48h since activation  → "fresh"   (signals will be empty by design)
+    //   48h–7d                  → "warming" (some signals starting to land)
+    //   >7d                     → "ready"   (signals are trustworthy)
+    // Recently_churned customers stay "ready" — their signals reflect their last
+    // active period and are not "fresh" in any meaningful sense.
+    let _signal_state: "fresh" | "warming" | "ready" | "stale_signals" = "ready";
+    if (_hasLiveSub && Number.isFinite(_activatedMs)) {
+      const ageMs = stageA.todayMs - _activatedMs;
+      const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      if (ageMs <= twoDaysMs) _signal_state = "fresh";
+      else if (ageMs <= sevenDaysMs) _signal_state = "warming";
+    }
     scored.push({
       customer_id: meta?.customer_id || "",
       entity_id: entityId,
@@ -942,6 +1106,7 @@ export async function composeSnapshot(
       lifecycle_state: _lifecycle_state,
       churned_on: _churnedOn,
       onboarded_on: _onboardedOn,
+      signal_state: _signal_state,
     });
   }
 
@@ -1050,6 +1215,39 @@ export async function composeSnapshot(
     notInChrone: scored.filter((c) => !c.in_chrone).length,
   };
 
+  // Phase E-11 — derive per-stage freshness from the pipeline_state reads and
+  // synthesize structured degraded_reasons. Used by the V2Dashboard banner.
+  const _stageFreshness = {
+    A: a?.generatedAt ?? null,
+    B: b?.generatedAt ?? null,
+    C: c?.generatedAt ?? null,
+    D: d?.generatedAt ?? null,
+  };
+  const _twentyFiveHoursMs = 25 * 60 * 60 * 1000;
+  const _nowMs = Date.now();
+  const _degradedReasons: string[] = [];
+  // Treat A/B/C as required, D as optional. Any required stage >25h stale is a
+  // user-visible degraded state. Stage D 25h+ stale only matters if it ran at
+  // all — if it never ran, that's a separate "hubspot_unavailable" reason.
+  for (const stage of ["A", "B", "C"] as const) {
+    const iso = _stageFreshness[stage];
+    if (!iso) continue;
+    const age = _nowMs - Date.parse(iso);
+    if (age > _twentyFiveHoursMs) _degradedReasons.push(`stage_${stage.toLowerCase()}_stale_${Math.floor(age / 3600_000)}h`);
+  }
+  if (!stageD) _degradedReasons.push("stage_d_hubspot_unavailable");
+  else if (_stageFreshness.D) {
+    const ageD = _nowMs - Date.parse(_stageFreshness.D);
+    if (ageD > _twentyFiveHoursMs) _degradedReasons.push(`stage_d_stale_${Math.floor(ageD / 3600_000)}h`);
+  }
+  // Surface any structured errors from upstream stages (Stage A integrity
+  // assertions push their findings into the errors[] array below).
+  for (const e of errors) {
+    if (typeof e === "string" && (e.startsWith("integrity:") || e.startsWith("stage_") || e.startsWith("hubspot:"))) {
+      _degradedReasons.push(e);
+    }
+  }
+
   const health: DataHealth = {
     totalSubsFetched: stageA.stats.totalSubs,
     customersWithEntityId: scored.filter((c) => c.entity_id).length,
@@ -1072,6 +1270,8 @@ export async function composeSnapshot(
     multiEntityExpansion: stageA.stats.multiEntityExpansion,
     fetchErrors: errors,
     refreshDurationMs: Date.now() - started,
+    signal_freshness_per_stage: _stageFreshness,
+    degraded_reasons: _degradedReasons.length ? _degradedReasons : undefined,
   };
 
   const snapshot: SnapshotV2 = {
@@ -1347,13 +1547,50 @@ export async function runStageDAndStore(snapshotDate?: string): Promise<{
   const date = snapshotDate ?? todaySnapshotDate();
   const stageA = await readPipelineStage<StageAData>("A", date);
   const anchorToday = stageA?.data?.todayMs ?? todayMs();
-  const { data, durationMs, errors } = await runStageD(anchorToday);
-  await writePipelineStage("D", date, data, {
-    durationMs,
-    errors,
-    rowCount: Object.keys(data.companiesByPlaceId).length,
-  });
-  return { durationMs, errors, rowCount: Object.keys(data.companiesByPlaceId).length };
+  try {
+    const { data, durationMs, errors } = await runStageD(anchorToday);
+    await writePipelineStage("D", date, data, {
+      durationMs,
+      errors,
+      rowCount: Object.keys(data.companiesByPlaceId).length,
+    });
+    return { durationMs, errors, rowCount: Object.keys(data.companiesByPlaceId).length };
+  } catch (e) {
+    // Phase E-11 (G5) — atomic Stage D abort. Fire-and-forget Slack alert +
+    // Sentry capture so we know HubSpot pipeline broke. The cron route reports
+    // a 500, composeSnapshot will fall back to yesterday's Stage D, and the
+    // V2Dashboard banner will show the structured reason.
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[stage-d abort] ${msg}`);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Sentry = require("@sentry/nextjs");
+      if (Sentry?.captureException) {
+        Sentry.captureException(e, {
+          level: "error",
+          tags: { kind: "stage_d_abort", snapshot_date: date },
+        });
+      }
+    } catch {
+      /* Sentry unavailable */
+    }
+    postSlack({
+      text: `:rotating_light: *Beacon Stage D aborted*: ${msg}`,
+      blocks: [
+        {
+          type: "header",
+          text: { type: "plain_text", text: ":rotating_light: Beacon — Stage D (HubSpot) aborted" },
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: `*Snapshot date*: \`${date}\`\n*Reason*: ${msg}\n\nCompose will fall back to yesterday's Stage D if available. AMs will see a staleness banner.` },
+        },
+      ],
+    }).catch(() => {
+      /* never crash on Slack hiccups */
+    });
+    throw e;
+  }
 }
 
 // ===========================================================================
