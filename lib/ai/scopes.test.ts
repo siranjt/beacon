@@ -231,6 +231,40 @@ describe("scopeLabel — every scope has a human label", () => {
   });
 });
 
+describe("scopeKey ↔ pathToScope round-tripping", () => {
+  // The scope_key string is used as a localStorage cache key, a system-prompt
+  // identifier, and an activity-log tag. It MUST be stable and parametrized
+  // for the entity-bearing scopes; otherwise we'd be conflating data.
+  it("customer-360 keys embed entity_id and pathToScope agrees", () => {
+    const scope = pathToScope("/360/abc-xyz-123");
+    expect(scopeKey(scope)).toBe("customer-360:abc-xyz-123");
+  });
+
+  it("performance-report keys embed entity_id and pathToScope agrees", () => {
+    const scope = pathToScope("/performance/report/eid-456");
+    expect(scopeKey(scope)).toBe("performance-report:eid-456");
+  });
+
+  it("post-payment-customer keys embed cb_customer_id and pathToScope agrees", () => {
+    const scope = pathToScope("/post-payment/reports/cb_cust_789");
+    expect(scopeKey(scope)).toBe("post-payment-customer:cb_cust_789");
+  });
+
+  it("non-parametrized scopes produce stable keys without identifiers", () => {
+    expect(scopeKey(pathToScope("/customer"))).toBe("customer-book");
+    expect(scopeKey(pathToScope("/performance"))).toBe("performance-landing");
+    expect(scopeKey(pathToScope("/escalation"))).toBe("escalation-overview");
+    expect(scopeKey(pathToScope("/post-payment"))).toBe("post-payment-book");
+    expect(scopeKey(pathToScope("/"))).toBe("inbox");
+  });
+
+  it("two different entity_ids produce different scope_keys (no conflation)", () => {
+    const a = scopeKey(pathToScope("/360/entity-A"));
+    const b = scopeKey(pathToScope("/360/entity-B"));
+    expect(a).not.toBe(b);
+  });
+});
+
 describe("scopeQuickPrompts — every visible scope has at least 2 prompts", () => {
   // Guard against accidentally shipping an empty quick-prompts list, which
   // would render an awkward gap in the AskPanel empty state.

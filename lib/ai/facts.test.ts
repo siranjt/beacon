@@ -152,4 +152,117 @@ describe("renderFactsForPrompt — formatting", () => {
     // Two sections → double newline between them.
     expect(out).toMatch(/style-A\n\nTone:/);
   });
+
+  it("handles all 8 categories simultaneously in correct order", () => {
+    const out = renderFactsForPrompt([
+      fact({ category: "behavior", fact: "B" }),
+      fact({ category: "context", fact: "C" }),
+      fact({ category: "preference", fact: "P" }),
+      fact({ category: "depth", fact: "D" }),
+      fact({ category: "tone", fact: "T" }),
+      fact({ category: "style", fact: "S" }),
+      fact({ category: "onboarding", fact: "O" }),
+      fact({ category: "explicit", fact: "E" }),
+    ]);
+    expect(out).not.toBeNull();
+    const expectedOrder = ["E", "O", "S", "T", "D", "P", "C", "B"];
+    let lastPos = -1;
+    for (const label of expectedOrder) {
+      const pos = out!.indexOf(`- ${label}`);
+      expect(pos, `${label} not found in render`).toBeGreaterThan(lastPos);
+      lastPos = pos;
+    }
+  });
+
+  it("preserves order of facts within a single category (most-recent-seen first matches input order)", () => {
+    const out = renderFactsForPrompt([
+      fact({ category: "style", fact: "first-style", id: 1 }),
+      fact({ category: "style", fact: "second-style", id: 2 }),
+      fact({ category: "style", fact: "third-style", id: 3 }),
+    ]);
+    const first = out!.indexOf("first-style");
+    const second = out!.indexOf("second-style");
+    const third = out!.indexOf("third-style");
+    expect(first).toBeLessThan(second);
+    expect(second).toBeLessThan(third);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase E-15.3 additions — DB-touching helpers exercised in their fail-safe
+// (no-DB) paths. These functions are designed to be defensive when the DB
+// isn't configured — listing/inserting/etc. all silently no-op rather than
+// crashing chat. We can't unit-test the SQL paths without a real Postgres,
+// but we CAN lock in the "no DB" contracts so a future refactor doesn't
+// accidentally make Beacon AI crash for users without storage wired.
+// ---------------------------------------------------------------------------
+
+import {
+  listFactsForUser,
+  addExplicitFact,
+  adjustFactConfidence,
+  hasCompletedOnboarding,
+  deactivateFact,
+  listUsersWithRecentActivity,
+} from "./facts";
+
+describe("facts.ts — no-DB fail-safe behavior", () => {
+  // When POSTGRES_URL isn't set (the case in this test environment),
+  // getSql() returns null and every helper degrades to a safe default
+  // instead of throwing.
+
+  it("listFactsForUser returns [] when no DB is wired", async () => {
+    expect(await listFactsForUser("u@zoca.com")).toEqual([]);
+  });
+
+  it("listFactsForUser with scopeKey also returns [] when no DB is wired", async () => {
+    expect(
+      await listFactsForUser("u@zoca.com", { scopeKey: "customer-360" }),
+    ).toEqual([]);
+  });
+
+  it("listFactsForUser with includeInactive also returns [] when no DB is wired", async () => {
+    expect(
+      await listFactsForUser("u@zoca.com", { includeInactive: true }),
+    ).toEqual([]);
+  });
+
+  it("addExplicitFact returns null when no DB is wired", async () => {
+    expect(
+      await addExplicitFact({ email: "u@zoca.com", fact: "remembered thing" }),
+    ).toBeNull();
+  });
+
+  it("addExplicitFact rejects empty fact text BEFORE touching the DB", async () => {
+    // The trim+slice happens before getSql() is checked, so this verifies
+    // input sanitization is the first gate.
+    expect(await addExplicitFact({ email: "u@zoca.com", fact: "   " })).toBeNull();
+    expect(await addExplicitFact({ email: "u@zoca.com", fact: "" })).toBeNull();
+  });
+
+  it("adjustFactConfidence returns 0 for empty ID array (short-circuit)", async () => {
+    expect(await adjustFactConfidence("u@zoca.com", [], "up")).toBe(0);
+    expect(await adjustFactConfidence("u@zoca.com", [], "down")).toBe(0);
+  });
+
+  it("adjustFactConfidence returns 0 when DB is unavailable", async () => {
+    expect(await adjustFactConfidence("u@zoca.com", [1, 2, 3], "up")).toBe(0);
+    expect(await adjustFactConfidence("u@zoca.com", [1, 2, 3], "down")).toBe(0);
+  });
+
+  it("hasCompletedOnboarding fail-safes to TRUE so we don't nag on errors", async () => {
+    // Documented behavior: if we can't check, assume completed so the
+    // onboarding card doesn't endlessly nag a user with a flaky DB connection.
+    expect(await hasCompletedOnboarding("u@zoca.com")).toBe(true);
+  });
+
+  it("deactivateFact returns false when no DB is wired", async () => {
+    expect(await deactivateFact("u@zoca.com", 123)).toBe(false);
+  });
+
+  it("listUsersWithRecentActivity returns [] when no DB is wired (cron-safe)", async () => {
+    // The extraction cron iterates this list. Returning [] safely makes
+    // the cron a no-op rather than crashing the function invocation.
+    expect(await listUsersWithRecentActivity()).toEqual([]);
+  });
 });

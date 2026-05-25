@@ -272,3 +272,226 @@ describe("scoreCustomer — return shape contract", () => {
     expect(Number.isInteger(s.score)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase E-15.3 additions — computeTicketsFlag + composeHybridSignals + edge
+// cases. These functions sit downstream of scoreCustomer and feed the final
+// CustomerSignalsV2 the V2CustomerCard reads.
+// ---------------------------------------------------------------------------
+
+import { computeTicketsFlag, composeHybridSignals } from "./scoring";
+import type {
+  CustomerSignals,
+  PerformanceMetrics,
+  TicketsMetrics,
+  BillingMetrics,
+} from "./types";
+
+describe("computeTicketsFlag — OR of two BaseSheet counters", () => {
+  it("zero on both → flag false", () => {
+    const t = computeTicketsFlag("e1", 0, 0);
+    expect(t.flag).toBe(false);
+    expect(t.open_tickets_30d).toBe(0);
+    expect(t.unresolved_issues_last_30_days).toBe(0);
+  });
+
+  it("any open tickets → flag true", () => {
+    expect(computeTicketsFlag("e1", 1, 0).flag).toBe(true);
+    expect(computeTicketsFlag("e1", 5, 0).flag).toBe(true);
+  });
+
+  it("any unresolved issues → flag true even with zero open tickets", () => {
+    expect(computeTicketsFlag("e1", 0, 1).flag).toBe(true);
+    expect(computeTicketsFlag("e1", 0, 3).flag).toBe(true);
+  });
+
+  it("both populated → flag true (no double-counting concern)", () => {
+    expect(computeTicketsFlag("e1", 2, 4).flag).toBe(true);
+  });
+});
+
+// Test helper: minimal CustomerSignals stub (we don't re-run scoreCustomer
+// because composeHybridSignals takes its output as input, not its input).
+function commsSignalsStub(
+  over: Partial<CustomerSignals> = {},
+): CustomerSignals {
+  return {
+    score: 0,
+    tier: "HEALTHY",
+    sig_we_silent: 0,
+    sig_client_silent: 0,
+    sig_response_drop: 0,
+    sig_volume_collapse: 0,
+    notes: "",
+    ...over,
+  };
+}
+
+function cleanCommsMetrics() {
+  // Always-active customer — no signals firing
+  return computeMetrics(
+    [event(2, { direction: "in" }), event(3, { direction: "out" })],
+    TODAY,
+  );
+}
+
+function zeroCommsMetrics() {
+  return computeMetrics([], TODAY);
+}
+
+describe("composeHybridSignals — pre-launch path", () => {
+  it("pre-launch customers get a neutral HEALTHY/GREEN with composite=50", () => {
+    const s = composeHybridSignals({
+      commsSignals: commsSignalsStub(),
+      usageScore: 0,
+      billingScore: 0,
+      performance: null,
+      tickets: null,
+      commsMetrics: zeroCommsMetrics(),
+      mixpanelHasData: false,
+      preLaunch: true,
+    });
+    expect(s.tier).toBe("HEALTHY");
+    expect(s.stoplight).toBe("GREEN");
+    expect(s.composite).toBe(50);
+    expect(s.pre_launch).toBe(true);
+    expect(s.reason_one_line).toMatch(/Pre-launch/i);
+    // All sub-signals zeroed — pre-launch customers shouldn't have churn signals.
+    expect(s.sig_we_silent).toBe(0);
+    expect(s.sig_client_silent).toBe(0);
+    expect(s.sig_billing).toBe(0);
+  });
+});
+
+describe("composeHybridSignals — zero-comms + no Mixpanel auto-HIGH override", () => {
+  it("forces HIGH tier when comms_90d=0 AND mixpanel has no data", () => {
+    const s = composeHybridSignals({
+      commsSignals: commsSignalsStub(),
+      usageScore: 0,
+      billingScore: 0,
+      performance: null,
+      tickets: null,
+      commsMetrics: zeroCommsMetrics(),
+      mixpanelHasData: false,
+      preLaunch: false,
+    });
+    expect(s.tier).toBe("HIGH");
+    expect(s.stoplight).toBe("RED");
+  });
+
+  it("does NOT force HIGH when zero comms but mixpanel data exists (coverage gap not churn signal)", () => {
+    const s = composeHybridSignals({
+      commsSignals: commsSignalsStub(),
+      usageScore: 0,
+      billingScore: 0,
+      performance: null,
+      tickets: null,
+      commsMetrics: zeroCommsMetrics(),
+      mixpanelHasData: true,
+      preLaunch: false,
+    });
+    // Without no-mixpanel override, tier is purely composite-driven.
+    expect(s.tier).not.toBe("HIGH");
+  });
+});
+
+describe("composeHybridSignals — billing crisis YELLOW override", () => {
+  it("strong billing score lifts otherwise-GREEN customer to YELLOW", () => {
+    const billing: BillingMetrics = {
+      entity_id: "e1",
+      customer_id: "c1",
+      unpaid_invoice_count: 5,
+      total_amount_due_cents: 50000,
+      days_past_oldest_unpaid: 45,
+      has_ach_in_progress: false,
+      auto_debit_off_with_failures: true,
+      recent_failed_transaction_count: 3,
+    };
+    const s = composeHybridSignals({
+      commsSignals: commsSignalsStub(),
+      usageScore: 0,
+      billingScore: 90, // billing crisis level
+      billing,
+      performance: null,
+      tickets: null,
+      commsMetrics: cleanCommsMetrics(),
+      mixpanelHasData: true,
+      preLaunch: false,
+    });
+    // Billing override should at minimum lift to YELLOW.
+    expect(["YELLOW", "RED"]).toContain(s.stoplight);
+    expect(s.sig_billing).toBe(90);
+  });
+});
+
+describe("composeHybridSignals — WATCH lane (2+ modifier flags lift HEALTHY/LOW to YELLOW)", () => {
+  it("HEALTHY customer with 2 flags surfaces as YELLOW via WATCH lane", () => {
+    const performance: PerformanceMetrics = {
+      entity_id: "e1",
+      gbp_clicks_peak_complete_month: 100,
+      gbp_clicks_current_complete_month: 50,
+      gbp_clicks_in_progress_month: null,
+      gbp_clicks_drop_pct: 50,
+      ytd_leads: null,
+      prior_ytd_leads: null,
+      ytd_leads_change_pct: null,
+      active_ranking_count: null,
+      rankings_top_3: null,
+      rankings_top_10: null,
+      rankings_outside_10: null,
+      reviews_last_12_weeks_total: null,
+      weeks_with_zero_reviews: null,
+      review_target_weekly: null,
+      flag: true,
+      flag_reasons: ["GBP clicks -50%"],
+    };
+    const tickets: TicketsMetrics = {
+      entity_id: "e1",
+      open_tickets_30d: 3,
+      unresolved_issues_last_30_days: 0,
+      flag: true,
+    };
+    const s = composeHybridSignals({
+      commsSignals: commsSignalsStub(),
+      usageScore: 0,
+      billingScore: 0,
+      performance,
+      tickets,
+      commsMetrics: cleanCommsMetrics(),
+      mixpanelHasData: true,
+      preLaunch: false,
+    });
+    expect(s.flag_performance).toBe(true);
+    expect(s.flag_tickets).toBe(true);
+    expect(s.flag_count).toBe(2);
+    // WATCH lane: 2 flags + HEALTHY underlying tier → YELLOW
+    expect(s.stoplight).toBe("YELLOW");
+  });
+});
+
+describe("composeHybridSignals — full sub-signal pass-through", () => {
+  it("comms sub-scores from input commsSignals land on output unchanged", () => {
+    const stub = commsSignalsStub({
+      sig_we_silent: 70,
+      sig_client_silent: 100,
+      sig_response_drop: 40,
+      sig_volume_collapse: 60,
+    });
+    const s = composeHybridSignals({
+      commsSignals: stub,
+      usageScore: 30,
+      billingScore: 20,
+      performance: null,
+      tickets: null,
+      commsMetrics: cleanCommsMetrics(),
+      mixpanelHasData: true,
+      preLaunch: false,
+    });
+    expect(s.sig_we_silent).toBe(70);
+    expect(s.sig_client_silent).toBe(100);
+    expect(s.sig_response_drop).toBe(40);
+    expect(s.sig_volume_collapse).toBe(60);
+    expect(s.sig_usage).toBe(30);
+    expect(s.sig_billing).toBe(20);
+  });
+});

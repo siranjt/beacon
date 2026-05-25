@@ -21,7 +21,7 @@ import { V2Hero } from "./V2Hero";
 import { V2RefreshBar } from "./V2RefreshBar";
 import { V2KpiTiles } from "./V2KpiTiles";
 import { ToastProvider, useToast } from "./Toast";
-import { CustomerCardSkeleton } from "./Skeleton";
+// Phase E-15.4 — CustomerCardSkeleton now imported in V2DashboardStates.tsx.
 import { CursorGlow } from "./CursorGlow";
 // Phase 23.A — AM-view interactive charts (book health + signal mix + 30d RED trend).
 import { BookHealthDonut } from "./charts/BookHealthDonut";
@@ -32,6 +32,14 @@ import SectionErrorBoundary from "@/components/SectionErrorBoundary";
 import SuggestedActions from "@/components/ai/SuggestedActions";
 // Phase E-14 — multi-customer compare floating bar (manager/admin only).
 import V2CompareBar from "./V2CompareBar";
+// Phase E-15.4 — state components extracted to keep V2Dashboard.tsx
+// under the 600-line target.
+import {
+  V2LoadingSkeleton,
+  V2ErrorState,
+  V2SelectAmPrompt,
+  V2UnmappedAmState,
+} from "./V2DashboardStates";
 import {
   SIGNAL_LABELS,
   isSignalKey,
@@ -806,73 +814,6 @@ function V2DashboardInner() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Loading skeleton — 4 card-shaped placeholders pulse during fetch
-// ---------------------------------------------------------------------------
-
-function V2LoadingSkeleton() {
-  return (
-    <section className="mt-2" aria-busy="true" aria-live="polite">
-      <div className="mb-4 h-9 w-3/4 rounded-zoca-sm v2-skeleton" />
-      <div className="mb-5 flex gap-2">
-        <div className="h-8 w-44 rounded-zoca-pill v2-skeleton" />
-        <div className="h-8 w-28 rounded-zoca-pill v2-skeleton" />
-        <div className="h-8 w-60 rounded-zoca-pill v2-skeleton" />
-      </div>
-      <CustomerCardSkeleton />
-    </section>
-  );
-}
-
-function V2ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="mt-8 rounded-zoca border border-red-500/30 bg-red-500/10 p-6" role="alert">
-      <h2 className="font-display text-lg font-bold text-red-200">Could not load snapshot</h2>
-      <p className="mt-2 text-sm text-zoca-text-muted">{message}</p>
-      <p className="mt-2 text-xs text-zoca-text-soft">
-        If this persists, the daily refresh cron may have failed. Check Vercel logs or
-        re-run /api/cron/refresh/compose.
-      </p>
-      <button
-        onClick={onRetry}
-        className="mt-4 rounded-zoca-pill bg-zoca-pink-2/20 px-4 py-2 text-sm font-medium text-zoca-pink-2 transition hover:bg-zoca-pink-2/30"
-      >
-        Retry
-      </button>
-    </div>
-  );
-}
-
-function V2SelectAmPrompt() {
-  return (
-    <div className="mt-12 rounded-zoca border border-dashed border-zoca-border-2 px-6 py-12 text-center">
-      <p className="font-display text-lg font-bold text-zoca-text-primary">
-        Select an AM to view their book.
-      </p>
-      <p className="mt-2 text-sm text-zoca-text-muted">
-        Use the dropdown in the top bar to pick yourself or another AM.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Phase 33.A — Empty state for an AM-role user whose Google email didn't
-// resolve to a BaseSheet entry. Friendly nudge; no data shown.
-// ---------------------------------------------------------------------------
-function V2UnmappedAmState() {
-  return (
-    <div
-      className="mt-12 rounded-zoca border border-dashed border-zoca-border-2 px-6 py-12 text-center"
-      role="status"
-    >
-      <p className="font-display text-lg font-bold text-zoca-text-primary">
-        Your account isn&rsquo;t mapped to an AM yet.
-      </p>
-      <p className="mt-2 text-sm text-zoca-text-muted">
-        We couldn&rsquo;t match your Google email to a BaseSheet record. Ask
-        your manager to add you to the AM list, then sign out and back in.
-      </p>
-    </div>
-  );
-}
+// Phase E-15.4 — V2LoadingSkeleton, V2ErrorState, V2SelectAmPrompt,
+// V2UnmappedAmState extracted to V2DashboardStates.tsx. They are pure
+// stateless components and removing them dropped this file ~70 lines.

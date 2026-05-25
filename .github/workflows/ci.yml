@@ -1,0 +1,61 @@
+name: CI
+
+# Phase E-15.1 — block bad commits before they hit Vercel.
+#
+# What we caught in production previously: lockfile mismatches (Sentry),
+# ESLint disable-directive references to uninstalled rules, missing
+# imports after refactors. All three would have been caught by a 60s CI run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck + lint + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Vitest + Next.js both honor CI. Vitest config uses this to switch
+      # the reporter to "github-actions" which produces nicer PR annotations.
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies (ci, frozen lockfile)
+        # `npm ci` will fail if package-lock.json is out of sync with package.json —
+        # exactly the regression class that took prod down twice.
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        # Vitest config (vitest.config.ts) already picks the github-actions
+        # reporter when CI is set, so failures show up as PR annotations.
+        run: npm test
+
+      # Optional smoke: ensure `next build` succeeds. Disabled by default
+      # because Beacon's build pulls Sentry source-map upload + Next pre-renders
+      # routes that hit Neon, both of which are slow + env-coupled. Re-enable
+      # once a preview-friendly build is wired (mock Neon + skip Sentry upload).
+      # - name: Build
+      #   run: npm run build
+      #   env:
+      #     SKIP_SENTRY: "1"
