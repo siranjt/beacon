@@ -13,6 +13,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
     "@neondatabase/serverless": "^0.10.4",
+    "@sentry/nextjs": "^8.42.0",
     "@vercel/blob": "^1.0.0",
     "@vercel/functions": "^1.5.0",
     "@vercel/kv": "2.0.0",
