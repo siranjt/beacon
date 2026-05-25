@@ -38,6 +38,7 @@ import {
   scopeQuickPrompts,
   type AiScope,
 } from "@/lib/ai/scopes";
+import { BeaconMark } from "@/components/BeaconMark";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -279,7 +280,10 @@ export default function AskPanel() {
             gap: 10,
           }}
         >
-          <Sparkles />
+          {/* Beacon flame mark — animated 4-layer flicker. Tower flips to
+              parchment so it shows on the char button background; flame
+              colors (ember + gold) stay default — they pop against char. */}
+          <BeaconMark size={18} towerFill="#F0E4CC" flicker />
           Ask Beacon
           {turns.length > 0 && (
             <span
@@ -354,7 +358,10 @@ export default function AskPanel() {
                     gap: 8,
                   }}
                 >
-                  <Sparkles /> Ask Beacon
+                  {/* Same animated flame, default colors — char tower
+                      reads well on the parchment drawer surface. */}
+                  <BeaconMark size={20} flicker />
+                  Ask Beacon
                 </div>
                 <div
                   style={{
@@ -613,23 +620,6 @@ function BlinkingCursor() {
         animation: "blink 1s steps(1, end) infinite",
       }}
     />
-  );
-}
-
-function Sparkles() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      aria-hidden
-      style={{ flexShrink: 0 }}
-    >
-      <path
-        fill="currentColor"
-        d="M8 0 L9 5 L14 6 L9 7 L8 12 L7 7 L2 6 L7 5 Z M13 9 L13.6 11.4 L16 12 L13.6 12.6 L13 15 L12.4 12.6 L10 12 L12.4 11.4 Z M3 9 L3.6 11.4 L6 12 L3.6 12.6 L3 15 L2.4 12.6 L0 12 L2.4 11.4 Z"
-      />
-    </svg>
   );
 }
 
