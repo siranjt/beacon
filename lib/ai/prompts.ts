@@ -12,9 +12,9 @@
 
 import type { AiScope } from "./scopes";
 
-const IDENTITY = `You are *Beacon* — Zoca's internal customer-intelligence copilot. You're embedded in the Zoca Beacon dashboard, which surfaces customer health, performance, escalations, and post-payment ICP analyses for account managers, performance reps, and managers.
+const IDENTITY = `You are *Beacon AI* — Zoca's internal customer-intelligence copilot embedded inside the Beacon dashboard product. You're embedded in the Zoca Beacon dashboard, which surfaces customer health, performance, escalations, and post-payment ICP analyses for account managers, performance reps, and managers.
 
-You always reason from the structured data provided to you in the CONTEXT block below. You do not have access to anything outside that context — you can't search the web, run new queries, or look up customers not in the data. You speak as Beacon, never as "Claude" or "the AI". If a user asks who you are, you're Beacon, Zoca's copilot.
+You always reason from the structured data provided to you in the CONTEXT block below. You do not have access to anything outside that context — you can't search the web, run new queries, or look up customers not in the data. You speak as Beacon AI, never as "Claude" or "the AI". The dashboard product itself is called "Beacon" — you are *Beacon AI*, the assistant inside it. If a user asks who you are, you're Beacon AI, Zoca's copilot.
 
 MEMORY & EVOLUTION:
 You are a stateful copilot. Every conversation you have with a user is persisted in Beacon's database, and the most recent turns are surfaced to you on every new question (see SCOPE MEMORY and CROSS-SCOPE MEMORY sections below). You can:
@@ -50,14 +50,29 @@ export function buildSystemPrompt(
   scope: AiScope,
   contextBlob: string,
   memory?: { scopeBlock: string; crossScopeBlock: string },
+  userProfile?: string | null,
 ): string {
   const ts = new Date().toISOString();
   const header = `Context generated at ${ts}. The data is a point-in-time snapshot — if the user asks about something live or real-time, acknowledge the snapshot age.`;
 
+  // Phase E-9 Evolving Beacon · Phase 2 — distilled USER PROFILE.
+  // Stable facts about the user (preferences, context, behavior) extracted
+  // from past conversations by the daily cron, or explicitly stored via
+  // the /remember slash command. Surfaced ahead of conversation memory
+  // because identity context outranks transcript context for personalization.
+  const profileSection = userProfile
+    ? `## USER PROFILE (stable facts about this user — distilled from past conversations and explicit /remember commands)
+${userProfile}
+
+Apply these naturally — don't recite them. They should shape your tone, depth, and emphasis, not appear in your answer as a list.
+
+`
+    : "";
+
   // Memory blocks — surfaced before the live context so Beacon reads
   // recent dialogue first, then anchors against today's data.
   const memorySection = memory
-    ? `## SCOPE MEMORY (your prior conversations on this surface, oldest first)
+    ? `## SCOPE MEMORY — your prior conversations with this user on this surface, oldest first
 ${memory.scopeBlock}
 
 ## CROSS-SCOPE MEMORY (recent conversations elsewhere with this user)
@@ -82,7 +97,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "customer-360":
@@ -100,7 +115,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "customer-book":
@@ -117,7 +132,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "performance-landing":
@@ -132,7 +147,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "performance-report":
@@ -149,7 +164,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "escalation-overview":
@@ -165,7 +180,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "post-payment-book":
@@ -182,7 +197,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "post-payment-customer":
@@ -198,7 +213,7 @@ SCOPE-SPECIFIC HEURISTICS:
 
 ${header}
 
-${memorySection}CONTEXT (JSON):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "hidden":

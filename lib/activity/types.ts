@@ -106,7 +106,11 @@ export type UmbrellaEvent =
   | "command_palette_opened"
   | "command_palette_select"
   // Phase E-9 — Customer 360 ask-Claude
-  | "claude_asked";
+  | "claude_asked"
+  // Phase E-9 Evolving Beacon — fact memory
+  | "fact_remembered"
+  | "fact_forgotten"
+  | "fact_extracted";
 
 export type UmbrellaSurface =
   | "auth"
@@ -144,6 +148,7 @@ export const ALL_EVENT_NAMES: readonly string[] = [
   // umbrella
   "sign_in", "sign_in_rejected", "launcher_card_clicked", "sign_out", "api_call",
   "command_palette_opened", "command_palette_select", "claude_asked",
+  "fact_remembered", "fact_forgotten", "fact_extracted",
 ] as const;
 
 export const ALL_SURFACES: readonly string[] = [

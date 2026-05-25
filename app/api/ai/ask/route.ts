@@ -38,6 +38,7 @@ import {
   renderMemoryForPrompt,
   saveTurn,
 } from "@/lib/ai/memory";
+import { listFactsForUser, renderFactsForPrompt } from "@/lib/ai/facts";
 import {
   loadCustomer360Context,
   loadCustomerBookContext,
@@ -196,11 +197,15 @@ export async function POST(req: NextRequest) {
   // system prompt below. Beacon decides whether to reference them based
   // on relevance.
   const sKey = scopeKey(scope);
-  const [scopeHistory, crossScope] = await Promise.all([
+  const [scopeHistory, crossScope, facts] = await Promise.all([
     getScopeConversations(email, sKey, 30).catch(() => []),
     getRecentCrossScope(email, sKey, 18).catch(() => []),
+    // Phase E-9 · Phase 2 — distilled facts about the user. Empty for
+    // new users; grows as the daily extraction cron runs.
+    listFactsForUser(email).catch(() => []),
   ]);
   const memoryBlocks = renderMemoryForPrompt(scopeHistory, crossScope);
+  const userProfile = renderFactsForPrompt(facts);
 
   // Telemetry (fire-and-forget).
   void logUmbrellaActivity({
@@ -244,7 +249,7 @@ export async function POST(req: NextRequest) {
         const sdkStream = anthropic.messages.stream({
           model: MODEL,
           max_tokens: MAX_TOKENS,
-          system: buildSystemPrompt(scope, ctx.blob, memoryBlocks),
+          system: buildSystemPrompt(scope, ctx.blob, memoryBlocks, userProfile),
           messages,
         });
         sdkStream.on("text", (delta: string) => {

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AskPanel — universal "Ask Beacon" copilot (Claude under the hood).
+ * AskPanel — universal "Ask Beacon AI" copilot (Claude under the hood).
  * Phase E-9.
  *
  * Mounted once at the umbrella root layout. Detects scope from
@@ -12,7 +12,7 @@
  *   - Header subtitle says "About this customer" / "About the inbox" / etc.
  *
  * UX:
- *   - Floating "✨ Ask Beacon" button bottom-right (hidden when scope is
+ *   - Floating "✨ Ask Beacon AI" button bottom-right (hidden when scope is
  *     "hidden" — auth pages, admin pages)
  *   - Click to open right-edge drawer
  *   - Esc / backdrop click to close
@@ -216,6 +216,41 @@ export default function AskPanel() {
       setErrorMsg(null);
       setDraft("");
 
+      // Phase E-9 · Phase 2 — /remember slash command. User types
+      // "/remember they manage Apurvaa's book" and Beacon AI stores it
+      // as an explicit fact in beacon_ai_user_facts. The fact is then
+      // injected into every future prompt as part of USER PROFILE.
+      // We acknowledge inline as a synthetic assistant turn — no LLM
+      // call needed.
+      const rememberMatch = trimmed.match(/^\/remember\s+(.+)$/i);
+      if (rememberMatch) {
+        const fact = rememberMatch[1].trim();
+        const userTurn: Turn = { role: "user", content: trimmed };
+        setTurns((prev) => [...prev, userTurn]);
+        try {
+          const res = await fetch("/api/ai/facts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fact }),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(body.error || `facts ${res.status}`);
+          }
+          const json = (await res.json()) as { ok: boolean; reused: boolean };
+          const ackText = json.reused
+            ? `Got it — I already remembered that. I'll keep applying it.`
+            : `Got it — I'll remember that across our future conversations.`;
+          setTurns((prev) => [
+            ...prev,
+            { role: "assistant", content: ackText },
+          ]);
+        } catch (e) {
+          setErrorMsg(e instanceof Error ? e.message : String(e));
+        }
+        return;
+      }
+
       const history = turns.slice(-MAX_HISTORY_TURNS * 2);
       const userTurn: Turn = { role: "user", content: trimmed };
       setTurns((prev) => [
@@ -342,7 +377,7 @@ export default function AskPanel() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={`Ask Beacon about ${audience}`}
+          aria-label={`Ask Beacon AI about ${audience}`}
           style={{
             position: "fixed",
             bottom: 24,
@@ -367,7 +402,7 @@ export default function AskPanel() {
               parchment so it shows on the char button background; flame
               colors (ember + gold) stay default — they pop against char. */}
           <BeaconMark size={18} towerFill="#F0E4CC" flicker />
-          Ask Beacon
+          Ask Beacon AI
           {turns.length > 0 && (
             <span
               style={{
@@ -390,7 +425,7 @@ export default function AskPanel() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Ask Beacon"
+          aria-label="Ask Beacon AI"
           onClick={() => {
             if (!streaming) setOpen(false);
           }}
@@ -444,7 +479,7 @@ export default function AskPanel() {
                   {/* Same animated flame, default colors — char tower
                       reads well on the parchment drawer surface. */}
                   <BeaconMark size={20} flicker />
-                  Ask Beacon
+                  Ask Beacon AI
                 </div>
                 <div
                   style={{
@@ -463,7 +498,7 @@ export default function AskPanel() {
                   <span>About {audience}</span>
                   {totalMemory !== null && totalMemory > 0 && (
                     <span
-                      title="Beacon remembers your past conversations across all surfaces. Earlier discussions are surfaced into Beacon's context on every new question."
+                      title="Beacon AI remembers your past conversations across all surfaces. Earlier discussions are surfaced into the context on every new question."
                       style={{
                         fontFamily: "ui-monospace, monospace",
                         fontSize: 10,
@@ -480,6 +515,18 @@ export default function AskPanel() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
+                <a
+                  href="/settings/beacon-ai"
+                  title="Beacon AI memory + facts settings"
+                  style={{
+                    ...ghostBtn(streaming),
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                  }}
+                >
+                  Memory
+                </a>
                 {turns.length > 0 && (
                   <button
                     type="button"
@@ -538,7 +585,7 @@ export default function AskPanel() {
                           lineHeight: 1.5,
                         }}
                       >
-                        Beacon remembers your past {totalMemory} day
+                        Beacon AI remembers your past {totalMemory} day
                         {totalMemory === 1 ? "" : "s"} of conversations
                         across every surface and will reference them when
                         relevant.
@@ -623,7 +670,7 @@ export default function AskPanel() {
                   }
                 }}
                 rows={2}
-                placeholder={`Ask about ${audience}…  (⌘+Enter to send)`}
+                placeholder={`Ask about ${audience}…  ⌘+Enter to send · /remember X to teach me`}
                 disabled={streaming}
                 style={{
                   width: "100%",
@@ -651,7 +698,7 @@ export default function AskPanel() {
                   color: C.text3,
                 }}
               >
-                <span>Beacon · grounded in {audience}</span>
+                <span>Beacon AI · grounded in {audience}</span>
                 <button
                   type="submit"
                   disabled={streaming || !draft.trim()}
