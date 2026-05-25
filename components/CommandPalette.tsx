@@ -82,10 +82,12 @@ async function fetchIndex(force: boolean = false): Promise<SearchIndex | null> {
   return inFlight;
 }
 
-type AgentRoute = "customer" | "performance" | "escalation" | "post-payment";
+type AgentRoute = "360" | "customer" | "performance" | "escalation" | "post-payment";
 
 function buildRoute(agent: AgentRoute, c: SearchableCustomer): string {
   switch (agent) {
+    case "360":
+      return `/360/${c.entity_id}`;
     case "customer":
       return `/customer/${c.entity_id}`;
     case "performance":
@@ -140,6 +142,7 @@ function writeRecent(c: SearchableCustomer) {
 }
 
 const AGENT_LABEL: Record<AgentRoute, string> = {
+  "360": "360",
   customer: "Customer",
   performance: "Performance",
   escalation: "Escalation",
@@ -147,6 +150,7 @@ const AGENT_LABEL: Record<AgentRoute, string> = {
 };
 
 const AGENT_ACCENT: Record<AgentRoute, string> = {
+  "360": "#2A4D5C", // Sea Lapis — distinct from any individual agent
   customer: "#C8431D", // Ember
   performance: "#D9A441", // Brass
   escalation: "#7C2D12", // Deep Crimson
@@ -264,7 +268,7 @@ export default function CommandPalette({ open, onClose }: Props) {
       if (e.key === "Enter") {
         e.preventDefault();
         const row = results[selectedIndex];
-        if (row) goTo("customer", row.customer);
+        if (row) goTo("360", row.customer);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -398,7 +402,7 @@ export default function CommandPalette({ open, onClose }: Props) {
                     <li
                       key={row.customer.entity_id}
                       onMouseEnter={() => setSelectedIndex(i)}
-                      onClick={() => goTo("customer", row.customer)}
+                      onClick={() => goTo("360", row.customer)}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -446,7 +450,7 @@ export default function CommandPalette({ open, onClose }: Props) {
                       {/* Per-agent quick-jump buttons. Click stops propagation
                           so the row's default-to-Customer onClick doesn't fire. */}
                       <div style={{ display: "flex", gap: 4 }}>
-                        {(["customer", "performance", "escalation", "post-payment"] as AgentRoute[]).map(
+                        {(["360", "customer", "performance", "escalation", "post-payment"] as AgentRoute[]).map(
                           (agent) => (
                             <button
                               key={agent}
@@ -496,7 +500,7 @@ export default function CommandPalette({ open, onClose }: Props) {
         >
           <div style={{ display: "flex", gap: 12 }}>
             <span><kbd>↑↓</kbd> navigate</span>
-            <span><kbd>⏎</kbd> open Customer Beacon</span>
+            <span><kbd>⏎</kbd> open Customer 360</span>
             <span>or click an agent badge</span>
           </div>
           <span>{customers.length.toLocaleString()} customers</span>

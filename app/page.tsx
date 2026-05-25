@@ -146,7 +146,7 @@ export default async function LauncherPage() {
           >
             ⌘K
           </kbd>{" "}
-          to jump to any customer.
+          to jump to any customer&apos;s 360 view.
         </div>
       </div>
 
