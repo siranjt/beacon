@@ -19,6 +19,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import SectionErrorBoundary from "@/components/SectionErrorBoundary";
+import FreshnessIndicator from "@/components/FreshnessIndicator";
+import CalculationTooltip from "@/components/CalculationTooltip";
 
 interface CriticalItem {
   entity_id: string;
@@ -124,41 +127,66 @@ export default function InboxFeed() {
   }
 
   const scopeNote = data?.scope.am_filtered
-    ? `Showing items in ${data.scope.am_name}&apos;s book.`
+    ? `Showing items in ${data.scope.am_name}'s book.`
     : data?.scope.role
     ? "Showing items across the whole book."
     : "";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {scopeNote && (
-        <div
-          style={{
-            fontFamily: SANS,
-            fontSize: 11,
-            color: C.text3,
-            textAlign: "center",
-            letterSpacing: "0.04em",
-          }}
-          dangerouslySetInnerHTML={{ __html: scopeNote }}
-        />
-      )}
+      {/* Scope note + freshness indicator + Cmd+K hint. The freshness
+          indicator drifts in real time so the user always knows how fresh
+          the inbox is. */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 14,
+          fontFamily: SANS,
+          fontSize: 11,
+          color: C.text3,
+          letterSpacing: "0.04em",
+          flexWrap: "wrap",
+        }}
+      >
+        {scopeNote && <span>{scopeNote}</span>}
+        {data?.generated_at && (
+          <>
+            {scopeNote && <span aria-hidden style={{ opacity: 0.5 }}>·</span>}
+            <FreshnessIndicator
+              ts={data.generated_at}
+              source="Inbox · live from sources"
+              compact
+            />
+          </>
+        )}
+      </div>
 
-      <CriticalCustomers
-        section={data?.critical_customers ?? null}
-        error={data?.errors.critical_customers}
-        loading={loading}
-      />
-      <NeedsCall
-        section={data?.needs_am_call ?? null}
-        error={data?.errors.needs_am_call}
-        loading={loading}
-      />
-      <OpenTickets
-        section={data?.open_tickets ?? null}
-        error={data?.errors.open_tickets}
-        loading={loading}
-      />
+      {/* Each section gets its own error boundary so a single bad source
+          doesn't take down the whole inbox. The boundaries also log to
+          telemetry so we see component-level failures in the activity stream. */}
+      <SectionErrorBoundary label="Customers needing contact">
+        <CriticalCustomers
+          section={data?.critical_customers ?? null}
+          error={data?.errors.critical_customers}
+          loading={loading}
+        />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary label="Post-Payment verdicts">
+        <NeedsCall
+          section={data?.needs_am_call ?? null}
+          error={data?.errors.needs_am_call}
+          loading={loading}
+        />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary label="Open tickets">
+        <OpenTickets
+          section={data?.open_tickets ?? null}
+          error={data?.errors.open_tickets}
+          loading={loading}
+        />
+      </SectionErrorBoundary>
     </div>
   );
 }
@@ -189,12 +217,15 @@ function SectionHeader({
   accent,
   viewAllHref,
   viewAllLabel,
+  tooltip,
 }: {
   title: string;
   count: number | null;
   accent: string;
   viewAllHref: string;
   viewAllLabel: string;
+  /** Optional explainer popover next to the count. */
+  tooltip?: { label: string; body: React.ReactNode };
 }) {
   return (
     <div
@@ -242,6 +273,9 @@ function SectionHeader({
           >
             {count === 0 ? "none" : `${count} total`}
           </span>
+        )}
+        {tooltip && (
+          <CalculationTooltip label={tooltip.label} body={tooltip.body} />
         )}
       </div>
       <Link
@@ -334,6 +368,25 @@ function CriticalCustomers({
         accent={C.ember}
         viewAllHref="/customer"
         viewAllLabel="Open Customer Beacon"
+        tooltip={{
+          label: "Composite score",
+          body: (
+            <>
+              Each row leads with a 0–100 composite score. Weighted sum of:
+              <br />
+              • 50% comms signals (we-silent, client-silent, response drop,
+              volume collapse)
+              <br />
+              • 30% product usage (Mixpanel engagement tier)
+              <br />
+              • 20% billing health (unpaid invoices, ACH failures)
+              <br />
+              <br />
+              Higher is worse. RED stoplight = composite ≥ 65, or any
+              billing-crisis override.
+            </>
+          ),
+        }}
       />
       {error && <ErrorRow error={error} />}
       {!error && loading && <Skeleton rows={3} />}
@@ -361,7 +414,7 @@ function CriticalCustomers({
               >
                 <span
                   aria-label="Composite score"
-                  title="Composite score"
+                  title={`Composite score · ${c.composite}/100`}
                   style={{
                     fontFamily: "ui-monospace, monospace",
                     fontSize: 11,
