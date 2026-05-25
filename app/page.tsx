@@ -8,6 +8,7 @@ import BeaconAmbient from "@/components/BeaconAmbient";
 import LauncherCard from "./_components/LauncherCard";
 import LauncherSignOut from "./_components/LauncherSignOut";
 import InboxFeed from "./_components/InboxFeed";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 
 /**
  * Beacon umbrella launcher — Phase E-9 "action inbox" rework.
@@ -88,6 +89,11 @@ export default async function LauncherPage() {
             Here&apos;s what needs your attention.
           </p>
         </div>
+
+        {/* Phase E-9 — Beacon AI proactive recommendations strip. Sits
+            above the inbox so the user sees "what should I focus on" as
+            their first read. */}
+        <SuggestedActions scope={{ kind: "inbox" }} />
 
         {/* Primary surface — today's inbox */}
         <InboxFeed />

@@ -7,6 +7,7 @@ import { composeReport } from "@/lib/report/compose";
 import BeaconPageShell from "@/components/BeaconPageShell";
 import ReportPreview from "../../_components/ReportPreview";
 import RecordRecentReport from "../../_components/RecordRecentReport";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +151,9 @@ export default async function ReportPage({
           {i.verticalDisplay ? ` · ${i.verticalDisplay}` : ""}
         </p>
       </section>
+
+      {/* Phase E-9 — Beacon AI proactive recommendations for this report */}
+      <SuggestedActions scope={{ kind: "performance-report", entityId }} />
 
       <ReportPreview report={report} />
 

@@ -1,14 +1,25 @@
 /**
  * Beacon AI proactive suggestions. Phase E-9.
  *
- * Returns 2-3 contextual "next best actions" for a given scope (currently
- * Customer 360 only). Calls Haiku with the customer's full data context +
- * the user's distilled facts, asks for structured JSON with action cards.
+ * Returns 2-3 contextual "next best actions" for the current scope. Calls
+ * Haiku with scope-appropriate context + the user's distilled facts, asks
+ * for structured JSON action cards.
+ *
+ * Supported scopes:
+ *   - inbox                  → "what should I tackle today" actions
+ *   - customer-360           → per-customer triage actions
+ *   - customer-book          → AM book-level patterns + outreach drafts
+ *   - performance-landing    → meta / conceptual asks (Beacon AI knowledge)
+ *   - performance-report     → single-customer performance actions
+ *   - escalation-overview    → queue triage + stalled-ticket nudges
+ *   - post-payment-book      → verdict-feed summaries + AM-call queue
+ *   - post-payment-customer  → walk-through-this-verdict actions
  *
  * No mutations in v1 — only soft actions:
  *   - `ask`      → open AskPanel pre-filled with a specific question
- *   - `draft`    → open AskPanel pre-filled with a draft request
- *   - `navigate` → deep-link to another surface (performance / escalation / Linear)
+ *   - `draft`    → open AskPanel pre-filled with a draft request, auto-submitted
+ *   - `navigate` → deep-link to another surface (any internal Beacon path or
+ *                  https://linear.app/* url)
  *
  * Mutation actions (mark contacted, snooze, etc.) come in a later phase
  * once we've designed undo / confirm / side-effect handling properly.
@@ -16,8 +27,19 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiScope } from "./scopes";
-import { loadCustomer360Context, type LoadedContext } from "./context-loaders";
+import {
+  loadCustomer360Context,
+  loadCustomerBookContext,
+  loadEscalationOverviewContext,
+  loadInboxContext,
+  loadPerformanceLandingContext,
+  loadPerformanceReportContext,
+  loadPostPaymentBookContext,
+  loadPostPaymentCustomerContext,
+  type LoadedContext,
+} from "./context-loaders";
 import { listFactsForUser, renderFactsForPrompt } from "./facts";
+import { getRoleForEmail } from "@/lib/customer/config";
 
 const MODEL = process.env.ANTHROPIC_SUGGEST_MODEL ?? "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 1500;
@@ -31,11 +53,9 @@ export type ActionKind = "ask" | "draft" | "navigate";
 
 export interface SuggestedAction {
   kind: ActionKind;
-  label: string;        // "Draft a check-in email"
-  why: string;          // "Last outbound was 38 days ago"
-  /** For ask + draft — the prompt to send to AskPanel. */
+  label: string;
+  why: string;
   prompt?: string;
-  /** For navigate — the URL to open. */
   href?: string;
 }
 
@@ -46,33 +66,117 @@ export interface SuggestResult {
   generated_at: string;
 }
 
-const SUGGEST_SYSTEM = `You are Beacon AI's proactive recommendation engine. Your job is to look at a single customer's full data picture and propose 2-3 specific, high-leverage next actions an account manager could take RIGHT NOW.
+/* ────────────────────────────────────────────────────────────────
+ * Prompt assembly — base rules shared across scopes; per-scope
+ * guidance appended on top.
+ * ──────────────────────────────────────────────────────────────── */
 
-You always output a JSON array of action objects. Each action has:
-{
-  "kind": "ask" | "draft" | "navigate",
-  "label": "<8 words or less, imperative — 'Draft a check-in email'>",
-  "why": "<one short sentence citing specific data — 'Last outbound was 38 days ago'>",
-  "prompt": "<for ask/draft only — the exact question/request to seed into the AskPanel>",
-  "href": "<for navigate only — e.g. /performance/report/{entity_id} or a Linear url>"
-}
+const BASE_RULES = `You are Beacon AI's proactive recommendation engine. Your job is to read the user's current surface + data context and propose 2-3 specific, high-leverage next actions they could take RIGHT NOW.
+
+Output a JSON array of action objects, no preamble, no markdown fences:
+[
+  {
+    "kind": "ask" | "draft" | "navigate",
+    "label": "<8 words or less, imperative — 'Draft a check-in email'>",
+    "why": "<one short sentence citing specific data — 'Last outbound was 38 days ago'>",
+    "prompt": "<for ask/draft only — the exact question/request to seed into the AskPanel>",
+    "href": "<for navigate only — e.g. /360/{entity_id}, /performance/report/{entity_id}, /escalation?q={biz}, https://linear.app/...>"
+  }
+]
 
 ACTION KINDS:
-- "ask"     → user clicks, AskPanel opens, the prompt is pre-typed. Good for "Why is this RED?" or "Compare their billing trajectory to last month."
-- "draft"   → AskPanel opens, prompt asks Beacon AI to draft something (email, slack message). The prompt should specify the format and reference one specific data point.
-- "navigate" → deep-link to another surface. Only use when navigating helps more than asking. e.g. open the Performance Beacon report, jump to an open Linear ticket.
+- "ask"     → user clicks, AskPanel opens, prompt is pre-typed for the user to review/edit. Good for "Why is this RED?" or "Compare their billing trajectory."
+- "draft"   → AskPanel opens, prompt is pre-typed AND auto-submitted. Beacon AI starts streaming immediately. Use ONLY for deliverables (emails, slack messages, summaries) that don't need user editing first.
+- "navigate" → deep-link to another surface. Only use when navigating helps more than asking.
 
 RULES:
 - 2-3 actions only. Never 1. Never 4+.
-- Each action must reference SPECIFIC data from the context (a number, a date, a name).
-- Prioritize the highest-leverage action FIRST. If composite is RED, action #1 should address that.
-- Don't suggest "mark contacted" or any mutation — only ask/draft/navigate are allowed in v1.
-- Don't propose generic actions ("review the customer's data") — be concrete.
-- Reference the user's stored facts (USER PROFILE) to match their preferred response style and topic focus.
-- If there's an open Linear ticket older than 14 days, propose a navigate to it.
-- If GBP clicks dropped >25% vs peak, propose an ask about why.
-- If the AM hasn't talked to this customer in 14+ days, propose a draft outreach.
-- Output ONLY the JSON array — no preamble, no markdown fences, no trailing text.`;
+- Each action must reference SPECIFIC data from the context (a number, a date, a bizname).
+- Prioritize the highest-leverage action FIRST.
+- Don't suggest mutations ("mark contacted", "snooze") — only ask/draft/navigate are allowed.
+- Don't propose generic actions ("review the data") — be concrete.
+- Respect the USER PROFILE: match their preferred response style and topic focus.`;
+
+function scopeGuidance(scope: AiScope): string {
+  switch (scope.kind) {
+    case "inbox":
+      return `SCOPE: User is on today's inbox — a cross-agent feed of customers needing contact, post-payment verdicts awaiting action, and open tickets.
+
+Good suggestions:
+- ASK about the single highest-leverage item today
+- DRAFT outreach to the most-silent RED customer
+- NAVIGATE to a specific 360 page for a customer that needs deep attention
+Use entity IDs you find in the context for navigate hrefs: /360/{entity_id}.`;
+
+    case "customer-360":
+      return `SCOPE: User is looking at one customer's full 360 view.
+
+Good suggestions:
+- ASK why composite is at its level / what the dominant signal is
+- DRAFT a check-in email referencing one specific data point (silence days, billing event, ticket)
+- NAVIGATE to the Performance Beacon report (/performance/report/{entity_id}) or an open Linear ticket
+If there's an open Linear ticket older than 14 days, prefer navigating to it.
+If GBP clicks dropped >25% vs peak, propose an ASK about why.
+If last_out is >14 days, propose a DRAFT outreach.`;
+
+    case "customer-book":
+      return `SCOPE: User is on the Customer Beacon dashboard looking at their book.
+
+Good suggestions:
+- ASK about patterns across RED customers in their book ("what's the dominant signal?")
+- ASK who's regressing fastest in their book
+- DRAFT a book health summary they can share with their manager
+- NAVIGATE to the 360 of their worst-trajectory customer
+For navigate, pick a real entity_id from the context.`;
+
+    case "performance-landing":
+      return `SCOPE: User is on Performance Beacon landing, no specific customer picked.
+
+Good suggestions:
+- ASK conceptual questions ("how is composite calculated", "what's a healthy GBP click trend")
+- NAVIGATE to a recent report URL if the context shows one (else skip navigate)
+Most useful actions here are ASKs that explain Beacon's product mechanics.`;
+
+    case "performance-report":
+      return `SCOPE: User is reading one customer's Performance Beacon report.
+
+Good suggestions:
+- ASK whether YTD leads are on track vs the predicted 6-month figure
+- ASK about the biggest concern in this report
+- DRAFT a check-in message highlighting one win + one focus area
+- NAVIGATE to the customer's 360 page (/360/{entity_id}) for full context`;
+
+    case "escalation-overview":
+      return `SCOPE: User is on Escalation Beacon looking at the open ticket queue.
+
+Good suggestions:
+- ASK how to prioritize the queue
+- ASK about stalled tickets (older than 14 days)
+- ASK about ticket patterns this week
+- NAVIGATE to a specific Linear ticket URL from the open_sample if one is notably old or critical (use the t.url field)`;
+
+    case "post-payment-book":
+      return `SCOPE: User is on Post-Payment Reviews dashboard looking at recent verdicts.
+
+Good suggestions:
+- ASK to summarize the week's verdicts
+- ASK who needs AM follow-up (verdict in Review/Not ICP + needs_am_call=true)
+- ASK about common reasons for Not ICP verdicts
+- NAVIGATE to the most concerning recent verdict (/post-payment/reports/{cb_customer_id})`;
+
+    case "post-payment-customer":
+      return `SCOPE: User is reading one customer's Post-Payment Review.
+
+Good suggestions:
+- ASK to walk through the verdict ("why did this land as X?")
+- ASK if there's a case to push back on the verdict
+- DRAFT a reply to the customer's owner addressing the key concern
+- NAVIGATE to the docx report or the customer's 360 page (/360/...)`;
+
+    case "hidden":
+      return "";
+  }
+}
 
 interface RawAction {
   kind?: string;
@@ -82,7 +186,6 @@ interface RawAction {
   href?: string;
 }
 
-/** Tries to extract a JSON array from a possibly-noisy LLM response. */
 function extractJsonArray(text: string): unknown[] | null {
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
@@ -107,9 +210,9 @@ function isValidAction(a: unknown): a is RawAction {
   return true;
 }
 
-/** Sanitize navigate hrefs — only allow internal Beacon paths or
- *  https://linear.app links. Anything else gets rewritten to a search. */
-function sanitizeHref(href: string, entityId: string | null): string {
+/** Sanitize navigate hrefs — allow any internal Beacon path or
+ *  https://linear.app links. Anything else becomes the launcher. */
+function sanitizeHref(href: string): string {
   const trimmed = href.trim();
   if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
     return trimmed;
@@ -117,20 +220,46 @@ function sanitizeHref(href: string, entityId: string | null): string {
   if (trimmed.startsWith("https://linear.app/")) {
     return trimmed;
   }
-  // Fallback — point at the Customer 360 if we have one, otherwise launcher.
-  return entityId ? `/360/${entityId}` : "/";
+  return "/";
+}
+
+/** Load the right context object for a scope. Mirrors the dispatcher in
+ *  /api/ai/ask, kept separate here to avoid circular deps. */
+async function loadContextFor(
+  scope: AiScope,
+  user: { am_name: string | null; role: "admin" | "manager" | "am" | null },
+): Promise<LoadedContext | null> {
+  switch (scope.kind) {
+    case "inbox":
+      return loadInboxContext({ amFilter: user.role === "am" ? user.am_name : null });
+    case "customer-360":
+      return loadCustomer360Context(scope.entityId);
+    case "customer-book":
+      return loadCustomerBookContext({ amFilter: user.role === "am" ? user.am_name : null });
+    case "performance-landing":
+      return loadPerformanceLandingContext();
+    case "performance-report":
+      return loadPerformanceReportContext(scope.entityId);
+    case "escalation-overview":
+      return loadEscalationOverviewContext();
+    case "post-payment-book":
+      return loadPostPaymentBookContext();
+    case "post-payment-customer":
+      return loadPostPaymentCustomerContext(scope.cbCustomerId);
+    case "hidden":
+      return null;
+  }
 }
 
 export async function suggestForScope(
   scope: AiScope,
   email: string,
+  sessionAmName: string | null = null,
 ): Promise<SuggestResult> {
-  // v1 — only customer-360 scope is supported. Other scopes return an
-  // empty actions array; the client renders nothing in that case.
-  if (scope.kind !== "customer-360") {
+  if (scope.kind === "hidden") {
     return {
       scope,
-      audience: "(unsupported scope)",
+      audience: "",
       actions: [],
       generated_at: new Date().toISOString(),
     };
@@ -145,13 +274,14 @@ export async function suggestForScope(
     };
   }
 
-  let ctx: LoadedContext;
-  try {
-    ctx = await loadCustomer360Context(scope.entityId);
-  } catch {
+  const role = getRoleForEmail(email);
+  const ctx = await loadContextFor(scope, { am_name: sessionAmName, role }).catch(
+    () => null,
+  );
+  if (!ctx) {
     return {
       scope,
-      audience: scope.entityId,
+      audience: "(no context)",
       actions: [],
       generated_at: new Date().toISOString(),
     };
@@ -160,9 +290,10 @@ export async function suggestForScope(
   const facts = await listFactsForUser(email).catch(() => []);
   const profile = renderFactsForPrompt(facts);
 
+  const systemPrompt = `${BASE_RULES}\n\n${scopeGuidance(scope)}`;
   const userPrompt = [
     profile ? `## USER PROFILE\n${profile}\n` : "",
-    `## CUSTOMER CONTEXT\n${ctx.blob}`,
+    `## CONTEXT (scope: ${scope.kind})\n${ctx.blob}`,
     "",
     "Return the JSON array of 2-3 actions now.",
   ].join("\n");
@@ -171,7 +302,7 @@ export async function suggestForScope(
     const res = await anthropic.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SUGGEST_SYSTEM,
+      system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     });
     const text = res.content
@@ -201,10 +332,7 @@ export async function suggestForScope(
             kind === "ask" || kind === "draft"
               ? a.prompt!.trim().slice(0, 1500)
               : undefined,
-          href:
-            kind === "navigate"
-              ? sanitizeHref(a.href!, scope.entityId)
-              : undefined,
+          href: kind === "navigate" ? sanitizeHref(a.href!) : undefined,
         };
       })
       .slice(0, 3);
@@ -216,7 +344,6 @@ export async function suggestForScope(
       generated_at: new Date().toISOString(),
     };
   } catch (err) {
-    // Silent fallback — the UI just renders nothing.
     console.warn(
       "[ai/suggest] failed:",
       err instanceof Error ? err.message : String(err),

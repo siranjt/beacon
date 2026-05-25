@@ -5,6 +5,7 @@ import BeaconPageShell from "@/components/BeaconPageShell";
 import EscalationsBrowser from "./_components/EscalationsBrowser";
 import EscalationHeader from "./_components/EscalationHeader";
 import PageViewLogger from "@/components/PageViewLogger";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 
 export const metadata = {
   title: "Escalation Beacon · Zoca",
@@ -22,6 +23,7 @@ export default async function Page() {
     <BeaconPageShell>
         <PageViewLogger agent="escalation" surface="escalation_home" />
         <EscalationHeader current="home" />
+        <SuggestedActions scope={{ kind: "escalation-overview" }} />
         <EscalationsBrowser />
     </BeaconPageShell>
   );

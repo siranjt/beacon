@@ -11,6 +11,7 @@ import BeaconPageShell from "@/components/BeaconPageShell";
 import AgentHeader from "@/components/AgentHeader";
 import PageViewLogger from "@/components/PageViewLogger";
 import { useActivityLogger } from "@/components/hooks/use-activity-logger";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -83,6 +84,12 @@ export default function PerformanceLanding() {
       */}
       <AgentHeader agentName="Performance" />
       <PageViewLogger agent="performance" surface="performance_landing" />
+
+      {/* Phase E-9 — Beacon AI proactive recommendations strip. On the
+          Performance landing the suggestions are mostly conceptual asks
+          (how-it-works) since the user hasn't picked a specific customer
+          yet. */}
+      <SuggestedActions scope={{ kind: "performance-landing" }} />
 
       {/* Hero */}
       <section style={{ padding: "44px 0 28px", textAlign: "center" }} className="pp-fade-in-up">

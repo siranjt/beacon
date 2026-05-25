@@ -14,6 +14,7 @@ import BeaconPageShell from "@/components/BeaconPageShell";
 import { listCustomersSinceFloor, type Customer } from "@/lib/post-payment/db/queries";
 import DashboardClient from "./_components/DashboardClient";
 import PageViewLogger from "@/components/PageViewLogger";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -85,6 +86,7 @@ export default async function Page() {
   return (
     <BeaconPageShell>
       <PageViewLogger agent="post-payment" surface="post_payment_dashboard" />
+      <SuggestedActions scope={{ kind: "post-payment-book" }} />
       <DashboardClient customers={payload} />
     </BeaconPageShell>
   );

@@ -22,6 +22,7 @@ import { DocxPreviewButton } from "../../_components/DocxPreviewButton";
 import { ReanalyzeButton } from "../../_components/ReanalyzeButton";
 import ReportVisual from "../../_components/ReportVisual";
 import PageViewLogger from "@/components/PageViewLogger";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,7 @@ export default async function ReportPage({ params }: { params: { customer_id: st
         surface="post_payment_report"
         metadata={{ customer_id: params.customer_id }}
       />
+      <SuggestedActions scope={{ kind: "post-payment-customer", cbCustomerId: params.customer_id }} />
       <div className="space-y-6">
         <div className="anim-rise">
           <Link href="/post-payment" className="text-sm underline hover:opacity-70 transition">

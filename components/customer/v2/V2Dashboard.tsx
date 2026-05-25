@@ -29,6 +29,7 @@ import { SignalMixPie } from "./charts/SignalMixPie";
 import { RedTrendLine } from "./charts/RedTrendLine";
 import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 import SectionErrorBoundary from "@/components/SectionErrorBoundary";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 import {
   SIGNAL_LABELS,
   isSignalKey,
@@ -674,6 +675,12 @@ function V2DashboardInner() {
       </SectionErrorBoundary>
 
       <main className="mx-auto max-w-[920px] px-4 pb-24 pt-4 md:px-6">
+        {/* Phase E-9 — Beacon AI proactive recommendations for the AM's
+            book. Hidden when the user has no AM scope yet (e.g. manager
+            before picking an AM). */}
+        {!showUnmappedAmState && snapshot.status === "ready" && selectedAm && (
+          <SuggestedActions scope={{ kind: "customer-book" }} />
+        )}
         {showUnmappedAmState && <V2UnmappedAmState />}
         {!showUnmappedAmState && mounted && !welcomeDismissed && snapshot.status === "ready" && (
           <V2WelcomeStrip
