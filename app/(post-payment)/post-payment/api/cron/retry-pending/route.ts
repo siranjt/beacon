@@ -23,6 +23,8 @@ import { sql } from "@/lib/post-payment/db/queries";
 // Phase E-7 — shared cron-auth helper. See reap-stuck/route.ts for the
 // rationale (consistent error codes + refuse-to-run when CRON_SECRET unset).
 import { requireCronAuth } from "@/lib/customer/cron-auth";
+// Phase E-11 (G6) — Slack alerting on stuck-pending customers.
+import { postSlack } from "@/lib/customer/slack";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,9 +112,94 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Phase E-11 (G6) — Forever-pending alert.
+  // Customers in pending_entity for >48h are likely stuck because their
+  // entity_id never made it into BaseSheet. Without this, the retry loop
+  // would run forever silently. Fire a single Slack alert per customer and
+  // record an `entity_id_missing_alerted` event so we don't spam.
+  // -------------------------------------------------------------------------
+  let alertsSent = 0;
+  try {
+    const { rows: stuck } = await sql<{
+      cb_customer_id: string;
+      biz_name: string | null;
+      email: string | null;
+      created_at: string;
+      hours_pending: number;
+    }>`
+      SELECT
+        c.cb_customer_id,
+        c.biz_name,
+        c.email,
+        c.created_at,
+        EXTRACT(EPOCH FROM (NOW() - c.created_at)) / 3600 AS hours_pending
+      FROM customers c
+      WHERE c.status = 'pending_entity'
+        AND c.created_at < NOW() - INTERVAL '48 hours'
+        AND NOT EXISTS (
+          SELECT 1 FROM events e
+          WHERE e.cb_customer_id = c.cb_customer_id
+            AND e.kind = 'entity_id_missing_alerted'
+        )
+      ORDER BY c.created_at ASC
+      LIMIT 25
+    `;
+    for (const s of stuck) {
+      const hours = Math.floor(Number(s.hours_pending));
+      const label = s.biz_name ? `*${s.biz_name}*` : `*${s.cb_customer_id}*`;
+      const meta = s.email ? `<${s.email}>` : "(no email)";
+      try {
+        await postSlack({
+          text: `:warning: Post-Payment customer stuck in pending_entity for ${hours}h: ${s.biz_name ?? s.cb_customer_id}`,
+          blocks: [
+            {
+              type: "header",
+              text: { type: "plain_text", text: ":warning: Post-Payment — entity_id never resolved" },
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text:
+                  `${label} ${meta}\n` +
+                  `Customer ID: \`${s.cb_customer_id}\`\n` +
+                  `Pending for: *${hours}h* (since ${new Date(s.created_at).toISOString()})\n\n` +
+                  `BaseSheet hasn't picked up the entity_id. Manual investigation needed — ` +
+                  `the retry loop is firing hourly but won't make progress until BaseSheet syncs.`,
+              },
+            },
+          ],
+        });
+        // Record the alert so we only fire once per customer.
+        await sql`
+          INSERT INTO events (cb_customer_id, kind, detail)
+          VALUES (
+            ${s.cb_customer_id},
+            'entity_id_missing_alerted',
+            ${JSON.stringify({ hours_pending: hours, alerted_at: new Date().toISOString() })}::jsonb
+          )
+        `;
+        alertsSent++;
+      } catch (e: any) {
+        // Slack errors don't abort the loop — keep alerting the others.
+        console.error(
+          `[retry-pending G6] alert for ${s.cb_customer_id} failed:`,
+          e?.message ?? String(e),
+        );
+      }
+    }
+  } catch (e: any) {
+    console.error(
+      "[retry-pending G6] stuck-pending check failed:",
+      e?.message ?? String(e),
+    );
+  }
+
   return NextResponse.json({
     ok: true,
     retried: pending.length,
     results,
+    stuckAlertsSent: alertsSent,
   });
 }

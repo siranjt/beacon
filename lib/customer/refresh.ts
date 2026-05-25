@@ -1493,6 +1493,8 @@ export async function runStageAAndStore(snapshotDate?: string): Promise<{
   durationMs: number;
   errors: string[];
   rowCount: number;
+  /** Phase E-11 (G3) — entity_ids new in this run vs. yesterday's stage A. */
+  newEntityIds: string[];
 }> {
   const date = snapshotDate ?? todaySnapshotDate();
   const { data, durationMs, errors } = await runStageA();
@@ -1501,7 +1503,68 @@ export async function runStageAAndStore(snapshotDate?: string): Promise<{
     errors,
     rowCount: data.activeEntityIds.length,
   });
-  return { durationMs, errors, rowCount: data.activeEntityIds.length };
+
+  // -------------------------------------------------------------------------
+  // Phase E-11 (G3) — Targeted refresh on new-customer detection.
+  // Diff today's active universe against yesterday's. If there are entity_ids
+  // we didn't see before, fire Stage B/C/D so their signals don't sit empty
+  // for ~24 hours. We return the diff so the route handler can wrap the chain
+  // in waitUntil() and return promptly — see app/(customer)/api/cron/refresh/stage-a.
+  // -------------------------------------------------------------------------
+  let newEntityIds: string[] = [];
+  try {
+    const yesterdayDate = new Date(date + "T00:00:00Z");
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+    const ymd = yesterdayDate.toISOString().slice(0, 10);
+    const yesterday = await readPipelineStage<StageAData>("A", ymd);
+    if (yesterday) {
+      const yesterdaySet = new Set(yesterday.data.activeEntityIds);
+      newEntityIds = data.activeEntityIds.filter((eid) => !yesterdaySet.has(eid));
+      if (newEntityIds.length > 0) {
+        console.log(
+          `[stage-a G3] detected ${newEntityIds.length} new entity_id(s) vs. ${ymd}: ${newEntityIds.slice(0, 3).join(", ")}${newEntityIds.length > 3 ? "…" : ""}`,
+        );
+      }
+    } else {
+      // No yesterday snapshot — first run, can't diff. Skip targeted refresh.
+      console.log(`[stage-a G3] no yesterday snapshot at ${ymd} — skipping diff`);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[stage-a G3] diff against yesterday failed: ${msg}`);
+  }
+
+  return { durationMs, errors, rowCount: data.activeEntityIds.length, newEntityIds };
+}
+
+/**
+ * Phase E-11 (G3) — Run Stage B/C/D in parallel after Stage A detected new
+ * customers. Designed to be called from a `waitUntil()` so it doesn't block
+ * the Stage A cron response. Each stage failure is logged but doesn't abort
+ * the others — partial signal landing is better than none for fresh customers.
+ *
+ * Compose at :05 will pick up whatever stages succeeded.
+ */
+export async function runTargetedRefreshForNewCustomers(
+  snapshotDate: string,
+  newEntityIds: string[],
+): Promise<void> {
+  if (newEntityIds.length === 0) return;
+  console.log(
+    `[targeted-refresh] firing B/C/D for ${newEntityIds.length} new customer(s) on ${snapshotDate}`,
+  );
+  const started = Date.now();
+  const results = await Promise.allSettled([
+    runStageBAndStore(snapshotDate),
+    runStageCAndStore(snapshotDate),
+    runStageDAndStore(snapshotDate),
+  ]);
+  const summary = results.map((r, i) => {
+    const stage = ["B", "C", "D"][i];
+    if (r.status === "fulfilled") return `${stage}=ok(${r.value.durationMs}ms)`;
+    return `${stage}=fail(${r.reason instanceof Error ? r.reason.message : String(r.reason)})`;
+  });
+  console.log(`[targeted-refresh] complete in ${Date.now() - started}ms: ${summary.join(", ")}`);
 }
 
 export async function runStageBAndStore(snapshotDate?: string): Promise<{
