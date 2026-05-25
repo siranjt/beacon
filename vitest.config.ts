@@ -23,7 +23,12 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.{ts,tsx}", "lib/**/*.test.{ts,tsx}"],
+    include: [
+      "tests/**/*.test.{ts,tsx}",
+      "lib/**/*.test.{ts,tsx}",
+      "scripts/**/*.test.{ts,tsx}",
+      "components/**/*.test.{ts,tsx}",
+    ],
     // Exclude the Next.js build output and anything in node_modules.
     exclude: ["node_modules", ".next", "dist", "out"],
     globals: false,

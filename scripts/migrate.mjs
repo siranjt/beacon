@@ -31,6 +31,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { neon } from "@neondatabase/serverless";
+// Phase E-15.3b — extracted so vitest can cover it independently.
+import { splitStatements } from "./lib/sql-split.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = resolve(__dirname, "..", "migrations");
@@ -45,35 +47,6 @@ if (!POSTGRES_URL) {
 }
 
 const sql = neon(POSTGRES_URL);
-
-/**
- * Split a multi-statement SQL file into individual statements.
- * Rule: a statement ends at `;` followed by newline (or end of file).
- * Comment-only chunks and whitespace-only chunks are filtered out.
- * This is intentionally simple — our migrations don't use $$ quoting or
- * embedded semicolons. If we add PL/pgSQL functions someday, this needs
- * a real lexer.
- */
-function splitStatements(sqlText) {
-  // Strip line comments first so a `--;` doesn't trip the splitter.
-  const stripped = sqlText
-    .split("\n")
-    .map((line) => {
-      const idx = line.indexOf("--");
-      return idx >= 0 ? line.slice(0, idx) : line;
-    })
-    .join("\n");
-
-  // Split on `;` at end of line.
-  const parts = stripped.split(/;\s*(?:\n|$)/);
-  return parts
-    .map((s) => s.trim())
-    // Drop empty chunks AND raw BEGIN/COMMIT tokens — we wrap each migration
-    // in our own sql.transaction() and a nested BEGIN/COMMIT would 500.
-    // Legacy migrations (the first two from 2026-05-22) had explicit
-    // BEGIN; / COMMIT; that were appropriate for psql but conflict here.
-    .filter((s) => s.length > 0 && !/^(BEGIN|COMMIT|END)\s*$/i.test(s));
-}
 
 async function ensureMigrationsTable() {
   await sql(`

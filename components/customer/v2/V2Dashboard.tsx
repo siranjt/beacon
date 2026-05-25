@@ -46,49 +46,12 @@ import {
   type SignalKey,
 } from "@/lib/customer/signal-taxonomy";
 
-const STORAGE_AM_KEY = "zoca_v2_selected_am";
-const STORAGE_WELCOME_DISMISSED = "zoca_v2_welcome_dismissed";
-// Phase E-7 (P2) — welcome strip dismissals expire after 30 days so the
-// re-introduction surfaces after a quiet period instead of staying buried
-// forever. Older values stored as the raw "1" string are migrated on read.
-const WELCOME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-function readWelcomeDismissed(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_WELCOME_DISMISSED);
-    if (!raw) return false;
-    // Legacy value — treat as freshly dismissed and let it expire 30d from now.
-    if (raw === "1") {
-      window.localStorage.setItem(
-        STORAGE_WELCOME_DISMISSED,
-        JSON.stringify({ at: Date.now() }),
-      );
-      return true;
-    }
-    const parsed = JSON.parse(raw) as { at?: number } | null;
-    if (!parsed || typeof parsed.at !== "number") return false;
-    if (Date.now() - parsed.at > WELCOME_TTL_MS) {
-      window.localStorage.removeItem(STORAGE_WELCOME_DISMISSED);
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function writeWelcomeDismissed(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      STORAGE_WELCOME_DISMISSED,
-      JSON.stringify({ at: Date.now() }),
-    );
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
+// Phase E-15.4d — localStorage shims extracted to V2DashboardStorage.ts.
+import {
+  STORAGE_AM_KEY,
+  readWelcomeDismissed,
+  writeWelcomeDismissed,
+} from "./V2DashboardStorage";
 
 type SnapshotState =
   | { status: "loading" }

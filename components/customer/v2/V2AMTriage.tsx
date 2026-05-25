@@ -56,23 +56,17 @@ type Props = {
   canCompare?: boolean;
 };
 
-// Phase 32.1 — added "watch" (YELLOW) + "healthy" (GREEN) so primary filter
-// pills mirror the KPI tile tiers exactly. "improving" and "quiet" remain in
-// the type for URL backward-compat + saved views but no longer have primary
-// chips on the bar.
-type FilterKey = "pinned" | "act" | "watch" | "healthy" | "improving" | "quiet" | "all" | "snoozed";
-type SortKey = "urgency" | "plan" | "lasttouch";
-
-const FILTER_KEYS: FilterKey[] = ["pinned", "act", "watch", "healthy", "improving", "quiet", "all", "snoozed"];
-const SORT_KEYS: SortKey[] = ["urgency", "plan", "lasttouch"];
-function isFilterKey(v: string): v is FilterKey {
-  return (FILTER_KEYS as string[]).includes(v);
-}
-function isSortKey(v: string): v is SortKey {
-  return (SORT_KEYS as string[]).includes(v);
-}
-
-const ACT_TODAY_TOP_N = 10;
+// Phase E-15.4c — FilterKey, SortKey, FILTER_KEYS, SORT_KEYS, isFilterKey,
+// isSortKey, ACT_TODAY_TOP_N extracted to V2AMTriageFilters.ts.
+import {
+  type FilterKey,
+  type SortKey,
+  FILTER_KEYS,
+  SORT_KEYS,
+  isFilterKey,
+  isSortKey,
+  ACT_TODAY_TOP_N,
+} from "./V2AMTriageFilters";
 
 const COACHING_METRIC_LABEL: Record<CoachingMetric, string> = {
   untouched_7d: "RED untouched >7d",
