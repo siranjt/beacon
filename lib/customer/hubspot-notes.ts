@@ -77,7 +77,15 @@ function htmlToText(html: string): string {
 /**
  * For each company_id → returns its single most recent note (if any in 60d).
  */
-async function fetchLatestNotePerCompany(
+/**
+ * Discover the most-recent note per company. Exported so callers can
+ * (1) read the cache by note_id before paying the Haiku enrichment cost,
+ * and (2) pass a populated cache into `fetchEnrichedNotesPerCompany`.
+ *
+ * Without this pre-fetch, every Stage D run re-enriches every note from
+ * scratch — that was the root cause of the 22:00 UTC cron timing out.
+ */
+export async function fetchLatestNotePerCompany(
   hubspotCompanyIds: string[],
 ): Promise<Map<string, HubspotApiNote>> {
   const map = new Map<string, HubspotApiNote>();

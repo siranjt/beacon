@@ -50,6 +50,23 @@ function describeReason(reason: string): string | null {
   if (reason.startsWith("integrity:")) {
     return reason.replace(/^integrity:\s*/, "Integrity check: ");
   }
+  // Per-source HubSpot failures (FIX-B): individual fetches soft-fail
+  // independently rather than collapsing into a wholesale yesterday-fallback.
+  if (reason.startsWith("hubspot:deals_fetch_failed")) {
+    return "HubSpot deals didn't refresh — deal stage / amount may be stale";
+  }
+  if (reason.startsWith("hubspot:notes_fetch_failed")) {
+    return "HubSpot notes didn't refresh — last call summary may be stale";
+  }
+  if (reason.startsWith("hubspot:calls_fetch_failed")) {
+    return "HubSpot calls didn't refresh — recent call history may be stale";
+  }
+  if (reason.startsWith("hubspot:contacts_fetch_failed")) {
+    return "HubSpot contacts didn't refresh — buyer-side org chart may be stale";
+  }
+  if (reason.startsWith("hubspot:companies_fetch_failed")) {
+    return "HubSpot company list didn't refresh — all HubSpot fields fell back to yesterday";
+  }
   if (reason.startsWith("hubspot:")) {
     return reason.replace(/^hubspot:\s*/, "HubSpot: ");
   }

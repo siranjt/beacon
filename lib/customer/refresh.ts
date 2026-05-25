@@ -14,7 +14,11 @@ import {
 import { fetchDealsForCompanies, type DealsForCompany } from "./hubspot-deals";
 import { fetchCallsForCompanies, type CallsForCompany } from "./hubspot-calls";
 import { fetchContactsForCompanies, type CompanyContact } from "./hubspot-contacts";
-import { fetchEnrichedNotesPerCompany, type LastCallSummary } from "./hubspot-notes";
+import {
+  fetchEnrichedNotesPerCompany,
+  fetchLatestNotePerCompany,
+  type LastCallSummary,
+} from "./hubspot-notes";
 import { readNoteEnrichments, writeNoteEnrichments, type CachedNoteEnrichment } from "./postgres";
 import { readPipelineStage } from "./pipeline-state";
 import {
@@ -645,70 +649,99 @@ export async function runStageD(_today: number = todayMs()): Promise<{
     hubspotCompanyIds.push(c.id);
   }
 
-  // 2. Deals per company — atomic with notes/calls/contacts below.
-  let dealsMap: Map<string, DealsForCompany>;
+  // 2. Deals per company — soft-fail (FIX-B). If deals don't land, ship
+  // companies-only and emit a structured degraded_reason. Better than
+  // wholesale-falling-back to yesterday's Stage D on a transient HubSpot
+  // blip — at least customer identity / lifecycle stays today-fresh.
+  let dealsMap: Map<string, DealsForCompany> = new Map();
   try {
     dealsMap = await timed("deals", () => fetchDealsForCompanies(hubspotCompanyIds));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     errors.push(`hubspot:deals_fetch_failed:${msg.slice(0, 100)}`);
-    throw new Error(`Stage D aborted — HubSpot deals fetch failed: ${msg}`);
+    console.warn(`[stageD/deals] soft-fail: ${msg}`);
   }
   memSnap("D after deals");
   const dealsByHubspotCompanyId: Record<string, DealsForCompany> = {};
   for (const [cid, d] of dealsMap) dealsByHubspotCompanyId[cid] = d;
 
-  // 3. Notes — read cache first, then enrich the rest
+  // 3. Notes — FIX-A: read the cache by note_id BEFORE enrichment so we
+  // don't re-pay the Haiku cost on every run. Without this, all ~900
+  // notes re-enrich every night and Stage D blows past Vercel's 300s
+  // function limit. Soft-fail under a 90s budget so a slow LLM doesn't
+  // strand the rest of Stage D.
   let notesByHubspotCompanyId: Record<string, LastCallSummary> = {};
   let notesEnrichedNew = 0;
   let notesEnrichedCached = 0;
   try {
-    const { perCompany: peek } = await fetchEnrichedNotesPerCompany(
-      hubspotCompanyIds.slice(0, 0),
-      new Map<string, CachedNoteEnrichment>(),
-    );
-    void peek;
+    const notesStarted = Date.now();
 
-    const discovered = await timed("notes", () =>
-      fetchEnrichedNotesPerCompany(
-        hubspotCompanyIds,
-        new Map<string, CachedNoteEnrichment>(),
-      ),
+    // Phase 1 — discover latest note id per company (cheap, no LLM).
+    const latestNotes = await timed("notes:discover", () =>
+      fetchLatestNotePerCompany(hubspotCompanyIds),
     );
-    const discoveredNoteIds: string[] = [];
-    for (const v of discovered.perCompany.values()) discoveredNoteIds.push(v.note_id);
-    const cache = await readNoteEnrichments(discoveredNoteIds);
+    const noteIds: string[] = [];
+    for (const n of latestNotes.values()) noteIds.push(n.id);
+
+    // Phase 2 — hydrate the enrichment cache by note_id. On a steady-
+    // state book this is ~95%+ cache hit ratio, which is the whole
+    // reason Stage D fits inside Vercel's 5-minute budget.
+    const cached = await readNoteEnrichments(noteIds);
+
+    // Phase 3 — enrich only the un-cached notes, under a wall-clock
+    // budget. If the LLM is slow we'd rather ship partial enrichment
+    // than abort the stage and serve yesterday's data.
+    const NOTES_BUDGET_MS = 90_000;
+    const discovered = await Promise.race([
+      timed("notes:enrich", () =>
+        fetchEnrichedNotesPerCompany(hubspotCompanyIds, cached),
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`notes_budget_exceeded:${NOTES_BUDGET_MS}ms`)),
+          NOTES_BUDGET_MS,
+        ),
+      ),
+    ]);
+
     if (discovered.toCache.size > 0) {
-      await writeNoteEnrichments(discovered.toCache);
+      await writeNoteEnrichments(discovered.toCache as Map<string, CachedNoteEnrichment>);
     }
     notesByHubspotCompanyId = Object.fromEntries(discovered.perCompany);
     notesEnrichedNew = discovered.toCache.size;
-    notesEnrichedCached = discoveredNoteIds.length - notesEnrichedNew;
-    void cache;
+    notesEnrichedCached = cached.size;
+    console.log(
+      `[stageD/notes] ${notesEnrichedCached} cache hits, ${notesEnrichedNew} new, ` +
+        `${Date.now() - notesStarted}ms`,
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     errors.push(`hubspot:notes_fetch_failed:${msg.slice(0, 100)}`);
-    // Phase E-11 — notes is the most LLM-heavy fetch; if it breaks we still
-    // have meaningful HubSpot data from companies/deals. Keep notes as a soft
-    // failure (empty map) but mark the structured error so the UI banner shows
-    // "notes unavailable" without nuking the rest of Stage D.
+    console.warn(`[stageD/notes] soft-fail: ${msg}`);
+    // Notes is intentionally soft — empty notes map, structured error in
+    // degraded_reasons. Companies/deals/calls/contacts still land.
   }
   memSnap("D after notes");
 
-  // 4 + 5. Calls + Contacts — atomic. Either both land, or we throw and let
-  // composeSnapshot fall back to yesterday's Stage D. Wrapped together because
-  // they're both small companion fetches and the failure mode is identical.
-  let callsMap: Map<string, CallsForCompany>;
-  let contactsMap: Map<string, CompanyContact[]>;
+  // 4 + 5. Calls + Contacts — soft-fail (FIX-B). Same reasoning as deals:
+  // a transient HubSpot 5xx on calls shouldn't strand the entire dashboard
+  // on yesterday's data. Each soft-fails independently with a structured
+  // reason. composeSnapshot still surfaces the banner so AMs know.
+  let callsMap: Map<string, CallsForCompany> = new Map();
+  let contactsMap: Map<string, CompanyContact[]> = new Map();
   try {
-    [callsMap, contactsMap] = await Promise.all([
-      timed("calls", () => fetchCallsForCompanies(hubspotCompanyIds)),
-      timed("contacts", () => fetchContactsForCompanies(hubspotCompanyIds)),
-    ]);
+    callsMap = await timed("calls", () => fetchCallsForCompanies(hubspotCompanyIds));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    errors.push(`hubspot:calls_or_contacts_fetch_failed:${msg.slice(0, 100)}`);
-    throw new Error(`Stage D aborted — HubSpot calls/contacts fetch failed: ${msg}`);
+    errors.push(`hubspot:calls_fetch_failed:${msg.slice(0, 100)}`);
+    console.warn(`[stageD/calls] soft-fail: ${msg}`);
+  }
+  try {
+    contactsMap = await timed("contacts", () => fetchContactsForCompanies(hubspotCompanyIds));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push(`hubspot:contacts_fetch_failed:${msg.slice(0, 100)}`);
+    console.warn(`[stageD/contacts] soft-fail: ${msg}`);
   }
   memSnap("D after calls + contacts");
   const callsByHubspotCompanyId: Record<string, CallsForCompany> = {};
@@ -1635,8 +1668,15 @@ export async function runStageDAndStore(snapshotDate?: string): Promise<{
     } catch {
       /* Sentry unavailable */
     }
+    // FIX-C: extract the failing phase from the thrown message so the
+    // Slack alert is triage-ready. Format: "Stage D aborted — HubSpot
+    // <phase> fetch failed: <inner>" → phase = "companies" / "deals" /
+    // "calls/contacts" / "notes" etc. Fall through to "unknown" if the
+    // shape doesn't match (e.g. DB write failure).
+    const phaseMatch = msg.match(/HubSpot ([\w/]+) fetch failed/i);
+    const phase = phaseMatch ? phaseMatch[1] : "unknown";
     postSlack({
-      text: `:rotating_light: *Beacon Stage D aborted*: ${msg}`,
+      text: `:rotating_light: *Beacon Stage D aborted*: ${phase} — ${msg}`,
       blocks: [
         {
           type: "header",
@@ -1644,7 +1684,16 @@ export async function runStageDAndStore(snapshotDate?: string): Promise<{
         },
         {
           type: "section",
-          text: { type: "mrkdwn", text: `*Snapshot date*: \`${date}\`\n*Reason*: ${msg}\n\nCompose will fall back to yesterday's Stage D if available. AMs will see a staleness banner.` },
+          text: {
+            type: "mrkdwn",
+            text:
+              `*Snapshot date*: \`${date}\`\n` +
+              `*Failing phase*: \`${phase}\`\n` +
+              `*Reason*: ${msg}\n\n` +
+              `After FIX-A/B/C only a wholesale *companies* fetch failure trips this. ` +
+              `deals/notes/calls/contacts now soft-fail with structured banner reasons. ` +
+              `Compose will fall back to yesterday's Stage D if available. AMs see a staleness banner with the specific failing source.`,
+          },
         },
       ],
     }).catch(() => {
