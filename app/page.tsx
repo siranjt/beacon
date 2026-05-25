@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { AGENTS } from "@/lib/config";
+import { getRoleForEmail } from "@/lib/customer/config";
 import BeaconAmbient from "@/components/BeaconAmbient";
 import LauncherCard from "./_components/LauncherCard";
 import LauncherSignOut from "./_components/LauncherSignOut";
@@ -28,6 +30,7 @@ export default async function LauncherPage() {
   }
 
   const firstName = (session.user?.name || "").trim().split(/\s+/)[0] || "there";
+  const isAdmin = getRoleForEmail(session.user?.email ?? "") === "admin";
 
   return (
     <main style={{ position: "relative", minHeight: "100vh", background: "var(--zoca-bg)" }}>
@@ -123,7 +126,7 @@ export default async function LauncherPage() {
           </div>
         </div>
 
-        {/* Subtle Cmd+K hint */}
+        {/* Subtle Cmd+K + ? hints */}
         <div
           style={{
             marginTop: "2rem",
@@ -131,22 +134,30 @@ export default async function LauncherPage() {
             fontFamily: "-apple-system, Inter, system-ui, sans-serif",
             fontSize: 11,
             color: "var(--zoca-text-3)",
+            display: "flex",
+            justifyContent: "center",
+            gap: 18,
+            flexWrap: "wrap",
           }}
         >
-          Press{" "}
-          <kbd
-            style={{
-              fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
-              fontSize: 10,
-              padding: "1px 5px",
-              border: "1px solid var(--zoca-border)",
-              borderRadius: 4,
-              background: "var(--zoca-surface)",
-            }}
-          >
-            ⌘K
-          </kbd>{" "}
-          to jump to any customer&apos;s 360 view.
+          <span>
+            <kbd style={kbdStyle}>⌘K</kbd> to jump to any customer&apos;s 360
+          </span>
+          <span>
+            <kbd style={kbdStyle}>?</kbd> for all keyboard shortcuts
+          </span>
+          {isAdmin && (
+            <Link
+              href="/admin/activity"
+              style={{
+                color: "var(--zoca-text-2)",
+                textDecoration: "none",
+                borderBottom: "1px dotted var(--zoca-text-3)",
+              }}
+            >
+              Admin · Activity log
+            </Link>
+          )}
         </div>
       </div>
 
@@ -174,3 +185,12 @@ export default async function LauncherPage() {
     </main>
   );
 }
+
+const kbdStyle: React.CSSProperties = {
+  fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
+  fontSize: 10,
+  padding: "1px 5px",
+  border: "1px solid var(--zoca-border)",
+  borderRadius: 4,
+  background: "var(--zoca-surface)",
+};

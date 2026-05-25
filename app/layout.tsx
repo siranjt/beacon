@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import SessionProvider from "@/components/SessionProvider";
 import FaviconFlicker from "@/components/FaviconFlicker";
 import CommandPaletteProvider from "@/components/CommandPaletteProvider";
+import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -43,10 +44,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <FaviconFlicker />
         <SessionProvider>
           {children}
-          {/* Phase E-9 — Cmd+K cross-agent command palette. Mounted inside
-              SessionProvider so the umbrella activity logger has session
-              context when it fires. */}
+          {/* Phase E-9 — Cmd+K cross-agent command palette + global
+              keyboard shortcuts (?, g-prefix nav). Both mounted inside
+              SessionProvider so any future shortcut that calls the
+              activity logger has session context. */}
           <CommandPaletteProvider />
+          <KeyboardShortcuts />
         </SessionProvider>
       </body>
     </html>

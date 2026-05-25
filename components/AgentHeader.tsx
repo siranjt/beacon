@@ -29,19 +29,7 @@
 import { BeaconMark } from "./BeaconMark";
 import ZocaLogo from "./ZocaLogo";
 import { V2UserMenu } from "./customer/v2/V2UserMenu";
-
-function relativeAge(generatedAt: string | null | undefined): string {
-  if (!generatedAt) return "—";
-  const ms = Date.now() - Date.parse(generatedAt);
-  if (!Number.isFinite(ms) || ms < 0) return "just now";
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
+import FreshnessIndicator from "./FreshnessIndicator";
 
 type AgentHeaderProps = {
   /** Agent name appended to "Beacon · " in the lockup. */
@@ -95,21 +83,78 @@ export default function AgentHeader({
         </span>
       </a>
 
-      {/* Right — live status + user menu (admin/manager/AM pill + sign-out) */}
+      {/* Right — Cmd+K hint chip, live status / freshness, user menu */}
       <div className="flex items-center gap-3 flex-wrap">
+        {/* Phase E-9 — discovery chip for the global command palette.
+            Hidden on small viewports where it would crowd the header. */}
+        <CmdKHint />
+
         <div
           className="flex items-center gap-2 text-[11px] text-zoca-text-2"
           style={{ transition: "font-size 0.2s ease" }}
         >
-          {/* Same outward-ping live dot used by V2Header. */}
-          <span className="b-status-ping zoca-pulse-dot-green" />
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>
-            {generatedAt ? `Live · ${relativeAge(generatedAt)}` : status}
-          </span>
+          {generatedAt ? (
+            <FreshnessIndicator
+              ts={generatedAt}
+              source={`${agentName} · live data`}
+              compact
+            />
+          ) : (
+            <>
+              <span className="b-status-ping zoca-pulse-dot-green" />
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>{status}</span>
+            </>
+          )}
         </div>
 
         <V2UserMenu />
       </div>
     </nav>
+  );
+}
+
+/* Small "⌘K" affordance chip — clickable, dispatches a synthetic Cmd+K
+   keydown so the existing CommandPaletteProvider handler opens the
+   palette. Avoids leaking a React Context just for the open() call. */
+function CmdKHint() {
+  return (
+    <button
+      type="button"
+      aria-label="Open command palette (⌘K)"
+      onClick={() => {
+        if (typeof window === "undefined") return;
+        // Dispatch the same kind of event the CommandPaletteProvider listens
+        // for. Modifier flag matches what real browsers send on Cmd+K (Mac).
+        const isMac = navigator.platform.toLowerCase().includes("mac");
+        const evt = new KeyboardEvent("keydown", {
+          key: "k",
+          metaKey: isMac,
+          ctrlKey: !isMac,
+          bubbles: true,
+          cancelable: true,
+        });
+        document.dispatchEvent(evt);
+      }}
+      className="hidden sm:inline-flex items-center gap-1 text-[10px] text-zoca-text-2"
+      style={{
+        background: "var(--zoca-surface, #F8EFD7)",
+        border: "1px solid var(--zoca-border, #D4C29B)",
+        borderRadius: 6,
+        padding: "2px 8px",
+        cursor: "pointer",
+        fontFamily: "-apple-system, Inter, system-ui, sans-serif",
+        letterSpacing: "0.04em",
+      }}
+    >
+      <kbd
+        style={{
+          fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
+          fontWeight: 600,
+        }}
+      >
+        ⌘K
+      </kbd>
+      <span style={{ opacity: 0.7 }}>jump</span>
+    </button>
   );
 }
