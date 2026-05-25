@@ -62,7 +62,6 @@ export default class SectionErrorBoundary extends Component<Props, State> {
     // try/catch so a missing dep never breaks the boundary.
     try {
       if (typeof window !== "undefined") {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const Sentry = require("@sentry/nextjs");
         if (Sentry?.captureException) {
           Sentry.captureException(error, {

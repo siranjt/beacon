@@ -410,7 +410,6 @@ export async function runStageA(today: number = todayMs()): Promise<{
     try {
       // Lazy Sentry — see SectionErrorBoundary for the same pattern. If
       // @sentry/nextjs isn't installed (local dev), this no-ops cleanly.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const Sentry = require("@sentry/nextjs");
       for (const a of alerts) {
         if (Sentry?.captureMessage) {
@@ -1563,7 +1562,6 @@ export async function runStageDAndStore(snapshotDate?: string): Promise<{
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[stage-d abort] ${msg}`);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const Sentry = require("@sentry/nextjs");
       if (Sentry?.captureException) {
         Sentry.captureException(e, {
