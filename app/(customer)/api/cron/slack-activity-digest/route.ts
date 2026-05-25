@@ -268,9 +268,13 @@ function describeAction(r: ActivityRow): string {
       return "selected a result from Cmd+K";
     }
     case "claude_asked": {
+      // Internal event_name stays as claude_asked (no schema migration) but
+      // user-facing copy in Slack says "Beacon" — the brand.
       const bizMeta = metaString(r.metadata, "biz_name");
-      if (bizMeta) return `asked Claude about *${bizMeta}*`;
-      return "asked Claude on a customer 360";
+      const audience = metaString(r.metadata, "audience");
+      if (audience) return `asked Beacon about *${audience}*`;
+      if (bizMeta) return `asked Beacon about *${bizMeta}*`;
+      return "asked Beacon for help";
     }
 
     default:

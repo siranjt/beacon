@@ -109,6 +109,27 @@ export async function loadInboxContext(opts: {
           .slice(0, 12)
       : [];
 
+  // Phase E-9 — additional signal richness for inbox reasoning:
+  //   - Outbound-silence buckets so Beacon can answer "who haven't we
+  //     contacted in 14d+?" without doing math itself.
+  //   - Days-since-last-contact median across RED so Beacon understands
+  //     whether silence is the dominant pain or something else is.
+  //   - Yesterday's RED count (best-effort, from snapshot history) so it
+  //     can comment on day-over-day trend.
+  const silent14 = scoped.filter(
+    (c) => (c.metrics?.days_since_out ?? 0) >= 14,
+  ).length;
+  const silent30 = scoped.filter(
+    (c) => (c.metrics?.days_since_out ?? 0) >= 30,
+  ).length;
+  const redSilenceDays = red
+    .map((c) => c.metrics?.days_since_out ?? 0)
+    .sort((a, b) => a - b);
+  const redMedianSilence =
+    redSilenceDays.length > 0
+      ? redSilenceDays[Math.floor(redSilenceDays.length / 2)]
+      : null;
+
   const blob = JSON.stringify(
     {
       scope: "inbox",
@@ -119,6 +140,9 @@ export async function loadInboxContext(opts: {
         green: scoped.filter((c) => c.signals_v2?.stoplight === "GREEN").length,
         needs_am_call: needsCall.length,
         open_tickets: openTickets.length,
+        outbound_silence_14d: silent14,
+        outbound_silence_30d: silent30,
+        red_median_days_since_outbound: redMedianSilence,
       },
       critical_customers: red.map((c) => ({
         entity_id: c.entity_id,
@@ -342,12 +366,77 @@ export async function loadCustomerBookContext(opts: {
     (c) => c.signals_v2?.trajectory_7d === "improving",
   ).length;
 
+  // Phase E-9 — sharper signal rollup so Beacon can reason about WHY the
+  // book is in its state, not just count the stoplights.
+  // 1. Median composite (book-level health proxy)
+  // 2. Sub-score distribution across RED customers (where's the dominant pain?)
+  // 3. Outbound-silence stat (how many customers haven't been contacted in 14d+)
+  // 4. Channel-mix diversity over the book
+  const composites = scoped
+    .map((c) => c.signals_v2?.composite)
+    .filter((n): n is number => typeof n === "number")
+    .sort((a, b) => a - b);
+  const median =
+    composites.length > 0
+      ? composites[Math.floor(composites.length / 2)]
+      : null;
+
+  const redSubScores = scoped
+    .filter((c) => c.signals_v2?.stoplight === "RED")
+    .reduce(
+      (acc, c) => {
+        const s = c.signals_v2;
+        if (!s) return acc;
+        acc.we_silent += s.sig_we_silent ?? 0;
+        acc.client_silent += s.sig_client_silent ?? 0;
+        acc.response_drop += s.sig_response_drop ?? 0;
+        acc.volume_collapse += s.sig_volume_collapse ?? 0;
+        acc.usage += s.sig_usage ?? 0;
+        acc.billing += s.sig_billing ?? 0;
+        acc.n += 1;
+        return acc;
+      },
+      {
+        we_silent: 0,
+        client_silent: 0,
+        response_drop: 0,
+        volume_collapse: 0,
+        usage: 0,
+        billing: 0,
+        n: 0,
+      },
+    );
+  const red_avg_sub_scores =
+    redSubScores.n > 0
+      ? {
+          we_silent: Math.round(redSubScores.we_silent / redSubScores.n),
+          client_silent: Math.round(redSubScores.client_silent / redSubScores.n),
+          response_drop: Math.round(redSubScores.response_drop / redSubScores.n),
+          volume_collapse: Math.round(redSubScores.volume_collapse / redSubScores.n),
+          usage: Math.round(redSubScores.usage / redSubScores.n),
+          billing: Math.round(redSubScores.billing / redSubScores.n),
+        }
+      : null;
+
+  const silent_14d_count = scoped.filter(
+    (c) => (c.metrics?.days_since_out ?? 0) >= 14,
+  ).length;
+  const silent_30d_count = scoped.filter(
+    (c) => (c.metrics?.days_since_out ?? 0) >= 30,
+  ).length;
+
   const blob = JSON.stringify(
     {
       scope: "customer-book",
       am_filter: opts.amFilter,
       counts,
       trajectory: { worsening, improving },
+      health_summary: {
+        median_composite: median,
+        red_avg_sub_scores,
+        outbound_silence_14d: silent_14d_count,
+        outbound_silence_30d: silent_30d_count,
+      },
       top_at_risk: top.map((c) => ({
         entity_id: c.entity_id,
         biz_name: c.company,

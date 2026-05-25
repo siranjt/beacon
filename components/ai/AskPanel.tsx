@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * AskPanel — universal Claude-powered copilot. Phase E-9.
+ * AskPanel — universal "Ask Beacon" copilot (Claude under the hood).
+ * Phase E-9.
  *
  * Mounted once at the umbrella root layout. Detects scope from
  * usePathname() and adapts:
@@ -11,12 +12,16 @@
  *   - Header subtitle says "About this customer" / "About the inbox" / etc.
  *
  * UX:
- *   - Floating "✨ Ask Claude" button bottom-right (hidden when scope is
+ *   - Floating "✨ Ask Beacon" button bottom-right (hidden when scope is
  *     "hidden" — auth pages, admin pages)
  *   - Click to open right-edge drawer
  *   - Esc / backdrop click to close
  *   - ⌘+Enter to send
  *   - Conversation persists in localStorage scoped to the current view
+ *
+ * Note on branding: this is *Beacon* — Zoca's customer-intelligence
+ * copilot. It's powered by Claude (Anthropic) but speaks as Beacon. Users
+ * never see "Claude" in the UI.
  */
 
 import {
@@ -253,7 +258,7 @@ export default function AskPanel() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={`Ask Claude about ${audience}`}
+          aria-label={`Ask Beacon about ${audience}`}
           style={{
             position: "fixed",
             bottom: 24,
@@ -275,7 +280,7 @@ export default function AskPanel() {
           }}
         >
           <Sparkles />
-          Ask Claude
+          Ask Beacon
           {turns.length > 0 && (
             <span
               style={{
@@ -298,7 +303,7 @@ export default function AskPanel() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Ask Claude"
+          aria-label="Ask Beacon"
           onClick={() => {
             if (!streaming) setOpen(false);
           }}
@@ -349,7 +354,7 @@ export default function AskPanel() {
                     gap: 8,
                   }}
                 >
-                  <Sparkles /> Ask Claude
+                  <Sparkles /> Ask Beacon
                 </div>
                 <div
                   style={{
@@ -520,7 +525,7 @@ export default function AskPanel() {
                   color: C.text3,
                 }}
               >
-                <span>Powered by Haiku · grounded in {audience}</span>
+                <span>Beacon · grounded in {audience}</span>
                 <button
                   type="submit"
                   disabled={streaming || !draft.trim()}

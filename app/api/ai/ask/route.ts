@@ -49,8 +49,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const MODEL = process.env.ANTHROPIC_ASK_MODEL ?? "claude-haiku-4-5-20251001";
-const MAX_TOKENS = 1200;
+// Default model — Sonnet 4.6 for the interactive copilot. Haiku is faster +
+// cheaper but Sonnet is materially better at reasoning across the rich
+// per-scope context blobs (especially "patterns across the book", "why is
+// this RED", and "compare these customers"). Streaming hides most of the
+// latency gap. Override with ANTHROPIC_ASK_MODEL=haiku in env to flip
+// back; per-question overrides aren't exposed in v1.
+const MODEL = process.env.ANTHROPIC_ASK_MODEL ?? "claude-sonnet-4-6";
+const MAX_TOKENS = 2400;
 const MAX_HISTORY_TURNS = 6;
 const MAX_QUESTION_CHARS = 2000;
 
