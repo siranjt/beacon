@@ -33,6 +33,12 @@ import {
   performanceChipSummary,
   type ActionChoice,
 } from "./V2CardChips";
+// Phase E-15.6 — bizname link + contacts section extracted (~110 lines).
+import {
+  BiznameLink,
+  ContactsSection,
+  daysSince,
+} from "./V2CardBizname";
 type CompositeTrendPoint = { date: string; composite: number };
 
 type Props = {
@@ -1474,11 +1480,8 @@ function actionLabel(c: ScoredCustomerV2): string {
   return action.replace(/\.$/, "");
 }
 
-function daysSince(iso: string): number {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return 0;
-  return Math.max(0, Math.floor((Date.now() - ms) / 86400_000));
-}
+// Phase E-15.6 — daysSince moved to V2CardBizname.tsx (utility shared with
+// ContactsSection). Imported below.
 
 /**
  * Render the rationale safely: parse only <b>...</b> markers into React
@@ -1605,108 +1608,5 @@ const V2CustomerCard = memo(V2CustomerCardInner, (prev, next) => {
 export default V2CustomerCard;
 
 // Phase E-15.4b — performanceChipSummary extracted to V2CardChips.tsx.
-
-// ---------------------------------------------------------------------------
-// BiznameLink (Phase 20)
-//
-// Wraps the bizname text so that when the customer has a matched HubSpot
-// company id we render an anchor that opens the HubSpot company page in a
-// new tab. On hover, an external-link icon appears to the right. When there
-// is no company id we just render the children as a plain span so layout
-// stays identical.
-// ---------------------------------------------------------------------------
-
-type BiznameLinkProps = {
-  bizname: string;
-  /** Phase 33.D — HubSpot Locations record id (replaces hubspotCompanyId). */
-  hubspotLocationRecordId?: string;
-  children: React.ReactNode;
-};
-
-function BiznameLink({ bizname, hubspotLocationRecordId, children }: BiznameLinkProps) {
-  if (!hubspotLocationRecordId) {
-    return <>{children}</>;
-  }
-  return (
-    <a
-      href={buildHubspotLocationUrl(hubspotLocationRecordId)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group/biz inline-flex items-baseline gap-1"
-      style={{
-        color: "inherit",
-        textDecoration: "none",
-        cursor: "pointer",
-      }}
-      title={`Open ${bizname} in HubSpot Locations (new tab)`}
-    >
-      {children}
-      <i
-        className="ti ti-external-link opacity-0 transition-opacity group-hover/biz:opacity-100"
-        aria-hidden
-        style={{ fontSize: "12px", lineHeight: 1, color: "var(--zoca-text-3, #94a3b8)" }}
-      />
-    </a>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// CONTACTS section (Phase 14C — Tier E: buyer-side org chart)
-//
-// Surfaces up to 5 HubSpot contacts per customer inside the "Why?" expand,
-// matching the styling of the PERFORMANCE SIGNALS section in V2PerformancePanel.
-// ---------------------------------------------------------------------------
-
-type ContactsSectionProps = {
-  contacts: NonNullable<NonNullable<ScoredCustomerV2["hubspot"]>["contacts"]>;
-  /** Phase 20 — passed through so mailto: subject/body can be pre-filled. */
-  bizname?: string;
-  amName?: string;
-};
-
-function ContactsSection({ contacts, bizname, amName }: ContactsSectionProps) {
-  if (!contacts || contacts.length === 0) return null;
-  return (
-    <div className="mt-3 rounded-zoca-sm border border-zoca-border bg-zoca-surface-soft/40 p-3">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zoca-text-2">
-        Contacts
-      </div>
-      <ul className="space-y-1.5">
-        {contacts.slice(0, 5).map((c) => {
-          const sinceLabel = c.last_activity ? `${daysSince(c.last_activity)}d ago` : "—";
-          return (
-            <li
-              key={c.contact_id}
-              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11px]"
-            >
-              <span className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-medium text-zoca-text">{c.name}</span>
-                {c.job_title && (
-                  <span className="text-[10px] text-zoca-text-2">{c.job_title}</span>
-                )}
-              </span>
-              <span className="flex flex-wrap items-baseline gap-x-2">
-                {c.email ? (
-                  <a
-                    href={buildMailto(c.email, { bizname, amName })}
-                    className="inline-flex items-center gap-1 hover:underline"
-                    style={{ color: "var(--zoca-blue, #2563eb)", textDecoration: "none" }}
-                    title={`Email ${c.name} — opens your mail client with a pre-filled draft`}
-                  >
-                    <i className="ti ti-mail" aria-hidden style={{ fontSize: "11px", lineHeight: 1 }} />
-                    {c.email}
-                  </a>
-                ) : (
-                  <span className="text-zoca-text-2">—</span>
-                )}
-                <span className="text-[10px] text-zoca-text-2" title={c.last_activity || ""}>
-                  {sinceLabel}
-                </span>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
+// Phase E-15.6 — BiznameLink + ContactsSection extracted to V2CardBizname.tsx
+// (~110 lines off V2CustomerCard).

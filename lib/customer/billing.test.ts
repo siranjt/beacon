@@ -150,3 +150,216 @@ describe("scoreBilling — output contract", () => {
     expect(max).toBeGreaterThanOrEqual(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase E-15.5 — buildBillingMetrics aggregator tests.
+//
+// Takes raw Chargebee arrays (invoices, transactions, subs) plus the
+// customer→entities map and produces one BillingMetrics row per entity.
+// This is where the entity-fan-out happens (multi-location customers share
+// one customer_id but get separate billing rows). Easy class of bug:
+// double-counting, missing fan-out, or wrong direction of the auto-debit
+// OR-reduce across multiple subs.
+// ---------------------------------------------------------------------------
+
+import { buildBillingMetrics } from "./billing";
+import type {
+  ChargebeeInvoice,
+  ChargebeeTransaction,
+  ChargebeeSub,
+} from "./types";
+
+function inv(over: Partial<ChargebeeInvoice> = {}): ChargebeeInvoice {
+  return {
+    invoice_id: "inv_1",
+    customer_id: "cust_1",
+    amount_due: 1000,
+    days_overdue: 0,
+    ...over,
+  } as ChargebeeInvoice;
+}
+
+function tx(over: Partial<ChargebeeTransaction> = {}): ChargebeeTransaction {
+  return {
+    id: "tx_1",
+    customer_id: "cust_1",
+    // Transactions Beacon cares about are either "failure" (counted as
+    // recent failed) or "in_progress" (gates the ACH-in-progress flag).
+    // "success" isn't surfaced — the count only includes failures.
+    status: "failure",
+    amount: 100,
+    date: Math.floor(Date.now() / 1000),
+    linked_invoice_ids: [],
+    ...over,
+  };
+}
+
+function sub(over: Partial<ChargebeeSub> = {}): ChargebeeSub {
+  return {
+    subscription_id: "sub_1",
+    customer_id: "cust_1",
+    status: "active",
+    auto_collection: "on",
+    ...over,
+  } as ChargebeeSub;
+}
+
+describe("buildBillingMetrics — fan-out + aggregation", () => {
+  it("returns empty map when no customer→entities entries", () => {
+    const out = buildBillingMetrics([], [], [], new Map());
+    expect(out.size).toBe(0);
+  });
+
+  it("fans one customer's invoices out to multiple entity_ids", () => {
+    // Multi-location customer: one cust_id → 3 entities. Each entity gets
+    // its own BillingMetrics row referencing the same parent customer.
+    const customerToEntities = new Map([["cust_1", ["ent_a", "ent_b", "ent_c"]]]);
+    const out = buildBillingMetrics(
+      [inv({ amount_due: 500 }), inv({ invoice_id: "inv_2", amount_due: 700 })],
+      [],
+      [],
+      customerToEntities,
+    );
+    expect(out.size).toBe(3);
+    expect(out.get("ent_a")?.unpaid_invoice_count).toBe(2);
+    expect(out.get("ent_a")?.total_amount_due_cents).toBe(1200);
+    // All three entities reference the same customer + aggregate.
+    expect(out.get("ent_b")?.total_amount_due_cents).toBe(1200);
+    expect(out.get("ent_c")?.total_amount_due_cents).toBe(1200);
+  });
+
+  it("uses MAX of days_overdue across invoices (oldest unpaid)", () => {
+    const out = buildBillingMetrics(
+      [
+        inv({ days_overdue: 5 }),
+        inv({ invoice_id: "inv_2", days_overdue: 22 }),
+        inv({ invoice_id: "inv_3", days_overdue: 14 }),
+      ],
+      [],
+      [],
+      new Map([["cust_1", ["ent_1"]]]),
+    );
+    expect(out.get("ent_1")?.days_past_oldest_unpaid).toBe(22);
+  });
+
+  it("counts failed transactions only (not in_progress)", () => {
+    // The ChargebeeTransaction type only tracks 'failure' and 'in_progress'
+    // statuses — 'success' isn't surfaced by the upstream fetch at all.
+    // Failure count drives the auto-debit-off-with-failures flag.
+    const out = buildBillingMetrics(
+      [],
+      [
+        tx({ status: "failure" }),
+        tx({ id: "tx_2", status: "failure" }),
+        tx({ id: "tx_3", status: "failure" }),
+        tx({ id: "tx_4", status: "in_progress" }),
+      ],
+      [],
+      new Map([["cust_1", ["ent_1"]]]),
+    );
+    expect(out.get("ent_1")?.recent_failed_transaction_count).toBe(3);
+  });
+
+  it("auto_debit_off_with_failures requires BOTH conditions on same customer", () => {
+    const customerToEntities = new Map([["cust_1", ["ent_1"]]]);
+    // Auto-debit off, but no failures → false
+    const justOff = buildBillingMetrics(
+      [],
+      [],
+      [sub({ auto_collection: "off" })],
+      customerToEntities,
+    );
+    expect(justOff.get("ent_1")?.auto_debit_off_with_failures).toBe(false);
+
+    // Failures, but auto-debit on → false
+    const justFailures = buildBillingMetrics(
+      [],
+      [tx({ status: "failure" })],
+      [sub({ auto_collection: "on" })],
+      customerToEntities,
+    );
+    expect(justFailures.get("ent_1")?.auto_debit_off_with_failures).toBe(false);
+
+    // BOTH → true
+    const both = buildBillingMetrics(
+      [],
+      [tx({ status: "failure" })],
+      [sub({ auto_collection: "off" })],
+      customerToEntities,
+    );
+    expect(both.get("ent_1")?.auto_debit_off_with_failures).toBe(true);
+  });
+
+  it("auto_debit_off across multiple subs is OR-reduced (any off ⇒ off)", () => {
+    // If a customer has two subs, one with auto on and one with auto off,
+    // the customer is considered "auto debit off" for the failure check.
+    const customerToEntities = new Map([["cust_1", ["ent_1"]]]);
+    const out = buildBillingMetrics(
+      [],
+      [tx({ status: "failure" })],
+      [
+        sub({ subscription_id: "sub_a", auto_collection: "on" }),
+        sub({ subscription_id: "sub_b", auto_collection: "off" }),
+      ],
+      customerToEntities,
+    );
+    expect(out.get("ent_1")?.auto_debit_off_with_failures).toBe(true);
+  });
+
+  it("flags has_ach_in_progress when in_progress tx links to an unpaid invoice", () => {
+    const customerToEntities = new Map([["cust_1", ["ent_1"]]]);
+    const out = buildBillingMetrics(
+      [inv({ invoice_id: "inv_a" })],
+      [tx({ status: "in_progress", linked_invoice_ids: ["inv_a"] })],
+      [],
+      customerToEntities,
+    );
+    expect(out.get("ent_1")?.has_ach_in_progress).toBe(true);
+  });
+
+  it("does NOT flag has_ach_in_progress when in_progress tx points elsewhere", () => {
+    const customerToEntities = new Map([["cust_1", ["ent_1"]]]);
+    const out = buildBillingMetrics(
+      [inv({ invoice_id: "inv_a" })],
+      [
+        tx({
+          status: "in_progress",
+          linked_invoice_ids: ["inv_unrelated"],
+        }),
+      ],
+      [],
+      customerToEntities,
+    );
+    expect(out.get("ent_1")?.has_ach_in_progress).toBe(false);
+  });
+
+  it("ignores rows with empty customer_id (defensive)", () => {
+    const out = buildBillingMetrics(
+      [inv({ customer_id: "" })],
+      [tx({ customer_id: "" })],
+      [sub({ customer_id: "" })],
+      new Map([["cust_1", ["ent_1"]]]),
+    );
+    // No data lands on ent_1 because no rows had matching customer_id.
+    expect(out.get("ent_1")?.unpaid_invoice_count).toBe(0);
+    expect(out.get("ent_1")?.recent_failed_transaction_count).toBe(0);
+  });
+
+  it("writes the BillingMetrics shape correctly (entity_id + customer_id + all numerics)", () => {
+    const out = buildBillingMetrics(
+      [inv({ amount_due: 1234, days_overdue: 7 })],
+      [tx({ status: "failure" })],
+      [sub({ auto_collection: "off" })],
+      new Map([["cust_1", ["ent_1"]]]),
+    );
+    const m = out.get("ent_1")!;
+    expect(m.entity_id).toBe("ent_1");
+    expect(m.customer_id).toBe("cust_1");
+    expect(m.unpaid_invoice_count).toBe(1);
+    expect(m.total_amount_due_cents).toBe(1234);
+    expect(m.days_past_oldest_unpaid).toBe(7);
+    expect(m.recent_failed_transaction_count).toBe(1);
+    expect(m.auto_debit_off_with_failures).toBe(true);
+    expect(m.has_ach_in_progress).toBe(false);
+  });
+});
