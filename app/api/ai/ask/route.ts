@@ -33,6 +33,12 @@ import { getRoleForEmail } from "@/lib/customer/config";
 import type { AiScope } from "@/lib/ai/scopes";
 import { scopeKey } from "@/lib/ai/scopes";
 import {
+  getRecentCrossScope,
+  getScopeConversations,
+  renderMemoryForPrompt,
+  saveTurn,
+} from "@/lib/ai/memory";
+import {
   loadCustomer360Context,
   loadCustomerBookContext,
   loadEscalationOverviewContext,
@@ -178,9 +184,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Trim conversation history.
+  // Trim conversation history sent by the client (in-memory turns from
+  // the current open drawer — used as immediate context).
   const history = Array.isArray(body.history) ? body.history : [];
   const trimmed = history.slice(-MAX_HISTORY_TURNS * 2);
+
+  // Phase E-9 memory — load PERSISTED history from Postgres for both:
+  //   1. The current scope (what we've discussed about THIS customer/inbox)
+  //   2. Other recent scopes (what they've been talking about lately)
+  // The two blocks are formatted as plain text and injected into the
+  // system prompt below. Beacon decides whether to reference them based
+  // on relevance.
+  const sKey = scopeKey(scope);
+  const [scopeHistory, crossScope] = await Promise.all([
+    getScopeConversations(email, sKey, 30).catch(() => []),
+    getRecentCrossScope(email, sKey, 18).catch(() => []),
+  ]);
+  const memoryBlocks = renderMemoryForPrompt(scopeHistory, crossScope);
 
   // Telemetry (fire-and-forget).
   void logUmbrellaActivity({
@@ -219,19 +239,39 @@ export async function POST(req: NextRequest) {
       const send = (obj: Record<string, unknown>) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       };
+      let assistantBuf = "";
       try {
         const sdkStream = anthropic.messages.stream({
           model: MODEL,
           max_tokens: MAX_TOKENS,
-          system: buildSystemPrompt(scope, ctx.blob),
+          system: buildSystemPrompt(scope, ctx.blob, memoryBlocks),
           messages,
         });
         sdkStream.on("text", (delta: string) => {
+          assistantBuf += delta;
           send({ delta });
         });
         await sdkStream.finalMessage();
         send({ done: true, audience: ctx.audience });
         controller.close();
+
+        // Persist this turn pair to Beacon's memory. Fire-and-forget — the
+        // stream is already closed; failures here only affect future
+        // continuity, not the current response.
+        void saveTurn({
+          email,
+          scope_key: sKey,
+          role: "user",
+          content: question,
+          metadata: { audience: ctx.audience, ...ctx.meta },
+        });
+        void saveTurn({
+          email,
+          scope_key: sKey,
+          role: "assistant",
+          content: assistantBuf,
+          metadata: { model: MODEL, audience: ctx.audience },
+        });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         // eslint-disable-next-line no-console

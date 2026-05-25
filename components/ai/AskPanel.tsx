@@ -62,34 +62,57 @@ interface Turn {
   content: string;
 }
 
-const MAX_HISTORY_TURNS = 5;
+const MAX_HISTORY_TURNS = 6;
 
-function storageKeyFor(scope: AiScope): string {
-  return `beacon_ai_history_${scopeKey(scope)}`;
+/**
+ * Memory hydration — Phase E-9.
+ *
+ * Beacon's memory now lives in Postgres (beacon_ai_conversations) so it
+ * persists across sessions, browsers, and devices. localStorage is kept
+ * as a 5-minute cache to avoid re-fetching on every drawer open, but the
+ * server is the source of truth.
+ */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface CachedHydration {
+  scope_key: string;
+  fetched_at: number;
+  scope_turns: Turn[];
+  total: number;
 }
 
-function readHistory(scope: AiScope): Turn[] {
-  if (typeof window === "undefined") return [];
+function cacheKeyFor(scope: AiScope): string {
+  return `beacon_ai_cache_${scopeKey(scope)}`;
+}
+
+function readCache(scope: AiScope): CachedHydration | null {
+  if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(storageKeyFor(scope));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Turn[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.slice(-MAX_HISTORY_TURNS * 2);
+    const raw = window.localStorage.getItem(cacheKeyFor(scope));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedHydration;
+    if (Date.now() - parsed.fetched_at > CACHE_TTL_MS) return null;
+    return parsed;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function writeHistory(scope: AiScope, turns: Turn[]): void {
+function writeCache(scope: AiScope, payload: CachedHydration): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(
-      storageKeyFor(scope),
-      JSON.stringify(turns.slice(-MAX_HISTORY_TURNS * 2)),
-    );
+    window.localStorage.setItem(cacheKeyFor(scope), JSON.stringify(payload));
   } catch {
     /* ignore quota */
+  }
+}
+
+function invalidateCache(scope: AiScope): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(cacheKeyFor(scope));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -102,26 +125,68 @@ export default function AskPanel() {
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Phase E-9 memory — total conversations Beacon has stored for this
+  // user, surfaced as a "Beacon remembers N" chip in the drawer header.
+  const [totalMemory, setTotalMemory] = useState<number | null>(null);
+  const [hydrating, setHydrating] = useState(false);
 
   const transcriptRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Hydrate history when the SCOPE changes (different URL = different
-  // conversation context). Closing the panel is preserved across scope
-  // changes — opening it again hydrates whichever conversation matches
-  // the current scope.
+  // Hydrate from Postgres on scope change. Cache to localStorage for 5min
+  // so revisiting the same scope is instant. Server is the source of truth.
   useEffect(() => {
-    setTurns(readHistory(scope));
-    // Don't reset `open` here — the user explicitly opened it.
+    let cancelled = false;
+    if (scope.kind === "hidden") return;
+
+    const sKey = scopeKey(scope);
+    const cached = readCache(scope);
+    if (cached && cached.scope_key === sKey) {
+      setTurns(cached.scope_turns);
+      setTotalMemory(cached.total);
+    } else {
+      // Show empty immediately; spinner is implicit in `hydrating`.
+      setTurns([]);
+      setHydrating(true);
+    }
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/ai/memory?scope_key=${encodeURIComponent(sKey)}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) throw new Error(`memory ${res.status}`);
+        const json = (await res.json()) as {
+          scope: Array<{ role: "user" | "assistant"; content: string }>;
+          total: number;
+        };
+        if (cancelled) return;
+        const hydrated = json.scope.map((t) => ({
+          role: t.role,
+          content: t.content,
+        }));
+        setTurns(hydrated);
+        setTotalMemory(json.total);
+        writeCache(scope, {
+          scope_key: sKey,
+          fetched_at: Date.now(),
+          scope_turns: hydrated,
+          total: json.total,
+        });
+      } catch {
+        // Silent fallback — empty transcript, no total.
+      } finally {
+        if (!cancelled) setHydrating(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeKey(scope)]);
-
-  // Persist on every turn change.
-  useEffect(() => {
-    writeHistory(scope, turns);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turns, scopeKey(scope)]);
 
   // Auto-scroll transcript on update.
   useEffect(() => {
@@ -242,10 +307,28 @@ export default function AskPanel() {
     [ask, draft],
   );
 
-  const clearConversation = useCallback(() => {
+  const clearConversation = useCallback(async () => {
     setTurns([]);
     setErrorMsg(null);
-    writeHistory(scope, []);
+    invalidateCache(scope);
+    // Wipe THIS scope's server history. Other scopes' memory is untouched.
+    try {
+      const sKey = scopeKey(scope);
+      const res = await fetch(
+        `/api/ai/memory?scope_key=${encodeURIComponent(sKey)}`,
+        { method: "DELETE" },
+      );
+      if (res.ok) {
+        // Refresh total — count went down.
+        const totalRes = await fetch(`/api/ai/memory`, { cache: "no-store" });
+        if (totalRes.ok) {
+          const json = (await totalRes.json()) as { total: number };
+          setTotalMemory(json.total);
+        }
+      }
+    } catch {
+      /* swallow — UI already cleared */
+    }
   }, [scope]);
 
   if (scope.kind === "hidden") return null;
@@ -372,9 +455,28 @@ export default function AskPanel() {
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                     maxWidth: 360,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                   }}
                 >
-                  About {audience}
+                  <span>About {audience}</span>
+                  {totalMemory !== null && totalMemory > 0 && (
+                    <span
+                      title="Beacon remembers your past conversations across all surfaces. Earlier discussions are surfaced into Beacon's context on every new question."
+                      style={{
+                        fontFamily: "ui-monospace, monospace",
+                        fontSize: 10,
+                        padding: "1px 6px",
+                        borderRadius: 999,
+                        background: C.parchment,
+                        border: `1px solid ${C.border}`,
+                        color: C.text2,
+                      }}
+                    >
+                      ✦ remembers {totalMemory}
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -425,6 +527,23 @@ export default function AskPanel() {
                   >
                     Ask anything about {audience}. Pick a starter below or
                     type your own question.
+                    {totalMemory !== null && totalMemory > 0 && (
+                      <div
+                        style={{
+                          fontFamily: SANS,
+                          fontStyle: "normal",
+                          fontSize: 11,
+                          color: C.text3,
+                          marginTop: 8,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        Beacon remembers your past {totalMemory} day
+                        {totalMemory === 1 ? "" : "s"} of conversations
+                        across every surface and will reference them when
+                        relevant.
+                      </div>
+                    )}
                   </div>
                   <div
                     style={{
