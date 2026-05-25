@@ -130,6 +130,12 @@ body {
 .beacon-ember-5 { animation: beacon-ember-5 2.4s ease-out 0.3s infinite; transform-box: fill-box; transform-origin: center; }
 .beacon-ember-6 { animation: beacon-ember-6 3.0s ease-out 1.8s infinite; transform-box: fill-box; transform-origin: center; }
 
+/* Phase E-9 — blinking cursor for AskPanel streaming responses */
+@keyframes blink {
+  0%, 50% { opacity: 0.6; }
+  51%, 100% { opacity: 0; }
+}
+
 /* ─────────────────────────────────────────────────────────────
    Launcher card hover lift
    ───────────────────────────────────────────────────────────── */

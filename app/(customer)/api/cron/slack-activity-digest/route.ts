@@ -85,6 +85,7 @@ const DIGEST_EVENTS: readonly string[] = [
   "sign_out",
   "command_palette_opened",
   "command_palette_select",
+  "claude_asked",
 ];
 
 // Human label for each surface. Keep short; appears inline in a narrative.
@@ -265,6 +266,11 @@ function describeAction(r: ActivityRow): string {
       if (biz) return `jumped to *${biz}* via Cmd+K${agent ? ` (${agent})` : ""}`;
       if (ent) return `jumped to ${ent} via Cmd+K${agent ? ` (${agent})` : ""}`;
       return "selected a result from Cmd+K";
+    }
+    case "claude_asked": {
+      const bizMeta = metaString(r.metadata, "biz_name");
+      if (bizMeta) return `asked Claude about *${bizMeta}*`;
+      return "asked Claude on a customer 360";
     }
 
     default:

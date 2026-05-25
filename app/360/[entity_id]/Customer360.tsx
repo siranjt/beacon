@@ -13,6 +13,7 @@ import Link from "next/link";
 import SectionErrorBoundary from "@/components/SectionErrorBoundary";
 import FreshnessIndicator from "@/components/FreshnessIndicator";
 import CalculationTooltip from "@/components/CalculationTooltip";
+import AskPanel from "./AskPanel";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -216,6 +217,10 @@ export default function Customer360({ entityId }: { entityId: string }) {
           cbCustomerId={data.meta.cb_customer_id}
         />
       </SectionErrorBoundary>
+
+      {/* Phase E-9 — floating Claude copilot. Drawer slides in from the
+          right when opened; doesn't compete for primary content space. */}
+      <AskPanel entityId={entityId} bizName={data.meta.biz_name} />
     </div>
   );
 }
