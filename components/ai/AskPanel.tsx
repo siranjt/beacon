@@ -39,6 +39,8 @@ import {
   type AiScope,
 } from "@/lib/ai/scopes";
 import { BeaconMark } from "@/components/BeaconMark";
+// Phase E-12 (E-12.4) — first-login working-style onboarding nudge.
+import StyleOnboarding from "@/components/ai/StyleOnboarding";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -60,6 +62,21 @@ const C = {
 interface Turn {
   role: "user" | "assistant";
   content: string;
+  /**
+   * Phase E-12 — assistant turn id from beacon_ai_conversations. Used as
+   * the target for thumbs up/down feedback (POST /api/ai/feedback).
+   * Undefined for user turns, the streaming-in-progress assistant placeholder,
+   * and historical turns hydrated from /api/ai/memory (those don't get
+   * thumbs because we'd need to render historical feedback state too —
+   * scope creep we don't want yet).
+   */
+  turnId?: number;
+  /**
+   * Phase E-12 — thumbs feedback already sent for this turn. Set after the
+   * user clicks; prevents repeated clicks from spamming the endpoint and
+   * gives us a visible "active" state on the button.
+   */
+  feedback?: "up" | "down" | null;
 }
 
 const MAX_HISTORY_TURNS = 6;
@@ -322,6 +339,8 @@ export default function AskPanel() {
               delta?: string;
               done?: boolean;
               error?: string;
+              turn_id?: number | null;
+              feedback_enabled?: boolean;
             };
             if (obj.error) throw new Error(obj.error);
             if (obj.delta) {
@@ -332,6 +351,22 @@ export default function AskPanel() {
                   next[next.length - 1] = {
                     role: "assistant",
                     content: last.content + obj.delta,
+                  };
+                }
+                return next;
+              });
+            }
+            // Phase E-12 — stamp the assistant turn with its DB id when the
+            // backend's final SSE frame lands. The thumbs UI keys off this id.
+            if (obj.done && typeof obj.turn_id === "number") {
+              const newId = obj.turn_id;
+              setTurns((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === "assistant") {
+                  next[next.length - 1] = {
+                    ...last,
+                    turnId: newId,
                   };
                 }
                 return next;
@@ -367,6 +402,51 @@ export default function AskPanel() {
       ask(draft);
     },
     [ask, draft],
+  );
+
+  /**
+   * Phase E-12 (E-12.3) — thumbs up/down on an assistant turn. Optimistically
+   * stamps the local `feedback` flag, then POSTs to /api/ai/feedback. On
+   * failure we roll the stamp back so the user can retry. Negative signals
+   * eventually demote (or evict) the facts that were active when this
+   * response was generated.
+   */
+  const sendFeedback = useCallback(
+    async (index: number, signal: "up" | "down") => {
+      const turn = turns[index];
+      if (!turn || turn.role !== "assistant" || !turn.turnId) return;
+      if (turn.feedback === signal) return; // idempotent click
+
+      // Optimistic UI update
+      setTurns((prev) => {
+        const next = [...prev];
+        if (next[index]) next[index] = { ...next[index], feedback: signal };
+        return next;
+      });
+
+      try {
+        const res = await fetch("/api/ai/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ turn_id: turn.turnId, signal }),
+        });
+        if (!res.ok) {
+          const body = await res
+            .json()
+            .catch(() => ({ error: res.statusText }));
+          throw new Error(body.error || `feedback ${res.status}`);
+        }
+      } catch (e) {
+        // Roll back optimistic stamp
+        setTurns((prev) => {
+          const next = [...prev];
+          if (next[index]) next[index] = { ...next[index], feedback: null };
+          return next;
+        });
+        setErrorMsg(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [turns],
   );
 
   const clearConversation = useCallback(async () => {
@@ -589,6 +669,13 @@ export default function AskPanel() {
             >
               {turns.length === 0 && (
                 <div style={{ marginTop: 4 }}>
+                  {/* Phase E-12 (E-12.4) — working-style onboarding nudge.
+                      Compact mode auto-detects whether the user already
+                      has any source='onboarding' facts; if so, renders
+                      nothing. The card only appears for first-time users. */}
+                  <div style={{ marginBottom: 14 }}>
+                    <StyleOnboarding compact />
+                  </div>
                   <div
                     style={{
                       fontFamily: SERIF,
@@ -658,6 +745,13 @@ export default function AskPanel() {
                   role={t.role}
                   content={t.content}
                   streaming={streaming && i === turns.length - 1}
+                  /* Phase E-12 — feedback only on assistant turns that landed
+                     with a turn id (set by the SSE done frame). User turns,
+                     the streaming-in-progress placeholder, and hydrated
+                     historical turns don't get thumbs. */
+                  turnId={t.role === "assistant" ? t.turnId : undefined}
+                  feedback={t.feedback ?? null}
+                  onFeedback={(signal) => sendFeedback(i, signal)}
                 />
               ))}
 
@@ -758,12 +852,28 @@ function Bubble({
   role,
   content,
   streaming,
+  turnId,
+  feedback,
+  onFeedback,
 }: {
   role: "user" | "assistant";
   content: string;
   streaming: boolean;
+  /**
+   * Phase E-12 — assistant turn id. Presence enables the thumbs UI.
+   * Absent on user turns, streaming-in-progress placeholder, hydrated
+   * historical turns.
+   */
+  turnId?: number;
+  feedback?: "up" | "down" | null;
+  onFeedback?: (signal: "up" | "down") => void;
 }) {
   const isUser = role === "user";
+  // Show thumbs only on assistant turns that have a stable id and aren't
+  // currently streaming. We don't want users voting on a half-formed answer.
+  const showFeedback =
+    !isUser && !streaming && typeof turnId === "number" && !!onFeedback;
+
   return (
     <div
       style={{
@@ -794,7 +904,82 @@ function Bubble({
           </span>
         )}
       </div>
+      {showFeedback && (
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            marginTop: 4,
+            marginLeft: 2,
+            opacity: feedback ? 1 : 0.6,
+            transition: "opacity 120ms ease",
+          }}
+          aria-label="Rate this response"
+        >
+          <ThumbButton
+            label="Helpful"
+            active={feedback === "up"}
+            onClick={() => onFeedback!("up")}
+            char="👍"
+          />
+          <ThumbButton
+            label="Not helpful"
+            active={feedback === "down"}
+            onClick={() => onFeedback!("down")}
+            char="👎"
+          />
+          {feedback && (
+            <span
+              style={{
+                fontSize: 10,
+                color: C.text3,
+                alignSelf: "center",
+                marginLeft: 4,
+                fontStyle: "italic",
+              }}
+            >
+              {feedback === "up"
+                ? "Thanks — I'll do more of that."
+                : "Noted — I'll adjust."}
+            </span>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function ThumbButton({
+  label,
+  active,
+  onClick,
+  char,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  char: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      style={{
+        padding: "2px 6px",
+        background: active ? "rgba(217, 164, 65, 0.18)" : "transparent",
+        border: `1px solid ${active ? "rgba(217, 164, 65, 0.45)" : C.border}`,
+        borderRadius: 6,
+        fontSize: 11,
+        lineHeight: 1,
+        cursor: "pointer",
+        color: C.text2,
+        transition: "background 120ms ease, border-color 120ms ease",
+      }}
+    >
+      {char}
+    </button>
   );
 }
 

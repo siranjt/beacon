@@ -7,6 +7,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import SectionErrorBoundary from "@/components/SectionErrorBoundary";
+// Phase E-12 (E-12.4) — working-style onboarding lives in its own component
+// and is reused both as the AskPanel first-login nudge AND as an editable
+// section on this settings page.
+import StyleOnboarding from "@/components/ai/StyleOnboarding";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -29,13 +33,28 @@ interface UserFact {
   id: number;
   email: string;
   fact: string;
-  category: "preference" | "context" | "behavior" | "explicit" | null;
-  source: "extracted" | "explicit";
+  // Phase E-12 — widened to include style/tone/depth/onboarding categories
+  // emitted by the sharpened extraction prompt + onboarding flow.
+  category:
+    | "preference"
+    | "context"
+    | "behavior"
+    | "explicit"
+    | "style"
+    | "tone"
+    | "depth"
+    | "onboarding"
+    | null;
+  // Phase E-12 — source widened to cover onboarding-authored and
+  // feedback-authored facts (currently only extracted/explicit/onboarding
+  // are emitted; "feedback" is reserved for a future learning loop).
+  source: "extracted" | "explicit" | "onboarding" | "feedback";
   confidence: number;
   created_at: string;
   last_seen_at: string;
   reference_count: number;
   active: boolean;
+  scope_key?: string | null;
 }
 
 const CATEGORY_TONE: Record<string, { color: string; label: string }> = {
@@ -43,6 +62,11 @@ const CATEGORY_TONE: Record<string, { color: string; label: string }> = {
   preference: { color: C.brass, label: "Preference" },
   context: { color: C.ember, label: "Context" },
   behavior: { color: C.patina, label: "Behavior" },
+  // Phase E-12 — three new style-dimension categories.
+  style: { color: C.lapis, label: "Style" },
+  tone: { color: C.patina, label: "Tone" },
+  depth: { color: C.brass, label: "Depth" },
+  onboarding: { color: C.lapis, label: "Onboarding" },
 };
 
 export default function FactsSettings() {
@@ -142,6 +166,15 @@ export default function FactsSettings() {
         <code style={kbdInline}>/remember X</code> in the chat. Delete
         anything you don&apos;t want it to apply.
       </p>
+
+      {/* Phase E-12 (E-12.4) — working-style onboarding. Always rendered on
+          this settings page (compact=false). Users can re-submit to overwrite
+          their answers. Existing answers stay in the facts list below. */}
+      <SectionErrorBoundary label="Working style">
+        <div style={{ marginBottom: 24 }}>
+          <StyleOnboarding compact={false} onComplete={loadFacts} />
+        </div>
+      </SectionErrorBoundary>
 
       <SectionErrorBoundary label="Add explicit fact">
         <form

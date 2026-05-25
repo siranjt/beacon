@@ -200,12 +200,18 @@ export async function POST(req: NextRequest) {
   const [scopeHistory, crossScope, facts] = await Promise.all([
     getScopeConversations(email, sKey, 30).catch(() => []),
     getRecentCrossScope(email, sKey, 18).catch(() => []),
-    // Phase E-9 · Phase 2 — distilled facts about the user. Empty for
-    // new users; grows as the daily extraction cron runs.
-    listFactsForUser(email).catch(() => []),
+    // Phase E-9 · Phase 2 — distilled facts about the user.
+    // Phase E-12 — surface-aware filtering: pass the current scope so we
+    // pick up scope-pinned style preferences alongside global ones. Facts
+    // with scope_key NULL apply everywhere; scope_key matching only here.
+    listFactsForUser(email, { scopeKey: sKey }).catch(() => []),
   ]);
   const memoryBlocks = renderMemoryForPrompt(scopeHistory, crossScope);
   const userProfile = renderFactsForPrompt(facts);
+  // Phase E-12 (E-12.3) — capture which fact IDs were active when this
+  // response was generated. Stored in the assistant turn's metadata so the
+  // thumbs up/down feedback loop knows which facts to reinforce or demote.
+  const activeFactIds = facts.map((f) => f.id);
 
   // Telemetry (fire-and-forget).
   void logUmbrellaActivity({
@@ -257,26 +263,56 @@ export async function POST(req: NextRequest) {
           send({ delta });
         });
         await sdkStream.finalMessage();
-        send({ done: true, audience: ctx.audience });
-        controller.close();
 
-        // Persist this turn pair to Beacon's memory. Fire-and-forget — the
-        // stream is already closed; failures here only affect future
-        // continuity, not the current response.
-        void saveTurn({
-          email,
-          scope_key: sKey,
-          role: "user",
-          content: question,
-          metadata: { audience: ctx.audience, ...ctx.meta },
+        // Phase E-12 — persist turns BEFORE closing the stream so we can
+        // send the assistant turn id in the final SSE frame. The client uses
+        // this id to target thumbs up/down feedback at the right turn.
+        // We still keep it best-effort: if the write fails, we send done:true
+        // without a turn id and feedback just won't be available for this turn.
+        let assistantTurnId: number | null = null;
+        try {
+          // User turn is fire-and-forget (no need for its id downstream).
+          void saveTurn({
+            email,
+            scope_key: sKey,
+            role: "user",
+            content: question,
+            metadata: { audience: ctx.audience, ...ctx.meta },
+          });
+          // Assistant turn id is needed for feedback — wait for the write
+          // so we can include the id in the final SSE message.
+          assistantTurnId = await saveTurn({
+            email,
+            scope_key: sKey,
+            role: "assistant",
+            content: assistantBuf,
+            metadata: {
+              model: MODEL,
+              audience: ctx.audience,
+              // Phase E-12 (E-12.3) — store which facts were active when
+              // generating this response so /api/ai/feedback can look them
+              // up by turn id and apply confidence adjustments.
+              active_fact_ids: activeFactIds,
+              scope_key: sKey,
+            },
+          });
+        } catch (e) {
+          // Persistence failures shouldn't fail the response — just log and
+          // continue without a turn id.
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[ai/ask] saveTurn failed:",
+            e instanceof Error ? e.message : String(e),
+          );
+        }
+
+        send({
+          done: true,
+          audience: ctx.audience,
+          turn_id: assistantTurnId,
+          feedback_enabled: assistantTurnId !== null,
         });
-        void saveTurn({
-          email,
-          scope_key: sKey,
-          role: "assistant",
-          content: assistantBuf,
-          metadata: { model: MODEL, audience: ctx.audience },
-        });
+        controller.close();
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         // eslint-disable-next-line no-console

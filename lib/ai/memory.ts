@@ -32,32 +32,43 @@ export interface PersistedTurn {
   ts: string;
 }
 
-/** Fire-and-forget write of a single turn. Never throws. */
+/**
+ * Write a single turn. Returns the inserted row id when storage is wired,
+ * or null when no DB is available / the write failed. Phase E-12 — callers
+ * (the ask route) use the assistant-turn id as the feedback target.
+ *
+ * Failures never throw — Beacon AI chat should keep working even when the
+ * Postgres write fails.
+ */
 export async function saveTurn(input: {
   email: string;
   scope_key: string;
   role: "user" | "assistant";
   content: string;
   metadata?: Record<string, unknown> | null;
-}): Promise<void> {
+}): Promise<number | null> {
   try {
     const sql = getSql();
-    if (!sql) return;
+    if (!sql) return null;
     const content =
       input.content.length > MAX_CONTENT_CHARS
         ? input.content.slice(0, MAX_CONTENT_CHARS)
         : input.content;
     const meta = input.metadata ? JSON.stringify(input.metadata) : null;
-    await sql`
+    const rows = await sql`
       INSERT INTO beacon_ai_conversations (email, scope_key, role, content, metadata)
       VALUES (${input.email}, ${input.scope_key}, ${input.role}, ${content}, ${meta}::jsonb)
+      RETURNING id
     `;
+    const r = (rows as unknown as Array<{ id: number }>)[0];
+    return r?.id ?? null;
   } catch (err) {
     // Logging failures should never affect the user's chat session.
     console.warn(
       "[ai/memory.saveTurn] failed:",
       err instanceof Error ? err.message : String(err),
     );
+    return null;
   }
 }
 
