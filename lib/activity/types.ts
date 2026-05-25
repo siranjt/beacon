@@ -110,7 +110,10 @@ export type UmbrellaEvent =
   // Phase E-9 Evolving Beacon — fact memory
   | "fact_remembered"
   | "fact_forgotten"
-  | "fact_extracted";
+  | "fact_extracted"
+  // Phase E-9 — Beacon AI proactive suggestions
+  | "suggestion_offered"
+  | "suggestion_acted";
 
 export type UmbrellaSurface =
   | "auth"
@@ -149,6 +152,7 @@ export const ALL_EVENT_NAMES: readonly string[] = [
   "sign_in", "sign_in_rejected", "launcher_card_clicked", "sign_out", "api_call",
   "command_palette_opened", "command_palette_select", "claude_asked",
   "fact_remembered", "fact_forgotten", "fact_extracted",
+  "suggestion_offered", "suggestion_acted",
 ] as const;
 
 export const ALL_SURFACES: readonly string[] = [

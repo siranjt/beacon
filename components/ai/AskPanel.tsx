@@ -195,6 +195,33 @@ export default function AskPanel() {
     el.scrollTop = el.scrollHeight;
   }, [turns, streaming]);
 
+  // Phase E-9 — SuggestedActions strip dispatches a "beacon-ai:open" event
+  // when a user clicks a card. We open the drawer, pre-fill the textarea
+  // with the suggested prompt, and optionally auto-submit (for drafts).
+  useEffect(() => {
+    const onOpenEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ prompt?: string; autoSubmit?: boolean }>)
+        .detail;
+      if (!detail?.prompt) return;
+      setOpen(true);
+      setDraft(detail.prompt);
+      if (detail.autoSubmit) {
+        // Defer one tick so the open + draft state lands before submit.
+        requestAnimationFrame(() => {
+          ask(detail.prompt!);
+        });
+      } else {
+        // Focus the textarea so the user can edit before sending.
+        requestAnimationFrame(() => textareaRef.current?.focus());
+      }
+    };
+    window.addEventListener("beacon-ai:open", onOpenEvent);
+    return () => window.removeEventListener("beacon-ai:open", onOpenEvent);
+    // We deliberately omit `ask` from deps to keep the listener stable —
+    // it closes over the latest setters via React state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Esc closes drawer (unless streaming, to avoid losing partial reply).
   useEffect(() => {
     if (!open) return;

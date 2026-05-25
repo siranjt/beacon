@@ -13,6 +13,7 @@ import Link from "next/link";
 import SectionErrorBoundary from "@/components/SectionErrorBoundary";
 import FreshnessIndicator from "@/components/FreshnessIndicator";
 import CalculationTooltip from "@/components/CalculationTooltip";
+import SuggestedActions from "@/components/ai/SuggestedActions";
 // AskPanel is now mounted globally in app/layout.tsx — no per-page wiring
 // needed. It picks up scope from usePathname() automatically.
 
@@ -189,7 +190,11 @@ export default function Customer360({ entityId }: { entityId: string }) {
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "16px 0 64px" }}>
       <Hero meta={data.meta} signals={data.signals} />
 
-      <div style={{ height: 8 }} />
+      {/* Phase E-9 — proactive Beacon AI strip. 2-3 contextual actions
+          (ask / draft / navigate) rendered above the main sections. */}
+      <SectionErrorBoundary label="Beacon AI suggestions">
+        <SuggestedActions scope={{ kind: "customer-360", entityId }} />
+      </SectionErrorBoundary>
 
       <SectionErrorBoundary label="Signals">
         <SignalsSection signals={data.signals} error={data.errors.snapshot} />

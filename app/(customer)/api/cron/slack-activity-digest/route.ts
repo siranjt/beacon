@@ -86,6 +86,8 @@ const DIGEST_EVENTS: readonly string[] = [
   "command_palette_opened",
   "command_palette_select",
   "claude_asked",
+  "suggestion_offered",
+  "suggestion_acted",
 ];
 
 // Human label for each surface. Keep short; appears inline in a narrative.
@@ -275,6 +277,14 @@ function describeAction(r: ActivityRow): string {
       if (audience) return `asked Beacon AI about *${audience}*`;
       if (bizMeta) return `asked Beacon AI about *${bizMeta}*`;
       return "asked Beacon AI for help";
+    }
+    case "suggestion_offered":
+      return "received Beacon AI suggestions";
+    case "suggestion_acted": {
+      const k = metaString(r.metadata, "kind");
+      const label = metaString(r.metadata, "label");
+      if (label) return `acted on Beacon AI suggestion: *${label}*`;
+      return k ? `acted on a Beacon AI ${k} suggestion` : "acted on a Beacon AI suggestion";
     }
 
     default:
