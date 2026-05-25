@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import SessionProvider from "@/components/SessionProvider";
 import FaviconFlicker from "@/components/FaviconFlicker";
+import CommandPaletteProvider from "@/components/CommandPaletteProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -40,7 +41,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <FaviconFlicker />
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          {children}
+          {/* Phase E-9 — Cmd+K cross-agent command palette. Mounted inside
+              SessionProvider so the umbrella activity logger has session
+              context when it fires. */}
+          <CommandPaletteProvider />
+        </SessionProvider>
       </body>
     </html>
   );

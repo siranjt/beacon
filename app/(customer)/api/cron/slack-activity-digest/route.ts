@@ -83,6 +83,8 @@ const DIGEST_EVENTS: readonly string[] = [
   // Umbrella
   "launcher_card_clicked",
   "sign_out",
+  "command_palette_opened",
+  "command_palette_select",
 ];
 
 // Human label for each surface. Keep short; appears inline in a narrative.
@@ -255,6 +257,14 @@ function describeAction(r: ActivityRow): string {
     case "launcher_card_clicked": {
       const agentName = metaString(r.metadata, "agent_name");
       return agentName ? `opened *${agentName}*` : "clicked a launcher card";
+    }
+    case "command_palette_opened":
+      return "opened the command palette";
+    case "command_palette_select": {
+      const agent = metaString(r.metadata, "agent");
+      if (biz) return `jumped to *${biz}* via Cmd+K${agent ? ` (${agent})` : ""}`;
+      if (ent) return `jumped to ${ent} via Cmd+K${agent ? ` (${agent})` : ""}`;
+      return "selected a result from Cmd+K";
     }
 
     default:

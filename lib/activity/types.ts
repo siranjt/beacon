@@ -101,7 +101,10 @@ export type UmbrellaEvent =
   | "sign_in_rejected"
   | "launcher_card_clicked"
   | "sign_out"
-  | "api_call";
+  | "api_call"
+  // Phase E-9 — Cmd+K command palette telemetry
+  | "command_palette_opened"
+  | "command_palette_select";
 
 export type UmbrellaSurface =
   | "auth"
@@ -138,6 +141,7 @@ export const ALL_EVENT_NAMES: readonly string[] = [
   "verdict_filter_changed", "rerun_clicked", "docx_opened", "rerender_clicked",
   // umbrella
   "sign_in", "sign_in_rejected", "launcher_card_clicked", "sign_out", "api_call",
+  "command_palette_opened", "command_palette_select",
 ] as const;
 
 export const ALL_SURFACES: readonly string[] = [
