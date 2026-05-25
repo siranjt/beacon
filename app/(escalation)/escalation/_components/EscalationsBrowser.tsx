@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useActivityLogger } from "@/components/hooks/use-activity-logger";
 import CommsActivityChart from "./charts/CommsActivityChart";
 import ChannelMixDonut from "./charts/ChannelMixDonut";
 import TicketsClassificationDonut from "./charts/TicketsClassificationDonut";
@@ -248,9 +249,15 @@ export default function EscalationsBrowser() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const log = useActivityLogger("escalation");
+
   async function lookup(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
+    log("search_submitted", {
+      surface: "escalation_home",
+      metadata: { query_length: query.trim().length, since_days: sinceDays },
+    });
     setLoading(true);
     setResponse(null);
     setCommsState({ status: "idle" });

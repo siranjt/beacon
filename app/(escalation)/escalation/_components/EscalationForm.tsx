@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useActivityLogger } from "@/components/hooks/use-activity-logger";
 
 interface Props {
   disabled?: boolean;
@@ -23,12 +24,24 @@ export default function EscalationForm({ onSubmit, disabled }: Props) {
   const [entityId, setEntityId] = useState("");
   const [bizName, setBizName] = useState("");
   const [medium, setMedium] = useState("form");
+  const log = useActivityLogger("escalation");
 
   return (
     <form
       className="rounded-2xl border border-border bg-panel p-6"
       onSubmit={(e) => {
         e.preventDefault();
+        log("search_submitted", {
+          surface: "escalation_triage",
+          entity_id: entityId || undefined,
+          metadata: {
+            medium,
+            has_email: !!email,
+            has_bizname: !!bizName,
+            has_customer_id: !!customerId,
+            text_length: text.length,
+          },
+        });
         onSubmit({ text, email, customerId, entityId, bizName, medium });
       }}
     >

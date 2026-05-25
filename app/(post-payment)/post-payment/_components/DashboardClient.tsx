@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ManualAnalysisButton } from "./ManualAnalysisButton";
 import AmbientSparkles from "./AmbientSparkles";
 import AgentHeader from "@/components/AgentHeader";
+import { useActivityLogger } from "@/components/hooks/use-activity-logger";
 
 // Lockup typography + colors — match Performance / Escalation exactly so the
 // brand bar is visually identical across all three beacons.
@@ -407,6 +408,19 @@ type SortKey = "created_desc" | "created_asc" | "biz_asc" | "verdict";
 
 export default function DashboardClient({ customers }: { customers: Customer[] }) {
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("all");
+  const log = useActivityLogger("post-payment");
+  // Phase E-9 — wrap setVerdictFilter so we capture verdict_filter_changed
+  // events in the activity log. The chip-style filters fire this on every
+  // click; the StatCard click handlers above also call it.
+  const setVerdictFilterTracked = (v: VerdictFilter) => {
+    if (v !== verdictFilter) {
+      log("verdict_filter_changed", {
+        surface: "post_payment_dashboard",
+        metadata: { from: verdictFilter, to: v },
+      });
+    }
+    setVerdictFilter(v);
+  };
   const [search, setSearch] = useState("");
   const [selectedAm, setSelectedAm] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>("created_desc");
