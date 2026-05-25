@@ -1,0 +1,3019 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Beacon — for Account Managers</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+  /* ========== Motion tokens ========== */
+  :root {
+    --ease-apple: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --dur-fast: 220ms;
+    --dur-base: 400ms;
+    --dur-slow: 700ms;
+    --dur-hero: 1200ms;
+  }
+
+  /* ========== Reset + base ========== */
+  *,*::before,*::after { box-sizing: border-box; }
+  html,body { margin:0; padding:0; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; }
+
+  /* Page fade-in on first paint */
+  body.page-loading { opacity: 0; }
+  body { transition: opacity 300ms var(--ease-apple); }
+
+  /* Skip-to-content a11y link */
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 12px;
+    background: #1d1d1f;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 2000;
+    text-decoration: none;
+    transition: top var(--dur-fast) var(--ease-apple);
+  }
+  .skip-link:focus {
+    top: 12px;
+    text-decoration: none;
+    outline: 2px solid #06c;
+    outline-offset: 2px;
+  }
+
+  /* ========== Animation states ========== */
+  [data-animate] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 700ms var(--ease-apple), transform 700ms var(--ease-apple);
+    will-change: opacity, transform;
+  }
+  [data-animate="scale-in"] {
+    transform: scale(0.96);
+  }
+  [data-animate="typewriter"] {
+    /* keep visible; typewriter handled via JS */
+    opacity: 1;
+    transform: none;
+  }
+  [data-animate].in-view {
+    opacity: 1;
+    transform: none;
+  }
+  [data-cascade] > * {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 600ms var(--ease-apple), transform 600ms var(--ease-apple);
+  }
+  [data-cascade].in-view > * {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ========== Reduced-motion override ========== */
+  @media (prefers-reduced-motion: reduce) {
+    *,*::before,*::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+    [data-animate],
+    [data-cascade] > * {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    .beacon-mark *,
+    .beacon-flame-1,
+    .beacon-flame-2,
+    .beacon-flame-3,
+    .beacon-flame-4,
+    .beacon-mark--glow,
+    .v2card__dot--pulse,
+    .mini-card__dot--red {
+      animation: none !important;
+    }
+    [data-word-reveal] > span,
+    .scroll-progress,
+    .pulse-trail::before,
+    .pulse-trail::after {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.5;
+    color: #1d1d1f;
+    background: #fbfbfd;
+    font-weight: 400;
+  }
+  a { color: #06c; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  img { max-width: 100%; display: block; }
+
+  /* ========== Section frame ========== */
+  .section {
+    width: 100%;
+    padding: 100px 24px;
+  }
+  .section--white  { background: #fbfbfd; color: #1d1d1f; }
+  .section--gray   { background: #f5f5f7; color: #1d1d1f; }
+  .section--dark   { background: #1d1d1f; color: #f5f5f7; }
+  .section--hero   { padding: 140px 24px 120px; background: #fbfbfd; }
+  .section--final  { padding: 120px 24px 100px; }
+
+  .container { max-width: 980px; margin: 0 auto; }
+  .container--narrow { max-width: 720px; margin: 0 auto; }
+  .container--wide { max-width: 1180px; margin: 0 auto; }
+
+  /* ========== Typography ========== */
+  .kicker {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #06c;
+    margin: 0 0 14px;
+  }
+  .kicker--muted { color: #86868b; }
+  .kicker--ember { color: #C8431D; }
+  .kicker--patina { color: #4A7C59; }
+
+  .section--dark .kicker { color: #6db0ff; }
+  .section--dark .kicker--muted { color: #a1a1a6; }
+
+  h1.hero-title {
+    font-size: 88px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    margin: 0 0 6px;
+  }
+  h2.hero-sub {
+    font-size: 36px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.12;
+    color: #515154;
+    margin: 0 0 28px;
+  }
+
+  h2.headline {
+    font-size: 48px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    margin: 0 0 18px;
+    text-align: center;
+  }
+  h2.headline--lg {
+    font-size: 56px;
+  }
+  .section--dark h2.headline { color: #f5f5f7; }
+
+  p.subhead {
+    font-size: 21px;
+    font-weight: 400;
+    line-height: 1.42;
+    color: #515154;
+    margin: 0 auto 36px;
+    max-width: 720px;
+    text-align: center;
+  }
+  .section--dark p.subhead { color: #a1a1a6; }
+
+  p.body {
+    font-size: 19px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #515154;
+    margin: 0 0 22px;
+  }
+  .section--dark p.body { color: #a1a1a6; }
+
+  .hero-body {
+    font-size: 22px;
+    line-height: 1.45;
+    color: #515154;
+    margin: 0 0 28px;
+    max-width: 640px;
+  }
+
+  .link-row {
+    display: flex;
+    gap: 36px;
+    flex-wrap: wrap;
+  }
+  .link-row a {
+    font-size: 19px;
+    color: #06c;
+    font-weight: 400;
+  }
+
+  /* ========== Divider ========== */
+  .divider {
+    height: 1px;
+    background: #d2d2d7;
+    margin: 0 24px;
+  }
+
+  /* ========== Illustration container ========== */
+  .illus-wrap {
+    margin: 56px auto 0;
+    max-width: 720px;
+  }
+  .illus-card {
+    background: #f5f5f7;
+    border-radius: 22px;
+    padding: 56px 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .section--gray .illus-card { background: transparent; padding: 0; }
+  .section--dark .illus-card { background: #2a2a2c; }
+
+  .illus-caption {
+    margin-top: 18px;
+    font-size: 12px;
+    color: #86868b;
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+  .section--dark .illus-caption { color: #a1a1a6; }
+
+  /* ========== Beacon Watchfire palette ========== */
+  :root {
+    --parchment: #F0E4CC;
+    --parchment-light: #FEFCF6;
+    --char: #2B1F14;
+    --char-muted: rgba(43,31,20,0.62);
+    --char-mutest: rgba(43,31,20,0.45);
+    --char-border: rgba(43,31,20,0.10);
+    --char-border-strong: rgba(43,31,20,0.20);
+    --brass: #D9A441;
+    --ember: #C8431D;
+    --ember-tint: rgba(200,67,29,0.10);
+    --ember-tint-strong: rgba(200,67,29,0.18);
+    --lapis: #2A4D5C;
+    --lapis-tint: rgba(42,77,92,0.10);
+    --patina: #4A7C59;
+    --patina-tint: rgba(74,124,89,0.12);
+    --crimson: #7C2D12;
+    --brass-tint: rgba(217,164,65,0.18);
+  }
+
+  /* ========== Beacon V2 card mockup ========== */
+  .v2card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    color: var(--char);
+    position: relative;
+    text-align: left;
+  }
+  .v2card__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .v2card__left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .v2card__dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--ember);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(200,67,29,0.15);
+  }
+  .v2card__dot--yellow { background: var(--brass); box-shadow: 0 0 0 2px rgba(217,164,65,0.20); }
+  .v2card__dot--green  { background: var(--patina); box-shadow: 0 0 0 2px rgba(74,124,89,0.20); }
+  .v2card__name {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--char);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v2card__right {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 0;
+  }
+  .v2card__score {
+    font-family: Georgia, serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--crimson);
+    line-height: 1;
+  }
+  .v2card__score--yellow { color: #8a5a00; }
+  .v2card__score--green  { color: var(--patina); }
+  .v2card__score-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--char-mutest);
+    margin-top: 4px;
+  }
+  .v2card__subline {
+    font-size: 11px;
+    color: var(--char-muted);
+    margin-top: 4px;
+    letter-spacing: 0.01em;
+  }
+  .v2card__chips {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    font-size: 11px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--ember-tint);
+    color: var(--ember);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    border: 1px solid var(--ember-tint-strong);
+    white-space: nowrap;
+  }
+  .chip--brass { background: var(--brass-tint); color: #8a5a00; border-color: rgba(217,164,65,0.30); }
+  .chip--patina { background: var(--patina-tint); color: var(--patina); border-color: rgba(74,124,89,0.20); }
+  .chip--lapis  { background: var(--lapis-tint);  color: var(--lapis);  border-color: rgba(42,77,92,0.20); }
+  .v2card__reason {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--char-muted);
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+  .v2card__actions {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .action-chip {
+    font-size: 11px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    cursor: default;
+  }
+  .action-chip--patina { background: var(--patina-tint); color: var(--patina); border-color: rgba(74,124,89,0.25); }
+  .action-chip--brass  { background: var(--brass-tint); color: #8a5a00; border-color: rgba(217,164,65,0.30); }
+  .action-chip--ember  { background: var(--ember-tint); color: var(--ember); border-color: var(--ember-tint-strong); }
+  .action-chip--ghost  { background: transparent; color: var(--char-muted); border-color: var(--char-border-strong); }
+  .v2card__pin {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--char-mutest);
+    font-size: 14px;
+  }
+  .v2card__pin--active {
+    color: #c2185b;
+  }
+
+  /* ========== Mini-card cluster (used in stoplight section) ========== */
+  .triplet {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    max-width: 980px;
+    margin: 56px auto 0;
+  }
+  .mini-card {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border);
+    border-radius: 14px;
+    padding: 22px 20px;
+    text-align: left;
+    color: var(--char);
+  }
+  .mini-card__dot {
+    width: 12px; height: 12px; border-radius: 50%; margin-bottom: 12px;
+  }
+  .mini-card__dot--red    { background: var(--ember); box-shadow: 0 0 0 3px rgba(200,67,29,0.15); }
+  .mini-card__dot--yellow { background: var(--brass); box-shadow: 0 0 0 3px rgba(217,164,65,0.20); }
+  .mini-card__dot--green  { background: var(--patina); box-shadow: 0 0 0 3px rgba(74,124,89,0.20); }
+  .mini-card__title {
+    font-family: Georgia, serif;
+    font-size: 19px;
+    font-weight: 500;
+    margin: 0 0 6px;
+    color: var(--char);
+  }
+  .mini-card__sub {
+    font-size: 13px;
+    color: var(--char-muted);
+    line-height: 1.5;
+  }
+
+  /* ========== 3-col callouts ========== */
+  .callouts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin: 64px auto 0;
+    max-width: 980px;
+  }
+  .callout {
+    text-align: left;
+  }
+  .callout__icon {
+    font-size: 22px;
+    color: #06c;
+    margin-bottom: 10px;
+  }
+  .section--dark .callout__icon { color: #6db0ff; }
+  .callout__kicker {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #86868b;
+    margin: 0 0 6px;
+    font-weight: 600;
+  }
+  .section--dark .callout__kicker { color: #a1a1a6; }
+  .callout__head {
+    font-size: 19px;
+    font-weight: 500;
+    margin: 0 0 6px;
+    color: #1d1d1f;
+  }
+  .section--dark .callout__head { color: #f5f5f7; }
+  .callout__body {
+    font-size: 15px;
+    color: #515154;
+    line-height: 1.5;
+    margin: 0;
+  }
+  .section--dark .callout__body { color: #a1a1a6; }
+
+  /* ========== Composite score illus ========== */
+  .composite-illus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    flex-wrap: wrap;
+  }
+  .composite-big {
+    font-family: Georgia, serif;
+    font-size: 144px;
+    font-weight: 600;
+    color: var(--crimson);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .composite-breakdown {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .composite-row {
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  .composite-pct {
+    font-family: Georgia, serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--char);
+    width: 56px;
+    text-align: right;
+  }
+  .composite-row--comms .composite-pct { color: var(--lapis); }
+  .composite-row--usage .composite-pct { color: var(--brass); }
+  .composite-row--bill  .composite-pct { color: var(--ember); }
+  .composite-label {
+    font-size: 13px;
+    color: var(--char-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ========== Signal chips display (sec 5) ========== */
+  .chip-grid {
+    display: flex; flex-direction: column; gap: 14px; align-items: center;
+  }
+  .chip-row {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    max-width: 580px;
+  }
+
+  /* ========== Action chip zoom (sec 6) ========== */
+  .action-zoom {
+    display: flex; flex-direction: column; gap: 36px; align-items: center;
+  }
+  .action-row-big {
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  }
+  .action-chip-big {
+    font-size: 16px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-weight: 500;
+    border: 1.5px solid transparent;
+  }
+  .action-chip-big--patina { background: var(--patina-tint); color: var(--patina); border-color: rgba(74,124,89,0.30); }
+  .action-chip-big--brass  { background: var(--brass-tint); color: #8a5a00; border-color: rgba(217,164,65,0.35); }
+  .action-chip-big--ember  { background: var(--ember-tint); color: var(--ember); border-color: var(--ember-tint-strong); }
+  .annotation-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px;
+    max-width: 720px; margin-top: 12px;
+  }
+  .annotation {
+    text-align: center;
+  }
+  .annotation__lbl {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--char-mutest); margin-bottom: 6px;
+  }
+  .annotation__body {
+    font-size: 14px; color: var(--char-muted); line-height: 1.5;
+  }
+
+  /* ========== Snooze dropdown (sec 7) ========== */
+  .snooze-illus {
+    position: relative;
+    display: inline-flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  }
+  .snooze-trigger {
+    background: var(--parchment);
+    color: var(--char);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    border: 1px solid var(--char-border-strong);
+  }
+  .snooze-menu {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 12px;
+    padding: 8px;
+    min-width: 220px;
+    box-shadow: 0 8px 24px rgba(43,31,20,0.10);
+  }
+  .snooze-item {
+    padding: 9px 12px;
+    font-size: 14px;
+    color: var(--char);
+    border-radius: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .snooze-item--active {
+    background: var(--lapis-tint);
+    color: var(--lapis);
+    font-weight: 500;
+  }
+  .snooze-item__hint {
+    font-size: 11px;
+    color: var(--char-mutest);
+    letter-spacing: 0.04em;
+  }
+
+  /* ========== Pin section card (sec 8) ========== */
+  .v2card--pinned-demo .v2card__pin--active {
+    color: #db2777;
+    font-size: 16px;
+    filter: drop-shadow(0 0 6px rgba(219,39,119,0.45));
+  }
+
+  /* ========== Notes editor (sec 9) ========== */
+  .notes-mock {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 14px;
+    padding: 0;
+    max-width: 560px;
+    width: 100%;
+    overflow: hidden;
+  }
+  .notes-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--char-border);
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--parchment);
+  }
+  .notes-head__title {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    color: var(--char);
+    font-weight: 500;
+  }
+  .notes-head__meta {
+    font-size: 11px;
+    color: var(--char-mutest);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .notes-body {
+    padding: 18px;
+    font-size: 14px;
+    color: var(--char);
+    line-height: 1.55;
+    min-height: 140px;
+    font-family: Georgia, serif;
+  }
+  .notes-body__entry {
+    margin-bottom: 14px;
+  }
+  .notes-body__entry-meta {
+    font-family: -apple-system, sans-serif;
+    font-size: 11px;
+    color: var(--char-mutest);
+    margin-bottom: 4px;
+    letter-spacing: 0.03em;
+  }
+  .notes-foot {
+    border-top: 1px solid var(--char-border);
+    padding: 10px 18px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .notes-foot__hint {
+    font-size: 11px; color: var(--char-mutest);
+  }
+  .notes-foot__save {
+    background: var(--lapis); color: var(--parchment-light);
+    padding: 6px 14px; border-radius: 999px;
+    font-size: 12px; font-weight: 500;
+  }
+
+  /* ========== Lifecycle pills (sec 10) ========== */
+  .lifecycle-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    max-width: 880px;
+    margin: 0 auto;
+  }
+  .lifecycle-pill {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border);
+    border-radius: 14px;
+    padding: 20px 18px;
+    text-align: left;
+  }
+  .lifecycle-pill__head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .lifecycle-pill__dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .lifecycle-pill__name {
+    font-family: Georgia, serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--char);
+  }
+  .lifecycle-pill__sub {
+    font-size: 12px;
+    color: var(--char-muted);
+    line-height: 1.5;
+  }
+  .lifecycle-pill__age {
+    font-size: 10px;
+    color: var(--char-mutest);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  /* ========== Customer 360 mockup (sec 11) ========== */
+  .c360 {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 18px;
+    padding: 28px;
+    color: var(--char);
+  }
+  .c360-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 1px solid var(--char-border);
+    padding-bottom: 22px;
+    margin-bottom: 22px;
+    gap: 24px;
+  }
+  .c360-head__title {
+    font-family: Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--char);
+    line-height: 1.15;
+    margin: 0 0 6px;
+  }
+  .c360-head__meta {
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--char-muted);
+  }
+  .c360-head__chip {
+    background: var(--ember-tint);
+    color: var(--ember);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--ember-tint-strong);
+    white-space: nowrap;
+  }
+  .c360-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .c360-card {
+    background: var(--parchment);
+    border: 1px solid var(--char-border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .c360-card__lbl {
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--char-mutest);
+    margin-bottom: 8px;
+  }
+  .c360-card__title {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    color: var(--char);
+    margin-bottom: 8px;
+  }
+  .c360-card__metric {
+    font-family: Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--char);
+    line-height: 1;
+  }
+  .c360-card__delta {
+    font-size: 11px;
+    margin-top: 4px;
+    color: var(--char-muted);
+  }
+  .c360-card__delta--ember { color: var(--ember); }
+  .c360-card__delta--patina { color: var(--patina); }
+  .c360-spark {
+    display: flex; align-items: flex-end; gap: 3px; height: 32px;
+    margin-top: 10px;
+  }
+  .c360-spark span {
+    flex: 1;
+    background: var(--lapis);
+    opacity: 0.7;
+    border-radius: 2px;
+  }
+
+  /* ========== Performance sparkline (sec 12) ========== */
+  .perf-mock {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 14px;
+    padding: 24px 26px;
+    max-width: 560px; width: 100%;
+  }
+  .perf-mock__head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .perf-mock__title {
+    font-family: Georgia, serif;
+    font-size: 17px;
+    color: var(--char);
+  }
+  .perf-mock__lbl {
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--char-mutest);
+  }
+  .perf-spark {
+    display: flex; align-items: flex-end; gap: 4px; height: 90px;
+    margin: 8px 0 20px;
+  }
+  .perf-spark span {
+    flex: 1;
+    background: var(--patina);
+    opacity: 0.85;
+    border-radius: 3px;
+  }
+  .perf-stat-row {
+    display: flex; justify-content: space-between; gap: 18px;
+    border-top: 1px solid var(--char-border);
+    padding-top: 16px;
+  }
+  .perf-stat {
+    flex: 1;
+  }
+  .perf-stat__num {
+    font-family: Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--char);
+    line-height: 1;
+  }
+  .perf-stat__lbl {
+    font-size: 11px;
+    color: var(--char-mutest);
+    margin-top: 6px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .perf-mock__cta {
+    margin-top: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--lapis);
+    color: var(--parchment-light);
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* ========== Beacon AI panel (sec 13) ========== */
+  .ai-panel {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 520px;
+    overflow: hidden;
+    color: var(--char);
+    text-align: left;
+  }
+  .ai-head {
+    background: var(--parchment);
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--char-border);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+  }
+  .ai-head__left {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ai-flame {
+    color: var(--ember); font-size: 18px;
+  }
+  .ai-head__title {
+    font-family: Georgia, serif;
+    font-size: 16px;
+    color: var(--char);
+    font-weight: 500;
+  }
+  .ai-head__chip {
+    font-size: 10px;
+    background: var(--lapis-tint);
+    color: var(--lapis);
+    padding: 4px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.03em;
+  }
+  .ai-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .ai-onboarding {
+    background: var(--brass-tint);
+    border: 1px solid rgba(217,164,65,0.35);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 14px;
+  }
+  .ai-onboarding__title {
+    font-family: Georgia, serif;
+    font-size: 13px;
+    color: #5e4400;
+    margin-bottom: 2px;
+    font-weight: 500;
+  }
+  .ai-onboarding__sub {
+    font-size: 11px;
+    color: #6b4f1a;
+  }
+  .ai-onboarding__cta {
+    background: var(--char);
+    color: var(--parchment-light);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .ai-bubble {
+    max-width: 86%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .ai-bubble--user {
+    background: var(--char);
+    color: var(--parchment-light);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+  .ai-bubble--assistant {
+    background: var(--parchment);
+    color: var(--char);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    font-family: Georgia, serif;
+  }
+  .ai-thumbs {
+    display: flex; gap: 8px; align-self: flex-start; margin-top: -8px;
+  }
+  .ai-thumb {
+    background: var(--brass-tint);
+    color: #8a5a00;
+    border: 1px solid rgba(217,164,65,0.30);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* ========== Onboarding questions (sec 14) ========== */
+  .onboarding-card {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 16px;
+    padding: 26px 28px;
+    max-width: 540px; width: 100%;
+    text-align: left;
+    color: var(--char);
+  }
+  .onboarding-card__head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+  }
+  .onboarding-card__title {
+    font-family: Georgia, serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--char);
+  }
+  .onboarding-card__sub {
+    font-size: 12px;
+    color: var(--char-muted);
+    margin-bottom: 18px;
+  }
+  .onboarding-q {
+    margin-bottom: 18px;
+  }
+  .onboarding-q__lbl {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--char-mutest);
+    margin-bottom: 8px;
+  }
+  .onboarding-q__opts {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .onboarding-q__opt {
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--parchment);
+    color: var(--char);
+    border: 1px solid var(--char-border);
+  }
+  .onboarding-q__opt--selected {
+    background: var(--lapis);
+    color: var(--parchment-light);
+    border-color: var(--lapis);
+  }
+
+  /* ========== Remember chat input (sec 15) ========== */
+  .remember-mock {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 16px;
+    padding: 18px;
+    width: 100%;
+    max-width: 560px;
+    color: var(--char);
+    text-align: left;
+  }
+  .remember-input {
+    background: var(--parchment);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .remember-input__cmd {
+    color: var(--ember);
+    font-weight: 600;
+  }
+  .remember-input__rest {
+    color: var(--char);
+  }
+  .remember-input__cursor {
+    width: 2px; height: 16px; background: var(--char);
+    animation: blink 1s infinite step-end;
+    margin-left: 2px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .remember-confirm {
+    margin-top: 14px;
+    background: var(--patina-tint);
+    border: 1px solid rgba(74,124,89,0.30);
+    color: var(--patina);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-family: Georgia, serif;
+    font-style: italic;
+  }
+
+  /* ========== Thumbs feedback (sec 16) ========== */
+  .thumbs-stack {
+    display: flex; flex-direction: column; gap: 14px; max-width: 480px; width: 100%;
+  }
+
+  /* ========== CmdK palette (sec 17) ========== */
+  .cmdk {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border-strong);
+    border-radius: 16px;
+    padding: 0;
+    width: 100%;
+    max-width: 620px;
+    overflow: hidden;
+    color: var(--char);
+    text-align: left;
+    box-shadow: 0 24px 60px rgba(43,31,20,0.20);
+  }
+  .cmdk-banner {
+    background: var(--lapis-tint);
+    border-bottom: 1px solid rgba(42,77,92,0.18);
+    padding: 9px 16px;
+    font-size: 12px;
+    color: var(--lapis);
+    display: flex; justify-content: space-between;
+    font-weight: 500;
+  }
+  .cmdk-input {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--char-border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .cmdk-input__icon { color: var(--char-mutest); font-size: 18px; }
+  .cmdk-input__text {
+    font-size: 17px;
+    color: var(--char);
+  }
+  .cmdk-input__cursor {
+    width: 1.5px; height: 18px; background: var(--char);
+    animation: blink 1s infinite step-end;
+  }
+  .cmdk-results {
+    padding: 6px;
+    max-height: 320px;
+    overflow: hidden;
+  }
+  .cmdk-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 14px;
+    border-radius: 10px;
+    gap: 12px;
+  }
+  .cmdk-row--active { background: var(--lapis-tint); }
+  .cmdk-row__left {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .cmdk-row__name {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    color: var(--char);
+  }
+  .cmdk-row__meta {
+    font-size: 11px; color: var(--char-mutest);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .cmdk-row__right {
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  .cmdk-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--parchment);
+    color: var(--char-muted);
+    border: 1px solid var(--char-border);
+    white-space: nowrap;
+  }
+  .cmdk-badge--lapis { background: var(--lapis-tint); color: var(--lapis); border-color: rgba(42,77,92,0.20); }
+  .cmdk-row__compare {
+    font-size: 10px;
+    background: var(--ember-tint);
+    color: var(--ember);
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--ember-tint-strong);
+  }
+
+  /* ========== Freshness banner (sec 18) ========== */
+  .fresh-stack {
+    display: flex; flex-direction: column; gap: 22px;
+    max-width: 640px; width: 100%; margin: 0 auto;
+  }
+  .fresh-banner {
+    background: var(--ember-tint);
+    border: 1px solid rgba(200,67,29,0.28);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+    color: var(--ember);
+  }
+  .fresh-banner__left {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px;
+  }
+  .fresh-banner__more {
+    color: var(--char-mutest);
+    font-size: 11px;
+  }
+  .fresh-banner__btn {
+    background: var(--parchment-light);
+    color: var(--ember);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid rgba(200,67,29,0.28);
+  }
+  .fresh-card {
+    /* uses v2card */
+  }
+  .fresh-chip {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--lapis-tint);
+    color: var(--lapis);
+    border: 1px solid rgba(42,77,92,0.22);
+    margin-left: 8px;
+  }
+
+  /* ========== Suggested actions strip (sec 19) ========== */
+  .sugg-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    max-width: 880px; margin: 0 auto;
+  }
+  .sugg-card {
+    background: var(--parchment-light);
+    border: 1px solid var(--char-border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    text-align: left;
+  }
+  .sugg-card__head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .sugg-card__icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .sugg-card__icon--ask { background: var(--lapis-tint); color: var(--lapis); }
+  .sugg-card__icon--draft { background: var(--brass-tint); color: #8a5a00; }
+  .sugg-card__icon--nav { background: var(--patina-tint); color: var(--patina); }
+  .sugg-card__lbl {
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--char-mutest);
+  }
+  .sugg-card__title {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    color: var(--char);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .sugg-card__body {
+    font-size: 12px;
+    color: var(--char-muted);
+    line-height: 1.5;
+  }
+
+  /* ========== Timeline (sec 20) ========== */
+  .timeline {
+    display: flex; gap: 0; align-items: center; justify-content: center;
+    margin: 0 auto; max-width: 880px;
+    flex-wrap: wrap;
+  }
+  .timeline-step {
+    flex: 1;
+    min-width: 130px;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 0 8px;
+  }
+  .timeline-step__dot {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: #2a2a2c;
+    border: 1.5px solid #444;
+    color: #f5f5f7;
+    font-family: Georgia, serif;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 12px;
+  }
+  .timeline-step__lbl {
+    font-size: 13px;
+    color: #f5f5f7;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .timeline-step__sub {
+    font-size: 11px;
+    color: #a1a1a6;
+    letter-spacing: 0.04em;
+  }
+  .timeline-line {
+    flex: 0 0 36px;
+    height: 1px;
+    background: #444;
+    align-self: flex-start;
+    margin-top: 22px;
+  }
+
+  .footer-mini {
+    margin-top: 80px;
+    text-align: center;
+    font-size: 12px;
+    color: #6e6e73;
+    letter-spacing: 0.04em;
+  }
+
+  /* ========== Sticky nav bar ========== */
+  .topnav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 78px;
+    background: rgba(251, 251, 253, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    transition: transform 400ms var(--ease-apple), background-color 300ms ease;
+  }
+  .topnav--hidden {
+    transform: translateY(-100%);
+  }
+  .topnav__inner {
+    max-width: 1180px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topnav__left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .topnav__word {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: #1d1d1f;
+  }
+  .topnav__right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    color: #86868b;
+  }
+  .topnav__ver {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: #86868b;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.04);
+  }
+
+  /* ========== Beacon mark (real BeaconMark: 4-tier tower + 4 nested flames) ========== */
+  .beacon-mark {
+    display: inline-block;
+    flex-shrink: 0;
+    transform-origin: bottom center;
+  }
+  /* 3:8 aspect ratio — tall and narrow tower-with-flame */
+  .beacon-mark--sm  { width: 9px;  height: 24px; }
+  .beacon-mark--md  { width: 12px; height: 32px; }
+  .beacon-mark--lg  { width: 18px; height: 48px; }
+  .beacon-mark--xl  { width: 27px; height: 72px; }
+  .beacon-mark--hero { width: 36px; height: 96px; }
+  /* nav-specific sizing per spec */
+  .topnav .beacon-mark { width: 9px; height: 24px; }
+
+  /* Co-prime flame flicker — 2.2 / 1.7 / 1.3 / 0.9 never re-sync */
+  @keyframes beacon-flame-1 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.06, 1.12); }
+    60%      { transform: scale(0.97, 0.96); }
+  }
+  @keyframes beacon-flame-2 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.10, 1.16); }
+    60%      { transform: scale(0.94, 0.94); }
+  }
+  @keyframes beacon-flame-3 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.13, 1.20); }
+    60%      { transform: scale(0.92, 0.92); }
+  }
+  @keyframes beacon-flame-4 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.18, 1.25); }
+    60%      { transform: scale(0.88, 0.88); }
+  }
+  .beacon-flame-1 { animation: beacon-flame-1 2.2s ease-in-out infinite; }
+  .beacon-flame-2 { animation: beacon-flame-2 1.7s ease-in-out infinite; }
+  .beacon-flame-3 { animation: beacon-flame-3 1.3s ease-in-out infinite; }
+  .beacon-flame-4 { animation: beacon-flame-4 0.9s ease-in-out infinite; }
+
+  /* Tower base ember glow — pulses in sync with flame-1 */
+  @keyframes beacon-tower-glow {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(217, 164, 65, 0)); }
+    50%      { filter: drop-shadow(0 1px 6px rgba(217, 164, 65, 0.55)); }
+  }
+  .beacon-mark.beacon-mark--glow {
+    animation: beacon-tower-glow 2.2s ease-in-out infinite;
+  }
+
+  /* hero flame wrapper — no radial halo (the tower mark stands on its own) */
+  .hero-flame-wrap {
+    display: inline-block;
+    margin-bottom: 14px;
+    transform: scale(0.85);
+    opacity: 0;
+    transition: transform var(--dur-hero) var(--ease-apple), opacity var(--dur-hero) var(--ease-apple);
+  }
+  .hero-flame-wrap.in-view {
+    transform: scale(1.0);
+    opacity: 1;
+  }
+
+  /* ========== Hero load animations ========== */
+  body.page-loading .hero-load { opacity: 0; transform: translateY(8px); }
+  .hero-load {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 600ms var(--ease-apple), transform 600ms var(--ease-apple);
+  }
+  .hero-load.in {
+    opacity: 1;
+    transform: none;
+  }
+  .hero-load--title {
+    transition: opacity 700ms var(--ease-apple), transform 700ms var(--ease-apple);
+    transform: scale(1.02);
+  }
+  .hero-load--title.in {
+    transform: scale(1.0);
+  }
+
+  /* ========== Card hover lift ========== */
+  .v2card,
+  .mini-card,
+  .lifecycle-pill,
+  .c360,
+  .notes-mock,
+  .sugg-card,
+  .illus-card {
+    transition: transform 200ms var(--ease-apple), box-shadow 200ms var(--ease-apple);
+  }
+  .v2card:hover,
+  .mini-card:hover,
+  .lifecycle-pill:hover,
+  .sugg-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+  }
+
+  /* ========== Section background transition ========== */
+  .section {
+    transition: background-color 0.3s ease;
+  }
+
+  /* ========== RED stoplight pulse ========== */
+  .mini-card__dot--red {
+    animation: red-pulse 2s ease-in-out infinite;
+  }
+  @keyframes red-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(200,67,29,0.30); }
+    50%  { box-shadow: 0 0 0 8px rgba(200,67,29,0.0); }
+    100% { box-shadow: 0 0 0 0 rgba(200,67,29,0.0); }
+  }
+  /* matching pulse on card dots */
+  .v2card__dot:not(.v2card__dot--green):not(.v2card__dot--yellow) {
+    animation: red-pulse 2s ease-in-out infinite;
+  }
+
+  /* ========== Parallax hero card ========== */
+  .hero-parallax {
+    will-change: transform;
+  }
+
+  /* ========== Magnetic links ========== */
+  .magnetic {
+    display: inline-block;
+    transition: transform 200ms var(--ease-apple);
+    will-change: transform;
+  }
+
+  /* ========== Back-to-top ========== */
+  .back-to-top {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(29, 29, 31, 0.85);
+    color: #fff;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: opacity 300ms var(--ease-apple), transform 300ms var(--ease-apple);
+    z-index: 999;
+  }
+  .back-to-top.visible {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  .back-to-top:hover {
+    background: rgba(29, 29, 31, 0.95);
+  }
+
+  /* ========== Body offset for fixed nav ========== */
+  body { padding-top: 78px; }
+
+  /* ========== Reveal helper for closing headline scale ========== */
+  .final-headline-wrap {
+    will-change: transform;
+  }
+
+  /* ========== Scroll progress bar (Anim #1) ========== */
+  .scroll-progress {
+    position: fixed;
+    top: 0; left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #D9A441, #C8431D);
+    z-index: 2001;
+    pointer-events: none;
+    transition: width 80ms linear;
+  }
+
+  /* ========== Word-by-word hero reveal (Anim #2) ========== */
+  [data-word-reveal] > span {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 700ms cubic-bezier(0.4, 0, 0.2, 1),
+                transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity, transform;
+  }
+  [data-word-reveal] > span.in {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ========== Stoplight pulse trail (Anim #3 — heartbeat ripple) ========== */
+  .pulse-trail {
+    position: relative;
+  }
+  .pulse-trail::before,
+  .pulse-trail::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 0 rgba(200, 67, 29, 0.45);
+    pointer-events: none;
+  }
+  .pulse-trail::before {
+    animation: pulse-ripple 2s ease-out infinite;
+  }
+  .pulse-trail::after {
+    animation: pulse-ripple 2s ease-out infinite;
+    animation-delay: 1s;
+  }
+  @keyframes pulse-ripple {
+    0%   { box-shadow: 0 0 0 0 rgba(200,67,29,0.45); opacity: 1; }
+    70%  { box-shadow: 0 0 0 14px rgba(200,67,29,0.0); opacity: 0; }
+    100% { box-shadow: 0 0 0 0 rgba(200,67,29,0.0); opacity: 0; }
+  }
+
+  /* ========== Magnetic hover on illustration cards (Anim #4) ========== */
+  .illus-wrap,
+  .v2card,
+  .mini-card,
+  .lifecycle-pill,
+  .sugg-card,
+  .callout,
+  .illus-card {
+    will-change: transform;
+  }
+
+  /* ========== Dark section cross-fade (Anim #5) ========== */
+  .section--dark.dark-in {
+    transition: background-color 500ms ease-out, color 500ms ease-out;
+  }
+
+  /* ========== Responsive ========== */
+  @media (max-width: 768px) {
+    h1.hero-title { font-size: 56px; }
+    h2.hero-sub { font-size: 26px; }
+    h2.headline { font-size: 36px; }
+    h2.headline--lg { font-size: 42px; }
+    p.subhead { font-size: 18px; }
+    .section { padding: 80px 20px; }
+    .callouts, .triplet, .sugg-row { grid-template-columns: 1fr; }
+    .lifecycle-row { grid-template-columns: 1fr 1fr; }
+    .c360-grid { grid-template-columns: 1fr; }
+    .composite-big { font-size: 96px; }
+    .timeline-line { display: none; }
+    .timeline { flex-direction: column; }
+    .timeline-step { padding: 12px 0; }
+    body { padding-top: 64px; }
+    .topnav { height: 64px; }
+    .topnav__right { gap: 8px; }
+    .topnav__right > .topnav__lbl { display: none; }
+  }
+</style>
+</head>
+<body class="page-loading">
+
+<!-- Scroll progress bar (Anim #1) -->
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+<!-- ============================================================ -->
+<!-- Skip link (a11y)                                             -->
+<!-- ============================================================ -->
+<a href="#main-content" class="skip-link">Skip to content</a>
+
+<!-- ============================================================ -->
+<!-- Reusable Beacon flame SVG (symbol)                           -->
+<!-- ============================================================ -->
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true">
+  <symbol id="beacon-mark" viewBox="-6 -32 12 32">
+    <!-- 4-tier stepped tower (Char #2B1F14) -->
+    <rect x="-6" y="-4"  width="12" height="4" fill="#2B1F14"/>
+    <rect x="-5" y="-10" width="10" height="4" fill="#2B1F14"/>
+    <rect x="-4" y="-16" width="8"  height="4" fill="#2B1F14"/>
+    <rect x="-3" y="-22" width="6"  height="4" fill="#2B1F14"/>
+    <!-- 4 nested teardrop flames blazing on top of the tower -->
+    <path d="M 0 -32 C 4 -28 5 -23 3 -21 L -3 -21 C -5 -23 -4 -28 0 -32 Z" fill="#C8431D" class="beacon-flame-1" style="transform-origin: 0px -21px;"/>
+    <path d="M 0 -30 C 3.4 -27 4 -23 2.5 -21 L -2.5 -21 C -4 -23 -3.4 -27 0 -30 Z" fill="#C8431D" opacity="0.75" class="beacon-flame-2" style="transform-origin: 0px -21px;"/>
+    <path d="M 0 -27 C 2 -24 3 -21 2 -19 L -2 -19 C -3 -21 -2 -24 0 -27 Z" fill="#FBBF24" class="beacon-flame-3" style="transform-origin: 0px -19px;"/>
+    <path d="M 0 -25 C 1.2 -23 1.5 -21 1 -19 L -1 -19 C -1.5 -21 -1.2 -23 0 -25 Z" fill="#FBBF24" class="beacon-flame-4" style="transform-origin: 0px -19px;"/>
+  </symbol>
+</svg>
+
+<!-- ============================================================ -->
+<!-- Sticky top navigation                                        -->
+<!-- ============================================================ -->
+<nav class="topnav" id="topnav" aria-label="Primary">
+  <div class="topnav__inner">
+    <a href="#top" class="topnav__left" style="text-decoration:none;color:inherit;">
+      <svg class="beacon-mark"><use href="#beacon-mark"/></svg>
+      <span class="topnav__word">Beacon</span>
+    </a>
+    <div class="topnav__right">
+      <span class="topnav__lbl">Account Manager Guide</span>
+      <span class="topnav__ver">v2026.05</span>
+    </div>
+  </div>
+</nav>
+
+<a id="top"></a>
+<main id="main-content">
+
+<!-- ============================================================ -->
+<!-- 1. HERO                                                      -->
+<!-- ============================================================ -->
+<section class="section section--hero" id="hero">
+  <div class="container hero-parallax-container">
+    <div class="hero-flame-wrap" data-hero-flame>
+      <svg class="beacon-mark beacon-mark--hero beacon-mark--glow"><use href="#beacon-mark"/></svg>
+    </div>
+    <p class="kicker kicker--muted hero-load" data-hero-step="1" style="margin-bottom: 18px;">For account managers</p>
+    <h1 class="hero-title hero-load hero-load--title" data-hero-step="2" data-word-reveal>Beacon.</h1>
+    <h2 class="hero-sub hero-load" data-hero-step="3" data-word-reveal>Built for your book.</h2>
+    <p class="hero-body hero-load" data-hero-step="4">
+      Triage thirteen-hundred customers in under fifteen minutes. See who needs attention. Log the contact. Let Beacon AI handle the rest.
+    </p>
+    <div class="link-row hero-load" data-hero-step="5">
+      <a href="#" class="magnetic">Open Beacon <i class="ti ti-chevron-right" style="font-size:14px;vertical-align:-1px"></i></a>
+      <a href="#" class="magnetic">Watch the 2-min tour <i class="ti ti-chevron-right" style="font-size:14px;vertical-align:-1px"></i></a>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 2. The customer card                                         -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Your daily home</p>
+    <h2 class="headline" data-animate="fade-up">The customer card.</h2>
+    <p class="subhead" data-animate="fade-up">Every customer in your book lives here. Score. Signals. One tap to log what happened.</p>
+
+    <div class="illus-wrap" data-animate="scale-in">
+      <div class="illus-card">
+        <div class="v2card">
+          <div class="v2card__pin"><i class="ti ti-pin"></i></div>
+          <div class="v2card__top">
+            <div class="v2card__left">
+              <span class="v2card__dot"></span>
+              <span class="v2card__name">SkinSpa NYC — Midtown</span>
+            </div>
+            <div class="v2card__right">
+              <div class="v2card__score" data-count-to="78">0</div>
+              <div class="v2card__score-label">Composite</div>
+            </div>
+          </div>
+          <div class="v2card__subline">Sudha · Pod 1 · ID a3f1…d8e2</div>
+          <div class="v2card__chips">
+            <span class="chip">Client silent 14d</span>
+            <span class="chip">We silent 11d</span>
+            <span class="chip">Open ticket</span>
+            <span class="chip chip--patina">App strong</span>
+          </div>
+          <p class="v2card__reason">No client message in two weeks. One support ticket open. Profile clicks still healthy — they're not failing, you're just losing the thread.</p>
+          <div class="v2card__actions">
+            <span class="action-chip action-chip--patina"><i class="ti ti-check" style="font-size:11px"></i> Connected</span>
+            <span class="action-chip action-chip--brass"><i class="ti ti-phone" style="font-size:11px"></i> VM</span>
+            <span class="action-chip action-chip--ember"><i class="ti ti-x" style="font-size:11px"></i> No reach</span>
+            <span class="action-chip action-chip--ghost">Snooze <i class="ti ti-chevron-down" style="font-size:10px"></i></span>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">A customer card. Score, signals, reason, action — top to bottom.</p>
+    </div>
+
+    <div class="callouts" data-cascade>
+      <div class="callout">
+        <div class="callout__icon"><i class="ti ti-traffic-lights"></i></div>
+        <p class="callout__kicker">Stoplight</p>
+        <h4 class="callout__head">Red, yellow, green</h4>
+        <p class="callout__body">The dot answers the only question that matters: do I touch this one today.</p>
+      </div>
+      <div class="callout">
+        <div class="callout__icon"><i class="ti ti-number"></i></div>
+        <p class="callout__kicker">Composite</p>
+        <h4 class="callout__head">One number</h4>
+        <p class="callout__body">A blend of comms, product usage, and billing — higher is more urgent.</p>
+      </div>
+      <div class="callout">
+        <div class="callout__icon"><i class="ti ti-bolt"></i></div>
+        <p class="callout__kicker">Action</p>
+        <h4 class="callout__head">Logged in one tap</h4>
+        <p class="callout__body">Connected, VM, or no reach. That's the whole interaction model.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3. The stoplight                                             -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Three colors. One answer.</p>
+    <h2 class="headline" data-animate="fade-up">Know who needs you today.</h2>
+    <p class="subhead" data-animate="fade-up">Red means now. Yellow means this week. Green means doing fine — keep doing what you're doing.</p>
+
+    <div class="triplet" data-cascade>
+      <div class="mini-card">
+        <div class="mini-card__dot mini-card__dot--red pulse-trail"></div>
+        <h4 class="mini-card__title">Red — Today</h4>
+        <p class="mini-card__sub">Composite ≥ 70. Multiple negative signals, no recent contact. Top of your queue, no exceptions.</p>
+      </div>
+      <div class="mini-card">
+        <div class="mini-card__dot mini-card__dot--yellow"></div>
+        <h4 class="mini-card__title">Yellow — This week</h4>
+        <p class="mini-card__sub">Composite 40–69. Something's drifting. Reach out before it lands in red.</p>
+      </div>
+      <div class="mini-card">
+        <div class="mini-card__dot mini-card__dot--green"></div>
+        <h4 class="mini-card__title">Green — Healthy</h4>
+        <p class="mini-card__sub">Composite &lt; 40. Engaged, paying, talking to us. Keep cadence light.</p>
+      </div>
+    </div>
+
+    <p class="illus-caption" style="margin-top:24px;">A 30-second filter. Sort by dot — work your reds, then your yellows.</p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 4. Composite score                                           -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">The number under the dot</p>
+    <h2 class="headline" data-animate="fade-up">One score. Three signals.</h2>
+    <p class="subhead" data-animate="fade-up">Comms (50%) + product usage (30%) + billing (20%). Higher means more urgent.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 720px;">
+      <div class="composite-illus">
+        <div class="composite-big" data-count-to="78">0</div>
+        <div class="composite-breakdown">
+          <div class="composite-row composite-row--comms">
+            <div class="composite-pct">50%</div>
+            <div class="composite-label">Comms volume &amp; recency</div>
+          </div>
+          <div class="composite-row composite-row--usage">
+            <div class="composite-pct">30%</div>
+            <div class="composite-label">Product usage signal</div>
+          </div>
+          <div class="composite-row composite-row--bill">
+            <div class="composite-pct">20%</div>
+            <div class="composite-label">Billing &amp; invoice state</div>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">A 78 isn't a verdict — it's a priority. The chips underneath tell you what to do about it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5. Signal chips                                              -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Why this customer? Why now?</p>
+    <h2 class="headline" data-animate="fade-up">Ten signals. One glance.</h2>
+    <p class="subhead" data-animate="fade-up">Six negative signals tell you what's breaking. Four positive signals tell you what's working.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 720px;">
+      <div class="illus-card">
+        <div class="chip-grid">
+          <div class="chip-row">
+            <span class="chip">Client silent 14d</span>
+            <span class="chip">We silent 11d</span>
+            <span class="chip">Open ticket</span>
+            <span class="chip">Missed payment</span>
+            <span class="chip">App dormant</span>
+            <span class="chip">Reviews stalled</span>
+          </div>
+          <div class="chip-row">
+            <span class="chip chip--patina">App strong</span>
+            <span class="chip chip--patina">Reviews replied</span>
+            <span class="chip chip--patina">Leads converting</span>
+            <span class="chip chip--patina">Multi-loc engaged</span>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">Negative on top in ember. Positive below in patina. Chips drive the reason line.</p>
+    </div>
+
+    <div class="callouts" data-cascade>
+      <div class="callout">
+        <p class="callout__kicker kicker--ember">Negative</p>
+        <h4 class="callout__head">What needs work</h4>
+        <p class="callout__body">Silent stretches, open tickets, missed invoices, dormant app, stalled reviews. The chip names the problem.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker kicker--patina">Positive</p>
+        <h4 class="callout__head">What's working</h4>
+        <p class="callout__body">Strong app usage, replied reviews, leads converting, multiple locations engaged. The chip names the strength.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">Mixed</p>
+        <h4 class="callout__head">Most cards have both</h4>
+        <p class="callout__body">A red card with one green chip is the most useful kind — it tells you what to lean on while you fix the rest.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 6. The action chips                                          -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Log it as it happens</p>
+    <h2 class="headline" data-animate="fade-up">Connected. VM. No reach.</h2>
+    <p class="subhead" data-animate="fade-up">Three taps cover every outcome. Beacon remembers what you did and when.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 760px;">
+      <div class="action-zoom">
+        <div class="action-row-big">
+          <span class="action-chip-big action-chip-big--patina"><i class="ti ti-check"></i> &nbsp;Connected</span>
+          <span class="action-chip-big action-chip-big--brass"><i class="ti ti-phone"></i> &nbsp;VM</span>
+          <span class="action-chip-big action-chip-big--ember"><i class="ti ti-x"></i> &nbsp;No reach</span>
+        </div>
+        <div class="annotation-grid">
+          <div class="annotation">
+            <div class="annotation__lbl">Connected</div>
+            <p class="annotation__body">You spoke to them. Beacon timestamps the touch and softens the dot if signals support it.</p>
+          </div>
+          <div class="annotation">
+            <div class="annotation__lbl">VM</div>
+            <p class="annotation__body">You left a voicemail. Counts as effort. Beacon nudges them back up if there's no callback in 72 hours.</p>
+          </div>
+          <div class="annotation">
+            <div class="annotation__lbl">No reach</div>
+            <p class="annotation__body">Tried, no contact. Beacon escalates if this is your third "no reach" in a row.</p>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">A three-button vocabulary. No notes required for the log.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 7. Snooze                                                    -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Defer cleanly</p>
+    <h2 class="headline" data-animate="fade-up">Push it. Without losing it.</h2>
+    <p class="subhead" data-animate="fade-up">Pick a day count. The customer hides from your triage view until then, then comes back.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 540px;">
+      <div class="illus-card">
+        <div class="snooze-illus">
+          <span class="snooze-trigger">Snooze <i class="ti ti-chevron-down" style="font-size:11px;vertical-align:-1px"></i></span>
+          <div class="snooze-menu">
+            <div class="snooze-item">
+              <span>Tomorrow</span>
+              <span class="snooze-item__hint">1d</span>
+            </div>
+            <div class="snooze-item snooze-item--active">
+              <span>Later this week</span>
+              <span class="snooze-item__hint">3d</span>
+            </div>
+            <div class="snooze-item">
+              <span>Next week</span>
+              <span class="snooze-item__hint">7d</span>
+            </div>
+            <div class="snooze-item">
+              <span>In two weeks</span>
+              <span class="snooze-item__hint">14d</span>
+            </div>
+            <div class="snooze-item">
+              <span>Custom…</span>
+              <span class="snooze-item__hint"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">A snoozed card disappears from triage and resurfaces on the chosen day.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 8. Pin                                                       -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Your priority shortlist</p>
+    <h2 class="headline" data-animate="fade-up">Stick the ones that matter.</h2>
+    <p class="subhead" data-animate="fade-up">Pinned customers float to the top. Pin survives across sessions, pod views, and filter swaps.</p>
+
+    <div class="illus-wrap" data-animate="scale-in">
+      <div class="illus-card">
+        <div class="v2card v2card--pinned-demo">
+          <div class="v2card__pin v2card__pin--active"><i class="ti ti-pin-filled"></i></div>
+          <div class="v2card__top">
+            <div class="v2card__left">
+              <span class="v2card__dot v2card__dot--yellow"></span>
+              <span class="v2card__name">Glow &amp; Co Wellness</span>
+            </div>
+            <div class="v2card__right">
+              <div class="v2card__score v2card__score--yellow">52</div>
+              <div class="v2card__score-label">Composite</div>
+            </div>
+          </div>
+          <div class="v2card__subline">Apurvaa · Pod 4 · ID 9b4c…7a1f · Pinned</div>
+          <div class="v2card__chips">
+            <span class="chip">We silent 9d</span>
+            <span class="chip chip--brass">Cancelling Aug 14</span>
+            <span class="chip chip--patina">App strong</span>
+          </div>
+          <p class="v2card__reason">Pinned for the August renewal conversation — they're still engaged but the cancel date is on the books.</p>
+          <div class="v2card__actions">
+            <span class="action-chip action-chip--patina"><i class="ti ti-check" style="font-size:11px"></i> Connected</span>
+            <span class="action-chip action-chip--brass"><i class="ti ti-phone" style="font-size:11px"></i> VM</span>
+            <span class="action-chip action-chip--ember"><i class="ti ti-x" style="font-size:11px"></i> No reach</span>
+            <span class="action-chip action-chip--ghost">Snooze <i class="ti ti-chevron-down" style="font-size:10px"></i></span>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">The filled pin floats this card above the dot-sorted queue.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 9. Notes                                                     -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Per-customer memory</p>
+    <h2 class="headline" data-animate="fade-up">Write it down. Beacon AI reads it.</h2>
+    <p class="subhead" data-animate="fade-up">Notes are per-AM and per-customer. They feed Beacon AI's context for that customer's 360 view.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 620px;">
+      <div class="illus-card">
+        <div class="notes-mock">
+          <div class="notes-head">
+            <div class="notes-head__title">Notes — SkinSpa NYC</div>
+            <div class="notes-head__meta">2 entries · Sudha</div>
+          </div>
+          <div class="notes-body">
+            <div class="notes-body__entry">
+              <div class="notes-body__entry-meta">May 18 · After call</div>
+              Owner Priya wants the GBP report monthly, not weekly. Husband Sam handles the invoices — copy him on billing.
+            </div>
+            <div class="notes-body__entry">
+              <div class="notes-body__entry-meta">Apr 02 · Onboarding</div>
+              Second location opening in Q3. Wants the same setup mirrored. Will introduce her sister-in-law as the AM contact for that one.
+            </div>
+          </div>
+          <div class="notes-foot">
+            <div class="notes-foot__hint">Markdown supported · Beacon AI uses these</div>
+            <div class="notes-foot__save">Save</div>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">Notes are scoped to you. Beacon AI pulls them into every 360 answer about this customer.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 10. Lifecycle states                                         -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Fresh. Warming. Active. Resurrected.</p>
+    <h2 class="headline" data-animate="fade-up">Beacon knows when they joined.</h2>
+    <p class="subhead" data-animate="fade-up">A new customer can't have a bad score yet — their signals haven't landed. Beacon AI tags them so you don't dismiss them by accident.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 920px;">
+      <div class="lifecycle-row" data-cascade>
+        <div class="lifecycle-pill">
+          <div class="lifecycle-pill__head">
+            <span class="lifecycle-pill__dot" style="background: var(--lapis);"></span>
+            <span class="lifecycle-pill__name">Fresh</span>
+          </div>
+          <p class="lifecycle-pill__sub">Joined under 14 days ago. No score yet — signals still warming.</p>
+          <p class="lifecycle-pill__age">0–14 days</p>
+        </div>
+        <div class="lifecycle-pill">
+          <div class="lifecycle-pill__head">
+            <span class="lifecycle-pill__dot" style="background: var(--brass);"></span>
+            <span class="lifecycle-pill__name">Warming</span>
+          </div>
+          <p class="lifecycle-pill__sub">Some signals landing. Score is provisional — interpret it lightly.</p>
+          <p class="lifecycle-pill__age">14–45 days</p>
+        </div>
+        <div class="lifecycle-pill">
+          <div class="lifecycle-pill__head">
+            <span class="lifecycle-pill__dot" style="background: var(--patina);"></span>
+            <span class="lifecycle-pill__name">Active</span>
+          </div>
+          <p class="lifecycle-pill__sub">Full signal coverage. Score is reliable. Standard triage rules apply.</p>
+          <p class="lifecycle-pill__age">45+ days</p>
+        </div>
+        <div class="lifecycle-pill">
+          <div class="lifecycle-pill__head">
+            <span class="lifecycle-pill__dot" style="background: var(--ember);"></span>
+            <span class="lifecycle-pill__name">Resurrected</span>
+          </div>
+          <p class="lifecycle-pill__sub">Returned after a churn or pause. Treat as fresh until comms re-stabilize.</p>
+          <p class="lifecycle-pill__age">Returned &lt; 30d</p>
+        </div>
+      </div>
+      <p class="illus-caption">Lifecycle tags appear above the composite score on the card.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 11. Customer 360 (DARK)                                      -->
+<!-- ============================================================ -->
+<section class="section section--dark">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Everything about a customer</p>
+    <h2 class="headline" data-animate="fade-up">Customer 360. One view.</h2>
+    <p class="subhead" data-animate="fade-up">Comms, performance, billing, tickets, post-payment — stitched together for the customer you're looking at.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 820px;">
+      <div class="c360">
+        <div class="c360-head">
+          <div>
+            <h3 class="c360-head__title">SkinSpa NYC — Midtown</h3>
+            <div class="c360-head__meta">entity · a3f1c204-7b8e-4f3d-9c12-d8e2af1c4421</div>
+          </div>
+          <div class="c360-head__chip">● RED · 78</div>
+        </div>
+        <div class="c360-grid" data-cascade>
+          <div class="c360-card">
+            <div class="c360-card__lbl">Customer Beacon</div>
+            <div class="c360-card__title">Comms last 30d</div>
+            <div class="c360-card__metric">14d</div>
+            <div class="c360-card__delta c360-card__delta--ember">↓ Client silent</div>
+          </div>
+          <div class="c360-card">
+            <div class="c360-card__lbl">Performance Beacon</div>
+            <div class="c360-card__title">GBP profile clicks</div>
+            <div class="c360-card__metric">2,184</div>
+            <div class="c360-spark">
+              <span style="height: 35%"></span>
+              <span style="height: 48%"></span>
+              <span style="height: 62%"></span>
+              <span style="height: 55%"></span>
+              <span style="height: 78%"></span>
+              <span style="height: 90%"></span>
+              <span style="height: 72%"></span>
+              <span style="height: 80%"></span>
+            </div>
+          </div>
+          <div class="c360-card">
+            <div class="c360-card__lbl">Escalation</div>
+            <div class="c360-card__title">Open tickets</div>
+            <div class="c360-card__metric">1</div>
+            <div class="c360-card__delta c360-card__delta--ember">Open 5d · GBP rejection</div>
+          </div>
+          <div class="c360-card">
+            <div class="c360-card__lbl">Post-Payment</div>
+            <div class="c360-card__title">Unpaid invoices</div>
+            <div class="c360-card__metric">$1,499</div>
+            <div class="c360-card__delta c360-card__delta--patina">Auto-debit ON · retry tomorrow</div>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption" style="color:#a1a1a6;">One screen. Four panels. Every conversation you'd need to have, prepped.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 12. Performance Beacon                                       -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Their performance, on demand</p>
+    <h2 class="headline" data-animate="fade-up">Pull a report. Send the win.</h2>
+    <p class="subhead" data-animate="fade-up">Google Business Profile clicks, keyword rankings, leads, reviews — generate a doc-quality report for any customer.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 620px;">
+      <div class="illus-card">
+        <div class="perf-mock">
+          <div class="perf-mock__head">
+            <div class="perf-mock__title">GBP profile clicks · last 12 weeks</div>
+            <div class="perf-mock__lbl">+38%</div>
+          </div>
+          <div class="perf-spark">
+            <span style="height: 22%"></span>
+            <span style="height: 32%"></span>
+            <span style="height: 28%"></span>
+            <span style="height: 40%"></span>
+            <span style="height: 36%"></span>
+            <span style="height: 52%"></span>
+            <span style="height: 48%"></span>
+            <span style="height: 64%"></span>
+            <span style="height: 72%"></span>
+            <span style="height: 60%"></span>
+            <span style="height: 86%"></span>
+            <span style="height: 92%"></span>
+          </div>
+          <div class="perf-stat-row">
+            <div class="perf-stat">
+              <div class="perf-stat__num">2,184</div>
+              <div class="perf-stat__lbl">YTD leads</div>
+            </div>
+            <div class="perf-stat">
+              <div class="perf-stat__num">412</div>
+              <div class="perf-stat__lbl">Booked</div>
+            </div>
+            <div class="perf-stat">
+              <div class="perf-stat__num">17</div>
+              <div class="perf-stat__lbl">Top-3 rankings</div>
+            </div>
+          </div>
+          <div class="perf-mock__cta"><i class="ti ti-download"></i> Download .docx</div>
+        </div>
+      </div>
+      <p class="illus-caption">Same metrics as the Performance Report — wrapped in a customer-ready Word document.</p>
+    </div>
+
+    <div class="callouts" data-cascade>
+      <div class="callout">
+        <p class="callout__kicker">Live data</p>
+        <h4 class="callout__head">Pulled at click time</h4>
+        <p class="callout__body">No staleness window. Hit Generate, get the current numbers from Metabase.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">Branded</p>
+        <h4 class="callout__head">Customer-ready out of the box</h4>
+        <p class="callout__body">Header strip with their bizname, your name in the footer. Send directly — no Word editing required.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">No predictions</p>
+        <h4 class="callout__head">Only what shipped</h4>
+        <p class="callout__body">Predicted leads stay internal. The customer-facing report shows actuals — reviews, rankings, clicks, leads.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 13. Beacon AI — your copilot (DARK)                          -->
+<!-- ============================================================ -->
+<section class="section section--dark">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Your copilot</p>
+    <h2 class="headline" data-animate="fade-up">Beacon AI.<br/>Knows your style. Remembers your customers.</h2>
+    <p class="subhead" data-animate="fade-up">Ask anything about your book. Get specific, citation-grounded answers.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 600px;">
+      <div class="illus-card" style="background:#2a2a2c;">
+        <div class="ai-panel">
+          <div class="ai-head">
+            <div class="ai-head__left">
+              <span class="ai-flame" aria-hidden="true" style="display:inline-flex;align-items:center;">
+                <svg class="beacon-mark" style="width:9px;height:24px;"><use href="#beacon-mark"/></svg>
+              </span>
+              <span class="ai-head__title">Beacon AI</span>
+            </div>
+            <span class="ai-head__chip">Remembers your past 4 days</span>
+          </div>
+          <div class="ai-body" data-ai-chat>
+            <div class="ai-onboarding" data-ai-bubble="onboarding">
+              <div>
+                <div class="ai-onboarding__title"><i class="ti ti-sparkles" style="font-size:13px"></i> Personalize Beacon AI in 30 seconds</div>
+                <div class="ai-onboarding__sub">Tell it how you like answers — brief or detailed, bullets or prose.</div>
+              </div>
+              <div class="ai-onboarding__cta">Set up</div>
+            </div>
+            <div class="ai-bubble ai-bubble--user" data-ai-bubble="user">Why is SkinSpa NYC red today?</div>
+            <div class="ai-bubble ai-bubble--assistant" data-ai-bubble="assistant">
+              No client message in 14 days and no team-side reach for 11 days. One open ticket from May 17 about a GBP rejection — Sudha has it. App usage is still strong (4 sessions this week), so they're using the product, just not talking to us. I'd push a check-in today before the ticket ages further.
+            </div>
+            <div class="ai-thumbs" data-ai-bubble="thumbs">
+              <span class="ai-thumb"><i class="ti ti-thumb-up" style="font-size:11px"></i></span>
+              <span class="ai-thumb"><i class="ti ti-thumb-down" style="font-size:11px"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption" style="color:#a1a1a6;">A side drawer. Always one keystroke away. Cites the signals it used.</p>
+    </div>
+
+    <div class="callouts" data-cascade style="margin-top: 64px;">
+      <div class="callout">
+        <p class="callout__kicker">Grounded</p>
+        <h4 class="callout__head">Citations, always</h4>
+        <p class="callout__body">Every answer points back to the signals or notes it used — no hallucinated metrics.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">Personal</p>
+        <h4 class="callout__head">Remembers four days</h4>
+        <p class="callout__body">Conversation memory across the work week. Pick up where you left off Tuesday on Friday.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">Tunable</p>
+        <h4 class="callout__head">Onboarding + /remember</h4>
+        <p class="callout__body">Style on day one. Specific facts whenever you teach it. Thumbs to fine-tune.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 14. Working-style onboarding                                 -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">30 seconds to personalize</p>
+    <h2 class="headline" data-animate="fade-up">Brief or detailed?<br/>Bullets or prose?</h2>
+    <p class="subhead" data-animate="fade-up">Four questions on first login. Beacon AI applies your style to every answer from then on.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 620px;">
+      <div class="illus-card">
+        <div class="onboarding-card">
+          <div class="onboarding-card__head">
+            <span style="color: var(--ember); font-size: 18px;"><i class="ti ti-flame"></i></span>
+            <span class="onboarding-card__title">Set up Beacon AI</span>
+          </div>
+          <p class="onboarding-card__sub">Four quick questions. You can change any of these later.</p>
+
+          <div class="onboarding-q">
+            <div class="onboarding-q__lbl">Answer length</div>
+            <div class="onboarding-q__opts">
+              <span class="onboarding-q__opt onboarding-q__opt--selected">Brief</span>
+              <span class="onboarding-q__opt">Detailed</span>
+            </div>
+          </div>
+          <div class="onboarding-q">
+            <div class="onboarding-q__lbl">Format</div>
+            <div class="onboarding-q__opts">
+              <span class="onboarding-q__opt">Bullets</span>
+              <span class="onboarding-q__opt onboarding-q__opt--selected">Prose</span>
+              <span class="onboarding-q__opt">Mixed</span>
+            </div>
+          </div>
+          <div class="onboarding-q">
+            <div class="onboarding-q__lbl">Tone</div>
+            <div class="onboarding-q__opts">
+              <span class="onboarding-q__opt onboarding-q__opt--selected">Direct</span>
+              <span class="onboarding-q__opt">Friendly</span>
+              <span class="onboarding-q__opt">Coach</span>
+            </div>
+          </div>
+          <div class="onboarding-q">
+            <div class="onboarding-q__lbl">Show your work</div>
+            <div class="onboarding-q__opts">
+              <span class="onboarding-q__opt onboarding-q__opt--selected">Yes — cite signals</span>
+              <span class="onboarding-q__opt">No — just the answer</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">A one-time setup. Beacon AI honors every choice forever after.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 15. /remember slash command                                  -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Teach Beacon AI a fact</p>
+    <h2 class="headline" data-animate="fade-up">/remember they manage Apurvaa's book.</h2>
+    <p class="subhead" data-animate="fade-up">Type /remember followed by a fact. Beacon stores it and weaves it into every future response.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 620px;">
+      <div class="illus-card">
+        <div class="remember-mock">
+          <div class="remember-input">
+            <svg class="beacon-mark" style="width:9px;height:24px;"><use href="#beacon-mark"/></svg>
+            <span class="remember-input__cmd"
+                  data-typewriter="/remember"
+                  data-typewriter-target="cmd">/remember</span>
+            <span class="remember-input__rest"
+                  data-typewriter=" Glow &amp; Co's owner prefers WhatsApp over email"
+                  data-typewriter-target="rest"
+                  data-typewriter-delay="500">&nbsp;Glow &amp; Co's owner prefers WhatsApp over email</span>
+            <span class="remember-input__cursor"></span>
+          </div>
+          <div class="remember-confirm" data-typewriter-confirm>
+            <i class="ti ti-check" style="font-size: 12px; font-style: normal;"></i>
+            &nbsp;Got it. I'll favor WhatsApp when drafting outreach for Glow &amp; Co.
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">A slash. A fact. Beacon remembers it the next time you talk about that customer.</p>
+    </div>
+
+    <div class="callouts" data-cascade>
+      <div class="callout">
+        <p class="callout__kicker">Customer-scoped</p>
+        <h4 class="callout__head">Tied to who you're discussing</h4>
+        <p class="callout__body">If you /remember while looking at Glow &amp; Co, it's pinned to Glow &amp; Co. Other customers don't get the noise.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">AM-scoped</p>
+        <h4 class="callout__head">Yours, not your pod's</h4>
+        <p class="callout__body">Your memories are private. The next AM on the account starts clean — or inherits via brief on handoff.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">Editable</p>
+        <h4 class="callout__head">List, prune, override</h4>
+        <p class="callout__body">View what Beacon remembers. Delete what's stale. Add a corrective fact when something changes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 16. Thumbs up / down                                         -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Reinforce or evict</p>
+    <h2 class="headline" data-animate="fade-up">Two taps. Beacon learns.</h2>
+    <p class="subhead" data-animate="fade-up">Thumbs-up keeps doing more of that. Thumbs-down evicts whatever was driving that response.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 560px;">
+      <div class="illus-card">
+        <div class="thumbs-stack">
+          <div class="ai-bubble ai-bubble--assistant" style="max-width: 100%;">
+            That's three "no reach" in a row on Glow &amp; Co — escalation rule kicks in tomorrow. Want me to draft a WhatsApp message since that's her preferred channel?
+          </div>
+          <div class="ai-thumbs" style="margin: 0;">
+            <span class="ai-thumb"><i class="ti ti-thumb-up-filled" style="font-size:11px"></i>&nbsp; Helpful</span>
+            <span class="ai-thumb"><i class="ti ti-thumb-down" style="font-size:11px"></i>&nbsp; Not useful</span>
+          </div>
+          <div class="remember-confirm" style="background: var(--lapis-tint); color: var(--lapis); border-color: rgba(42,77,92,0.22);">
+            <i class="ti ti-check" style="font-size: 12px; font-style: normal;"></i>
+            &nbsp;Noted — I'll adjust.
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">A reinforcement signal. Over a week, Beacon AI shapes itself around your taste.</p>
+    </div>
+
+    <div class="callouts" data-cascade>
+      <div class="callout">
+        <p class="callout__kicker kicker--patina">Thumbs up</p>
+        <h4 class="callout__head">More like this</h4>
+        <p class="callout__body">Beacon AI reinforces the pattern — tone, structure, what it cited, what it offered to do next.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker kicker--ember">Thumbs down</p>
+        <h4 class="callout__head">Evict that pattern</h4>
+        <p class="callout__body">Beacon AI rolls back the move it just made — and avoids the same shape next time.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">Quiet learning</p>
+        <h4 class="callout__head">No re-prompting</h4>
+        <p class="callout__body">You don't have to explain why. The thumb is the signal. Beacon AI does the rest in the background.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 17. Cmd+K (DARK)                                             -->
+<!-- ============================================================ -->
+<section class="section section--dark">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Jump to anything</p>
+    <h2 class="headline" data-animate="fade-up">Cmd + K.<br/>From anywhere.</h2>
+    <p class="subhead" data-animate="fade-up">Type a customer name. Get there in one keystroke — Customer 360, Performance report, Escalation, or Post-Payment review.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 680px;">
+      <div class="illus-card" style="background:#2a2a2c; padding: 36px 28px;">
+        <div class="cmdk">
+          <div class="cmdk-banner">
+            <span><i class="ti ti-git-compare" style="font-size:11px"></i> &nbsp;Compare 2 selected customers <i class="ti ti-arrow-right" style="font-size:11px"></i></span>
+            <span>↵</span>
+          </div>
+          <div class="cmdk-input">
+            <i class="ti ti-search cmdk-input__icon"></i>
+            <span class="cmdk-input__text">skin</span>
+            <span class="cmdk-input__cursor"></span>
+          </div>
+          <div class="cmdk-results" data-cascade>
+            <div class="cmdk-row cmdk-row--active">
+              <div class="cmdk-row__left">
+                <div class="cmdk-row__name">SkinSpa NYC — Midtown</div>
+                <div class="cmdk-row__meta">Sudha · a3f1…d8e2</div>
+              </div>
+              <div class="cmdk-row__right">
+                <span class="cmdk-badge cmdk-badge--lapis">360</span>
+                <span class="cmdk-badge">Perf</span>
+                <span class="cmdk-badge">Esc</span>
+                <span class="cmdk-badge">Post-Pay</span>
+                <span class="cmdk-row__compare">+ Compare</span>
+              </div>
+            </div>
+            <div class="cmdk-row">
+              <div class="cmdk-row__left">
+                <div class="cmdk-row__name">Skin Studio Pasadena</div>
+                <div class="cmdk-row__meta">Hubern · 22b1…ff04</div>
+              </div>
+              <div class="cmdk-row__right">
+                <span class="cmdk-badge cmdk-badge--lapis">360</span>
+                <span class="cmdk-badge">Perf</span>
+                <span class="cmdk-row__compare">+ Compare</span>
+              </div>
+            </div>
+            <div class="cmdk-row">
+              <div class="cmdk-row__left">
+                <div class="cmdk-row__name">SkinHaus Beauty Bar</div>
+                <div class="cmdk-row__meta">Bikash · 8e9a…1c33</div>
+              </div>
+              <div class="cmdk-row__right">
+                <span class="cmdk-badge cmdk-badge--lapis">360</span>
+                <span class="cmdk-badge">Perf</span>
+                <span class="cmdk-row__compare">+ Compare</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption" style="color:#a1a1a6;">A search field. A surface badge. You're there.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 18. Freshness + signal state                                 -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Honest about the data</p>
+    <h2 class="headline" data-animate="fade-up">When something's stale,<br/>you'll know.</h2>
+    <p class="subhead" data-animate="fade-up">Top-of-page banner if a pipeline stage hasn't refreshed in 25 hours. Per-customer "Fresh — signals warming" chip for customers under 48 hours old.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 720px;">
+      <div class="illus-card">
+        <div class="fresh-stack">
+          <div class="fresh-banner">
+            <div class="fresh-banner__left">
+              <i class="ti ti-alert-triangle"></i>
+              <span>Some signals are stale. Stage B (comms) last refreshed 27h ago.</span>
+              <span class="fresh-banner__more">(+1 more)</span>
+            </div>
+            <div class="fresh-banner__btn">Force refresh</div>
+          </div>
+          <div class="v2card" style="max-width: 100%;">
+            <div class="v2card__top">
+              <div class="v2card__left">
+                <span class="v2card__dot v2card__dot--green"></span>
+                <span class="v2card__name">Bloom Beauty Bar</span>
+                <span class="fresh-chip">Fresh — signals warming</span>
+              </div>
+              <div class="v2card__right">
+                <div class="v2card__score v2card__score--green">—</div>
+                <div class="v2card__score-label">Composite</div>
+              </div>
+            </div>
+            <div class="v2card__subline">Atharv · Pod 4 · ID 4f12…99c1 · Joined 3 days ago</div>
+            <div class="v2card__chips">
+              <span class="chip chip--lapis">Onboarding</span>
+              <span class="chip chip--patina">App opens 5</span>
+            </div>
+            <p class="v2card__reason">Too new to score reliably. Beacon will start surfacing real signals around day 14.</p>
+          </div>
+        </div>
+      </div>
+      <p class="illus-caption">Banner for the dashboard. Chip for the card. Both tell you to read the score with care.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 19. Suggested actions                                        -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container">
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">Proactive AI</p>
+    <h2 class="headline" data-animate="fade-up">Beacon AI offers. You decide.</h2>
+    <p class="subhead" data-animate="fade-up">A row of 2–3 suggested actions on every dashboard surface. Ask · Draft · Navigate. Click to launch.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 920px;">
+      <div class="sugg-row" data-cascade>
+        <div class="sugg-card">
+          <div class="sugg-card__head">
+            <div class="sugg-card__icon sugg-card__icon--ask"><i class="ti ti-message-circle-question"></i></div>
+            <div class="sugg-card__lbl">Ask</div>
+          </div>
+          <div class="sugg-card__title">Why are 4 customers red today?</div>
+          <p class="sugg-card__body">Beacon AI explains the dominant signal across your top reds — usually a shared root cause.</p>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__head">
+            <div class="sugg-card__icon sugg-card__icon--draft"><i class="ti ti-pencil"></i></div>
+            <div class="sugg-card__lbl">Draft</div>
+          </div>
+          <div class="sugg-card__title">Draft a check-in for SkinSpa NYC</div>
+          <p class="sugg-card__body">Pulls comms history, notes, and tone preferences. You review, edit, send.</p>
+        </div>
+        <div class="sugg-card">
+          <div class="sugg-card__head">
+            <div class="sugg-card__icon sugg-card__icon--nav"><i class="ti ti-arrow-up-right"></i></div>
+            <div class="sugg-card__lbl">Navigate</div>
+          </div>
+          <div class="sugg-card__title">Open Glow &amp; Co Customer 360</div>
+          <p class="sugg-card__body">Pinned to your shortlist, renewal coming. Beacon AI surfaces it first thing in the morning.</p>
+        </div>
+      </div>
+      <p class="illus-caption">Three cards. Three verbs. Skip them or take them — Beacon learns either way.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 20. Daily 15-minute triage (DARK, FINAL)                     -->
+<!-- ============================================================ -->
+<section class="section section--dark section--final" data-final-section>
+  <div class="container">
+    <div class="final-headline-wrap" style="text-align:center; margin-bottom: 12px;">
+      <svg class="beacon-mark beacon-mark--lg" style="display:inline-block;"><use href="#beacon-mark"/></svg>
+    </div>
+    <p class="kicker" data-animate="fade-up" style="text-align:center;">The rhythm</p>
+    <h2 class="headline headline--lg" data-animate="fade-up" data-final-headline>Fifteen minutes.<br/>Every morning.</h2>
+    <p class="subhead" data-animate="fade-up">Open /customer. Filter to "act today." Take the top three. Log. Done by 9:15.</p>
+
+    <div class="illus-wrap" data-animate="scale-in" style="max-width: 960px; margin-top: 72px;">
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="timeline-step__dot">1</div>
+          <div class="timeline-step__lbl">Open</div>
+          <div class="timeline-step__sub">/customer · 09:00</div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-step">
+          <div class="timeline-step__dot">2</div>
+          <div class="timeline-step__lbl">Filter</div>
+          <div class="timeline-step__sub">Act today · Pinned · Red</div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-step">
+          <div class="timeline-step__dot">3</div>
+          <div class="timeline-step__lbl">Top 3</div>
+          <div class="timeline-step__sub">Read the reasons</div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-step">
+          <div class="timeline-step__dot">4</div>
+          <div class="timeline-step__lbl">Log</div>
+          <div class="timeline-step__sub">Connected · VM · No reach</div>
+        </div>
+        <div class="timeline-line"></div>
+        <div class="timeline-step">
+          <div class="timeline-step__dot">5</div>
+          <div class="timeline-step__lbl">Beacon AI</div>
+          <div class="timeline-step__sub">Drafts the follow-up</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callouts" data-cascade style="margin-top: 80px;">
+      <div class="callout">
+        <p class="callout__kicker">9:00</p>
+        <h4 class="callout__head">Open Beacon</h4>
+        <p class="callout__body">Cmd+K, or just hit the bookmark. Your pod loads with reds at the top.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">9:05</p>
+        <h4 class="callout__head">Decide</h4>
+        <p class="callout__body">Read three reason lines. The chips already told you what's wrong.</p>
+      </div>
+      <div class="callout">
+        <p class="callout__kicker">9:15</p>
+        <h4 class="callout__head">Move on</h4>
+        <p class="callout__body">Three logs filed. Beacon AI carries the rest into your calendar.</p>
+      </div>
+    </div>
+
+    <p class="footer-mini" style="display:flex;align-items:center;gap:8px;justify-content:center;">
+      <svg class="beacon-mark" style="width:9px;height:24px;"><use href="#beacon-mark"/></svg>
+      <span>Built for Zoca · v2026.05</span>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================================================ -->
+<!-- Back-to-top button                                           -->
+<!-- ============================================================ -->
+<button id="back-to-top" class="back-to-top" aria-label="Back to top" type="button">
+  <i class="ti ti-arrow-up" aria-hidden="true"></i>
+</button>
+
+<!-- ============================================================ -->
+<!-- Motion script — IntersectionObserver, parallax, nav, counters -->
+<!-- ============================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  var prefersReduced = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ----- Page fade-in -----
+  requestAnimationFrame(function () {
+    document.body.classList.remove('page-loading');
+  });
+
+  // ----- Hero entrance choreography -----
+  function runHeroEntrance() {
+    if (prefersReduced) {
+      document.querySelectorAll('.hero-load, [data-hero-flame]').forEach(function (el) {
+        el.classList.add('in', 'in-view');
+      });
+      return;
+    }
+    var delays = { '1': 0, '2': 200, '3': 400, '4': 600, '5': 800 };
+    document.querySelectorAll('.hero-load').forEach(function (el) {
+      var step = el.getAttribute('data-hero-step') || '1';
+      setTimeout(function () { el.classList.add('in'); }, delays[step] || 0);
+    });
+    var flame = document.querySelector('[data-hero-flame]');
+    if (flame) {
+      setTimeout(function () { flame.classList.add('in-view'); }, 50);
+    }
+  }
+  runHeroEntrance();
+
+  // ----- IntersectionObserver: fade-up + cascade + scale-in -----
+  if (!prefersReduced && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        el.classList.add('in-view');
+
+        // Sequential kicker/headline/subhead delay (when grouped in one container)
+        if (el.matches('[data-animate]')) {
+          var parent = el.parentElement;
+          if (parent) {
+            var siblings = parent.querySelectorAll('[data-animate]');
+            siblings.forEach(function (sib, i) {
+              if (sib === el) {
+                // already in-view
+              }
+            });
+          }
+        }
+
+        // Cascade stagger
+        if (el.hasAttribute('data-cascade')) {
+          var children = el.children;
+          for (var i = 0; i < children.length; i++) {
+            (function (c, idx) {
+              c.style.transitionDelay = (idx * 80) + 'ms';
+            })(children[i], i);
+          }
+        }
+
+        // Stop observing — Apple doesn't re-trigger
+        io.unobserve(el);
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
+
+    document.querySelectorAll('[data-animate]').forEach(function (el) {
+      io.observe(el);
+    });
+    document.querySelectorAll('[data-cascade]').forEach(function (el) {
+      io.observe(el);
+    });
+  } else {
+    // Reduced motion: reveal everything immediately
+    document.querySelectorAll('[data-animate], [data-cascade]').forEach(function (el) {
+      el.classList.add('in-view');
+    });
+  }
+
+  // ----- Number counter animation -----
+  var counterIO = (!prefersReduced && 'IntersectionObserver' in window)
+    ? new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var el = entry.target;
+          var target = parseInt(el.getAttribute('data-count-to'), 10);
+          if (isNaN(target)) return;
+          var start = performance.now();
+          var dur = 1200;
+          function step(now) {
+            var t = Math.min(1, (now - start) / dur);
+            var eased = 1 - Math.pow(1 - t, 3);
+            el.textContent = Math.round(eased * target).toString();
+            if (t < 1) requestAnimationFrame(step);
+            else el.textContent = target.toString();
+          }
+          requestAnimationFrame(step);
+          counterIO.unobserve(el);
+        });
+      }, { rootMargin: '0px 0px -20% 0px', threshold: 0.3 })
+    : null;
+  document.querySelectorAll('[data-count-to]').forEach(function (el) {
+    if (counterIO) counterIO.observe(el);
+    else el.textContent = el.getAttribute('data-count-to');
+  });
+
+  // ----- Sticky nav show/hide on scroll -----
+  var nav = document.getElementById('topnav');
+  var lastScroll = 0;
+  var ticking = false;
+  function onNavScroll() {
+    var y = window.pageYOffset || document.documentElement.scrollTop;
+    if (nav) {
+      if (y > 80 && y > lastScroll) {
+        nav.classList.add('topnav--hidden');
+      } else {
+        nav.classList.remove('topnav--hidden');
+      }
+    }
+    lastScroll = y;
+    ticking = false;
+  }
+  window.addEventListener('scroll', function () {
+    if (!ticking) {
+      requestAnimationFrame(onNavScroll);
+      ticking = true;
+    }
+  }, { passive: true });
+
+  // ----- Parallax on hero -----
+  if (!prefersReduced) {
+    var heroContainer = document.querySelector('.hero-parallax-container');
+    var parallaxTicking = false;
+    function onParallaxScroll() {
+      var y = window.pageYOffset || document.documentElement.scrollTop;
+      if (heroContainer && y < 800) {
+        heroContainer.style.transform = 'translate3d(0,' + (y * 0.3) + 'px, 0)';
+      }
+      parallaxTicking = false;
+    }
+    window.addEventListener('scroll', function () {
+      if (!parallaxTicking) {
+        requestAnimationFrame(onParallaxScroll);
+        parallaxTicking = true;
+      }
+    }, { passive: true });
+  }
+
+  // ----- Magnetic CTAs -----
+  if (!prefersReduced) {
+    document.querySelectorAll('.magnetic').forEach(function (link) {
+      link.addEventListener('mousemove', function (e) {
+        var r = link.getBoundingClientRect();
+        var x = e.clientX - r.left - r.width / 2;
+        var y = e.clientY - r.top - r.height / 2;
+        link.style.transform = 'translate(' + (x * 0.15) + 'px,' + (y * 0.15) + 'px)';
+      });
+      link.addEventListener('mouseleave', function () {
+        link.style.transform = '';
+      });
+    });
+  }
+
+  // ----- Anim #1: Scroll progress bar -----
+  var progBar = document.getElementById('scroll-progress');
+  if (progBar) {
+    var progTicking = false;
+    function onProgScroll() {
+      var h = document.documentElement;
+      var max = (h.scrollHeight - h.clientHeight) || 1;
+      var pct = Math.min(100, Math.max(0, (h.scrollTop / max) * 100));
+      progBar.style.width = pct + '%';
+      progTicking = false;
+    }
+    window.addEventListener('scroll', function () {
+      if (!progTicking) { requestAnimationFrame(onProgScroll); progTicking = true; }
+    }, { passive: true });
+    onProgScroll();
+  }
+
+  // ----- Anim #2: Word-by-word hero reveal -----
+  if (!prefersReduced) {
+    var wrEls = document.querySelectorAll('[data-word-reveal]');
+    wrEls.forEach(function (el) {
+      var raw = el.textContent.trim();
+      var parts = raw.split(/(\s+)/);
+      el.textContent = '';
+      var wordIdx = 0;
+      parts.forEach(function (p) {
+        if (/^\s+$/.test(p)) {
+          el.appendChild(document.createTextNode(p));
+        } else {
+          var s = document.createElement('span');
+          s.textContent = p;
+          s.style.transitionDelay = (wordIdx * 80) + 'ms';
+          el.appendChild(s);
+          wordIdx++;
+        }
+      });
+    });
+    // trigger reveal after hero entrance
+    setTimeout(function () {
+      wrEls.forEach(function (el) {
+        el.querySelectorAll('span').forEach(function (s) { s.classList.add('in'); });
+      });
+    }, 300);
+  } else {
+    document.querySelectorAll('[data-word-reveal]').forEach(function (el) {
+      el.querySelectorAll('span').forEach(function (s) { s.classList.add('in'); });
+    });
+  }
+
+  // ----- Anim #4: Magnetic hover on illustration cards (subtle 4%) -----
+  if (!prefersReduced && window.matchMedia('(pointer: fine)').matches) {
+    var magCards = document.querySelectorAll('.illus-wrap, .v2card, .mini-card, .lifecycle-pill, .sugg-card, .callout, .illus-card');
+    magCards.forEach(function (card) {
+      var resetTO = null;
+      card.addEventListener('mousemove', function (e) {
+        var r = card.getBoundingClientRect();
+        var x = e.clientX - r.left - r.width / 2;
+        var y = e.clientY - r.top - r.height / 2;
+        card.style.transition = 'transform 80ms linear, box-shadow 200ms var(--ease-apple)';
+        card.style.transform = 'translate3d(' + (x * 0.04).toFixed(2) + 'px,' + (y * 0.04).toFixed(2) + 'px,0)';
+      });
+      card.addEventListener('mouseleave', function () {
+        card.style.transition = 'transform 200ms var(--ease-apple), box-shadow 200ms var(--ease-apple)';
+        card.style.transform = '';
+      });
+    });
+  }
+
+  // ----- Anim #5: Dark section cross-fade flag -----
+  if (!prefersReduced && 'IntersectionObserver' in window) {
+    var darkIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) entry.target.classList.add('dark-in');
+        else entry.target.classList.remove('dark-in');
+      });
+    }, { rootMargin: '0px 0px -20% 0px', threshold: 0.1 });
+    document.querySelectorAll('.section--dark').forEach(function (s) { darkIO.observe(s); });
+  }
+
+  // ----- AI chat reveal (assistant bubble 600ms after section enters) -----
+  if (!prefersReduced && 'IntersectionObserver' in window) {
+    var aiIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var chat = entry.target;
+        var bubbles = chat.querySelectorAll('[data-ai-bubble]');
+        bubbles.forEach(function (b) {
+          b.style.opacity = '0';
+          b.style.transform = 'translateY(10px)';
+          b.style.transition = 'opacity 500ms var(--ease-apple), transform 500ms var(--ease-apple)';
+        });
+        var schedule = { onboarding: 0, user: 200, assistant: 800, thumbs: 1300 };
+        bubbles.forEach(function (b) {
+          var kind = b.getAttribute('data-ai-bubble');
+          var d = schedule[kind] || 0;
+          setTimeout(function () {
+            b.style.opacity = '1';
+            b.style.transform = 'none';
+          }, d);
+        });
+        aiIO.unobserve(chat);
+      });
+    }, { rootMargin: '0px 0px -15% 0px', threshold: 0.2 });
+    document.querySelectorAll('[data-ai-chat]').forEach(function (c) { aiIO.observe(c); });
+  }
+
+  // ----- /remember typewriter -----
+  if (!prefersReduced && 'IntersectionObserver' in window) {
+    var twIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var nodes = Array.prototype.slice.call(
+          entry.target.querySelectorAll('[data-typewriter]')
+        );
+        if (!nodes.length) { twIO.unobserve(entry.target); return; }
+        var confirmEl = entry.target.querySelector('[data-typewriter-confirm]');
+        if (confirmEl) {
+          confirmEl.style.opacity = '0';
+          confirmEl.style.transform = 'translateY(6px)';
+          confirmEl.style.transition = 'opacity 400ms var(--ease-apple), transform 400ms var(--ease-apple)';
+        }
+        var totalDelay = 0;
+        nodes.forEach(function (node) {
+          var fullHTML = node.innerHTML;
+          var fullText = node.textContent;
+          var startDelay = parseInt(node.getAttribute('data-typewriter-delay') || '0', 10);
+          var dur = Math.max(400, Math.min(1200, fullText.length * 35));
+          node.textContent = '';
+          setTimeout(function () {
+            var startedAt = performance.now();
+            function step(now) {
+              var t = Math.min(1, (now - startedAt) / dur);
+              var n = Math.round(t * fullText.length);
+              node.textContent = fullText.slice(0, n);
+              if (t < 1) requestAnimationFrame(step);
+              else node.innerHTML = fullHTML;
+            }
+            requestAnimationFrame(step);
+          }, totalDelay + startDelay);
+          totalDelay += dur + startDelay;
+        });
+        if (confirmEl) {
+          setTimeout(function () {
+            confirmEl.style.opacity = '1';
+            confirmEl.style.transform = 'none';
+          }, totalDelay + 300);
+        }
+        twIO.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -15% 0px', threshold: 0.3 });
+    document.querySelectorAll('.remember-mock').forEach(function (m) { twIO.observe(m); });
+  }
+
+  // ----- Final headline gentle scale -----
+  if (!prefersReduced) {
+    var finalSection = document.querySelector('[data-final-section]');
+    var finalHead = document.querySelector('[data-final-headline]');
+    if (finalSection && finalHead) {
+      var finalTicking = false;
+      function onFinalScroll() {
+        var rect = finalSection.getBoundingClientRect();
+        var vh = window.innerHeight;
+        if (rect.top < vh && rect.bottom > 0) {
+          var p = 1 - (rect.bottom / (vh + rect.height));
+          var s = 1.0 + Math.max(0, Math.min(0.05, p * 0.05));
+          finalHead.style.transform = 'scale(' + s + ')';
+          finalHead.style.transformOrigin = 'center';
+        }
+        finalTicking = false;
+      }
+      window.addEventListener('scroll', function () {
+        if (!finalTicking) {
+          requestAnimationFrame(onFinalScroll);
+          finalTicking = true;
+        }
+      }, { passive: true });
+    }
+  }
+
+  // ----- Back to top -----
+  var btt = document.getElementById('back-to-top');
+  if (btt) {
+    var bttTicking = false;
+    function onBttScroll() {
+      var y = window.pageYOffset || document.documentElement.scrollTop;
+      if (y > 1000) btt.classList.add('visible');
+      else btt.classList.remove('visible');
+      bttTicking = false;
+    }
+    window.addEventListener('scroll', function () {
+      if (!bttTicking) {
+        requestAnimationFrame(onBttScroll);
+        bttTicking = true;
+      }
+    }, { passive: true });
+    btt.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: prefersReduced ? 'auto' : 'smooth' });
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
