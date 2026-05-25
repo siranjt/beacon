@@ -28,6 +28,7 @@ import { BookHealthDonut } from "./charts/BookHealthDonut";
 import { SignalMixPie } from "./charts/SignalMixPie";
 import { RedTrendLine } from "./charts/RedTrendLine";
 import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
+import SectionErrorBoundary from "@/components/SectionErrorBoundary";
 import {
   SIGNAL_LABELS,
   isSignalKey,
@@ -603,18 +604,29 @@ function V2DashboardInner() {
         setView={setView}
       />
       {ready && <FreshnessBanner generatedAt={ready.generatedAt} />}
-      <V2Hero
-        amName={selectedAm}
-        redCount={redCountForAm}
-        customerCount={totalScopeCount}
-      />
-      <V2RefreshBar
-        showing={amCustomers.length}
-        total={totalScopeCount}
-        generatedAt={ready?.generatedAt}
-        amName={selectedAm}
-        pod={selectedPod}
-      />
+      {/* Phase E-9 — wrap each major section in a SectionErrorBoundary so
+          a single component's render failure doesn't blank the entire
+          dashboard. Each boundary has a retry button + telemetry. The
+          V2Header above is intentionally outside — if it breaks, the user
+          needs to navigate out of the page entirely, which they can't do
+          if the header is gone. */}
+      <SectionErrorBoundary label="Hero">
+        <V2Hero
+          amName={selectedAm}
+          redCount={redCountForAm}
+          customerCount={totalScopeCount}
+        />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary label="Refresh bar">
+        <V2RefreshBar
+          showing={amCustomers.length}
+          total={totalScopeCount}
+          generatedAt={ready?.generatedAt}
+          amName={selectedAm}
+          pod={selectedPod}
+        />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary label="KPI tiles">
       <V2KpiTiles
         tiles={[
           {
@@ -659,6 +671,7 @@ function V2DashboardInner() {
           },
         ]}
       />
+      </SectionErrorBoundary>
 
       <main className="mx-auto max-w-[920px] px-4 pb-24 pt-4 md:px-6">
         {showUnmappedAmState && <V2UnmappedAmState />}
@@ -688,63 +701,71 @@ function V2DashboardInner() {
               into /v2 with filter/signal URL params so the existing chip /
               filter-pill machinery picks up the navigation.
             */}
-            <section style={{ padding: "0 0 16px" }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "10px",
-                  marginBottom: "10px",
-                }}
-              >
-                <BookHealthDonut
-                  criticalCount={criticalForAm}
-                  atRiskCount={atRiskForAm}
-                  monitorCount={monitorForAm}
-                  healthyCount={healthyForAm}
-                  amName={selectedAm}
-                />
-                <SignalMixPie customers={amCustomers} amName={selectedAm} />
-              </div>
-              <RedTrendLine currentRed={redCountForAm} amName={selectedAm} />
-            </section>
-          <V2AMTriage
-            amName={selectedAm}
-            pod={selectedPod}
-            customers={amCustomers}
-            generatedAt={snapshot.snapshot.generatedAt}
-            pinnedSet={pinnedSet}
-            onTogglePinned={handleTogglePinned}
-            snoozedSet={snoozedSet}
-            onSnooze={handleSnooze}
-            onUnsnooze={handleUnsnooze}
-            signal={signal}
-            onSignalChange={setSignal}
-            onSignalChipClick={handleSignalChipClick}
-            podFilter={podFilter}
-            onPodFilterChange={setPodFilter}
-          />
+            <SectionErrorBoundary label="Chart row">
+              <section style={{ padding: "0 0 16px" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "10px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <BookHealthDonut
+                    criticalCount={criticalForAm}
+                    atRiskCount={atRiskForAm}
+                    monitorCount={monitorForAm}
+                    healthyCount={healthyForAm}
+                    amName={selectedAm}
+                  />
+                  <SignalMixPie customers={amCustomers} amName={selectedAm} />
+                </div>
+                <RedTrendLine currentRed={redCountForAm} amName={selectedAm} />
+              </section>
+            </SectionErrorBoundary>
+            <SectionErrorBoundary label="Customer feed">
+              <V2AMTriage
+                amName={selectedAm}
+                pod={selectedPod}
+                customers={amCustomers}
+                generatedAt={snapshot.snapshot.generatedAt}
+                pinnedSet={pinnedSet}
+                onTogglePinned={handleTogglePinned}
+                snoozedSet={snoozedSet}
+                onSnooze={handleSnooze}
+                onUnsnooze={handleUnsnooze}
+                signal={signal}
+                onSignalChange={setSignal}
+                onSignalChipClick={handleSignalChipClick}
+                podFilter={podFilter}
+                onPodFilterChange={setPodFilter}
+              />
+            </SectionErrorBoundary>
           </>
         )}
         {!showUnmappedAmState && snapshot.status === "ready" && view === "pod" && (
-          <V2Rollup
-            snapshot={snapshot.snapshot}
-            initialPod={selectedPod || "All"}
-            onJumpToAm={(am) => {
-              handleSelectAm(am);
-              setView("am");
-            }}
-          />
+          <SectionErrorBoundary label="Pod rollup">
+            <V2Rollup
+              snapshot={snapshot.snapshot}
+              initialPod={selectedPod || "All"}
+              onJumpToAm={(am) => {
+                handleSelectAm(am);
+                setView("am");
+              }}
+            />
+          </SectionErrorBoundary>
         )}
         {!showUnmappedAmState && snapshot.status === "ready" && view === "leadership" && (
-          <V2Rollup
-            snapshot={snapshot.snapshot}
-            initialPod="All"
-            onJumpToAm={(am) => {
-              handleSelectAm(am);
-              setView("am");
-            }}
-          />
+          <SectionErrorBoundary label="Leadership rollup">
+            <V2Rollup
+              snapshot={snapshot.snapshot}
+              initialPod="All"
+              onJumpToAm={(am) => {
+                handleSelectAm(am);
+                setView("am");
+              }}
+            />
+          </SectionErrorBoundary>
         )}
       </main>
 
