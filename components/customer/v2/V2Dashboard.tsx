@@ -30,6 +30,8 @@ import { RedTrendLine } from "./charts/RedTrendLine";
 import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 import SectionErrorBoundary from "@/components/SectionErrorBoundary";
 import SuggestedActions from "@/components/ai/SuggestedActions";
+// Phase E-14 — multi-customer compare floating bar (manager/admin only).
+import V2CompareBar from "./V2CompareBar";
 import {
   SIGNAL_LABELS,
   isSignalKey,
@@ -752,6 +754,8 @@ function V2DashboardInner() {
                 onSignalChipClick={handleSignalChipClick}
                 podFilter={podFilter}
                 onPodFilterChange={setPodFilter}
+                // Phase E-14 — compare checkboxes for manager/admin viewers only.
+                canCompare={canSwitchAm}
               />
             </SectionErrorBoundary>
           </>
@@ -790,6 +794,14 @@ function V2DashboardInner() {
           </p>
         </div>
       </footer>
+
+      {/* Phase E-14 — floating compare bar. Reads from the global selection
+          store; renders only for manager/admin viewers and only when ≥1
+          customer is selected. The component handles its own nothing-to-show
+          state, so we always mount it. */}
+      {ready && (
+        <V2CompareBar enabled={canSwitchAm} customers={ready.customers} />
+      )}
     </div>
   );
 }

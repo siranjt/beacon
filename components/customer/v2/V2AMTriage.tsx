@@ -52,6 +52,8 @@ type Props = {
   filterFromUrl?: FilterKey | null;
   /** Phase 24 — controlled sort from URL (?sort=) — used by MRR @ risk drill. */
   sortFromUrl?: SortKey | null;
+  /** Phase E-14 — true → render compare-selection checkboxes on each card. */
+  canCompare?: boolean;
 };
 
 // Phase 32.1 — added "watch" (YELLOW) + "healthy" (GREEN) so primary filter
@@ -79,7 +81,7 @@ const COACHING_METRIC_LABEL: Record<CoachingMetric, string> = {
   snooze_ignored: "Snooze ignored",
 };
 
-export default function V2AMTriage({ amName, pod, customers, generatedAt, pinnedSet, onTogglePinned, snoozedSet, onSnooze, onUnsnooze, signal, onSignalChange, onSignalChipClick, podFilter, onPodFilterChange, filterFromUrl, sortFromUrl }: Props) {
+export default function V2AMTriage({ amName, pod, customers, generatedAt, pinnedSet, onTogglePinned, snoozedSet, onSnooze, onUnsnooze, signal, onSignalChange, onSignalChipClick, podFilter, onPodFilterChange, filterFromUrl, sortFromUrl, canCompare }: Props) {
   const [filter, setFilter] = useState<FilterKey>("act");
   const [sort, setSort] = useState<SortKey>("urgency");
   const [query, setQuery] = useState<string>("");
@@ -1087,6 +1089,7 @@ export default function V2AMTriage({ amName, pod, customers, generatedAt, pinned
                   }
                   onUnsnooze={onUnsnooze ? () => onUnsnooze(c.entity_id) : undefined}
                   onSignalChipClick={onSignalChipClick}
+                  canCompare={canCompare}
                 />
               </div>
             );

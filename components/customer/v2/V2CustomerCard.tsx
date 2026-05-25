@@ -19,6 +19,10 @@ import { useMagnetic } from "@/lib/customer/hooks/useMagnetic";
 
 import { useActivityLogger } from "@/lib/customer/hooks/use-activity-logger";
 import { normalizeHealthTier, HEALTH_TIER_COLORS, HEALTH_TIER_LABELS } from "@/lib/customer/config";
+// Phase E-14 — multi-customer comparison selection. The checkbox only renders
+// for manager/admin viewers (controlled by the `canCompare` prop passed in
+// from V2Dashboard) and toggles entries in the global compare-selection store.
+import { useCompareSelection } from "@/lib/customer/hooks/use-compare-selection";
 type CompositeTrendPoint = { date: string; composite: number };
 
 type Props = {
@@ -38,6 +42,12 @@ type Props = {
   index?: number;
   /** Phase 22.B.1 — chip click handler for signal-based filtering. */
   onSignalChipClick?: (key: SignalKey) => void;
+  /**
+   * Phase E-14 — when true, render a compare-selection checkbox in the
+   * card's top corner. False (default) hides it entirely. Threaded from
+   * V2Dashboard based on `role !== 'am'` so AMs never see the affordance.
+   */
+  canCompare?: boolean;
 };
 
 const STOPLIGHT_TITLE: Record<Stoplight, string> = {
@@ -55,9 +65,13 @@ const ENGAGEMENT_COLOR: Record<EngagementTier, string> = {
 const ENGAGEMENT_FALLBACK = "text-zoca-text-2";
 
 function V2CustomerCardInner({
- customer, trend, recentlyContacted, isPinned, onTogglePinned, amName, isSnoozed, snoozedUntil, onSnooze, onUnsnooze, index, onSignalChipClick }: Props) {
+ customer, trend, recentlyContacted, isPinned, onTogglePinned, amName, isSnoozed, snoozedUntil, onSnooze, onUnsnooze, index, onSignalChipClick, canCompare }: Props) {
   // Phase 33.B.8 — usage tracking
   const logEvent = useActivityLogger();
+  // Phase E-14 — compare-selection wiring (lifts to no-op when canCompare is false).
+  const compare = useCompareSelection();
+  const compareChecked = canCompare ? compare.has(customer.entity_id) : false;
+  const compareDisabled = canCompare ? !compareChecked && compare.isFull : true;
   const primaryCtaRef = useMagnetic<HTMLButtonElement>({ strength: 0.18, radius: 80 });
   // Phase 18.B — selected AM from parent, fall back to the card's own AM if not passed.
   const notesAmName = amName ?? customer.am_name;
@@ -878,6 +892,33 @@ function V2CustomerCardInner({
 
         {/* Right side: action button (state machine) */}
         <div className="flex flex-col items-end gap-1.5">
+          {/* Phase E-14 — multi-customer compare checkbox.
+              Only rendered for manager/admin viewers (canCompare === true).
+              When the global compare-selection store is at the 3-customer cap,
+              unchecked checkboxes go disabled with an explanatory title. */}
+          {canCompare && (
+            <label
+              className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-zoca-text-2 select-none cursor-pointer"
+              title={
+                compareDisabled
+                  ? `At the cap (${compare.max}). Uncheck another customer first.`
+                  : compareChecked
+                    ? "Remove from comparison"
+                    : "Add to comparison"
+              }
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={compareChecked}
+                disabled={compareDisabled}
+                onChange={() => compare.toggle(customer.entity_id)}
+                className="h-3.5 w-3.5 accent-[#2A4D5C] cursor-pointer disabled:cursor-not-allowed"
+                aria-label={`Select ${customer.company || customer.entity_id} for comparison`}
+              />
+              <span style={{ opacity: compareDisabled ? 0.5 : 1 }}>Compare</span>
+            </label>
+          )}
           {onTogglePinned && (
             <PinButton isPinned={!!isPinned} onToggle={onTogglePinned} popping={popping} />
           )}

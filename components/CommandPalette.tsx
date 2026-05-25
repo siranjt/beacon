@@ -38,6 +38,10 @@ import {
   type ScoredMatch,
 } from "@/lib/command-palette/search";
 import { useActivityLogger } from "@/components/hooks/use-activity-logger";
+// Phase E-14 — multi-customer compare integration. The palette can both
+// assemble a selection (+ Compare button on each row) and trigger the
+// /compare navigation once 2+ are selected (sticky banner at the top).
+import { useCompareSelection } from "@/lib/customer/hooks/use-compare-selection";
 
 const STORAGE_RECENTS = "beacon_palette_recents_v1";
 const MAX_RECENTS = 5;
@@ -164,6 +168,10 @@ interface Props {
 
 export default function CommandPalette({ open, onClose }: Props) {
   const router = useRouter();
+  // Phase E-14 — wire the global compare-selection store. We're inside the
+  // palette, which any role can open, but the /compare destination itself
+  // gates by manager/admin role; non-eligible viewers will get redirected.
+  const compare = useCompareSelection();
   const inputRef = useRef<HTMLInputElement>(null);
   const log = useActivityLogger("umbrella");
 
@@ -357,6 +365,49 @@ export default function CommandPalette({ open, onClose }: Props) {
           </kbd>
         </div>
 
+        {/* Phase E-14 — "Compare N selected" prompt at the top of the
+            palette whenever the user has 2+ customers in the compare store.
+            Provides a keyboard-accessible launch point for the comparison
+            view without forcing the user back to the dashboard. */}
+        {compare.count >= 2 && (
+          <button
+            type="button"
+            onClick={() => {
+              const q = encodeURIComponent(compare.selected.join(","));
+              log("command_palette_compare", {
+                surface: "launcher",
+                metadata: { count: compare.count },
+              });
+              onClose();
+              router.push(`/compare?entities=${q}`);
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              width: "100%",
+              padding: "10px 16px",
+              background: "rgba(42, 77, 92, 0.10)",
+              border: "none",
+              borderBottom: "1px solid #D4C29B",
+              cursor: "pointer",
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: 13,
+              color: "#2A4D5C",
+              fontWeight: 600,
+              textAlign: "left",
+            }}
+          >
+            <span>
+              Compare {compare.count} selected customer
+              {compare.count === 1 ? "" : "s"} →
+            </span>
+            <span style={{ fontSize: 10, opacity: 0.7 }}>
+              {compare.count} / {compare.max}
+            </span>
+          </button>
+        )}
+
         {/* Results / states */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {error && (
@@ -449,7 +500,48 @@ export default function CommandPalette({ open, onClose }: Props) {
 
                       {/* Per-agent quick-jump buttons. Click stops propagation
                           so the row's default-to-Customer onClick doesn't fire. */}
-                      <div style={{ display: "flex", gap: 4 }}>
+                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                        {/* Phase E-14 — compare-toggle button. Adds the customer
+                            to the global compare selection (or removes it if
+                            already present). Doesn't navigate — lets the user
+                            assemble a selection by clicking through results. */}
+                        {(() => {
+                          const checked = compare.has(row.customer.entity_id);
+                          const disabled = !checked && compare.isFull;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (disabled) return;
+                                compare.toggle(row.customer.entity_id);
+                              }}
+                              title={
+                                disabled
+                                  ? `At cap (${compare.max}). Uncheck another customer first.`
+                                  : checked
+                                    ? "Remove from comparison"
+                                    : "Add to comparison"
+                              }
+                              disabled={disabled}
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                letterSpacing: "0.04em",
+                                padding: "4px 8px",
+                                borderRadius: 6,
+                                border: `1px solid ${checked ? "#2A4D5C" : "#2A4D5C40"}`,
+                                background: checked ? "rgba(42, 77, 92, 0.16)" : "transparent",
+                                color: "#2A4D5C",
+                                cursor: disabled ? "not-allowed" : "pointer",
+                                opacity: disabled ? 0.4 : 1,
+                                fontFamily: "inherit",
+                              }}
+                            >
+                              {checked ? "✓ Compare" : "+ Compare"}
+                            </button>
+                          );
+                        })()}
                         {(["360", "customer", "performance", "escalation", "post-payment"] as AgentRoute[]).map(
                           (agent) => (
                             <button
