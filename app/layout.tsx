@@ -3,6 +3,7 @@ import SessionProvider from "@/components/SessionProvider";
 import FaviconFlicker from "@/components/FaviconFlicker";
 import CommandPaletteProvider from "@/components/CommandPaletteProvider";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
+import AskPanel from "@/components/ai/AskPanel";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,11 +46,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SessionProvider>
           {children}
           {/* Phase E-9 — Cmd+K cross-agent command palette + global
-              keyboard shortcuts (?, g-prefix nav). Both mounted inside
-              SessionProvider so any future shortcut that calls the
-              activity logger has session context. */}
+              keyboard shortcuts (?, g-prefix nav) + universal Claude
+              copilot. All three mounted inside SessionProvider so they
+              have session context. AskPanel derives scope from
+              usePathname() so it shows up on every agent surface with
+              the right context (inbox / customer-360 / book / etc.) and
+              hides on /auth + /admin. */}
           <CommandPaletteProvider />
           <KeyboardShortcuts />
+          <AskPanel />
         </SessionProvider>
       </body>
     </html>

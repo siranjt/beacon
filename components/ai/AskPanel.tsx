@@ -1,23 +1,38 @@
 "use client";
 
 /**
- * AskPanel — floating Claude-powered copilot sidebar for Customer 360.
- * Phase E-9.
+ * AskPanel — universal Claude-powered copilot. Phase E-9.
+ *
+ * Mounted once at the umbrella root layout. Detects scope from
+ * usePathname() and adapts:
+ *   - Quick-prompt chips change per scope
+ *   - Endpoint /api/ai/ask receives the resolved scope + question
+ *   - localStorage key is per-scope so each surface keeps its own history
+ *   - Header subtitle says "About this customer" / "About the inbox" / etc.
  *
  * UX:
- *   - Floating "Ask Claude" button bottom-right of /360/{entity_id}
- *   - Click to open a slide-in drawer from the right edge
- *   - 4 quick-action prompts + custom textarea
- *   - Streaming response rendering (SSE → token-by-token)
- *   - Conversation persists in localStorage per entity (last 10 turns)
- *   - Esc closes, ⌘+Enter submits
- *
- * The streaming response uses the Fetch API + ReadableStream rather than
- * an EventSource because EventSource doesn't support custom headers and
- * we want POST semantics (so the question lives in the body, not the URL).
+ *   - Floating "✨ Ask Claude" button bottom-right (hidden when scope is
+ *     "hidden" — auth pages, admin pages)
+ *   - Click to open right-edge drawer
+ *   - Esc / backdrop click to close
+ *   - ⌘+Enter to send
+ *   - Conversation persists in localStorage scoped to the current view
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { usePathname } from "next/navigation";
+import {
+  pathToScope,
+  scopeKey,
+  scopeLabel,
+  scopeQuickPrompts,
+  type AiScope,
+} from "@/lib/ai/scopes";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -36,49 +51,21 @@ const C = {
   char: "#2B1F14",
 };
 
-const QUICK_PROMPTS: Array<{ label: string; prompt: string }> = [
-  {
-    label: "Why is this customer at this score?",
-    prompt:
-      "Looking at this customer's signals, what's the single biggest reason their composite score is where it is? Cite specific numbers from the data.",
-  },
-  {
-    label: "Summarize the last 30 days",
-    prompt:
-      "Give me a 4-bullet summary of what's happened with this customer in the last 30 days — comms, signals, billing, tickets. End with what I should pay attention to.",
-  },
-  {
-    label: "Draft an outreach email",
-    prompt:
-      "Draft a short, warm-but-direct outreach email I can send this customer's owner today. Use the AM's signature voice. Reference one specific thing from their data so it doesn't feel templated.",
-  },
-  {
-    label: "What should I prioritize?",
-    prompt:
-      "What are the top 3 things I should do for this customer this week, in priority order? Be specific and actionable.",
-  },
-];
-
 interface Turn {
   role: "user" | "assistant";
   content: string;
 }
 
-interface Props {
-  entityId: string;
-  bizName: string;
-}
-
 const MAX_HISTORY_TURNS = 5;
 
-function storageKey(entityId: string): string {
-  return `beacon_ask_history_${entityId}`;
+function storageKeyFor(scope: AiScope): string {
+  return `beacon_ai_history_${scopeKey(scope)}`;
 }
 
-function readHistory(entityId: string): Turn[] {
+function readHistory(scope: AiScope): Turn[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(storageKey(entityId));
+    const raw = window.localStorage.getItem(storageKeyFor(scope));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Turn[];
     if (!Array.isArray(parsed)) return [];
@@ -88,11 +75,11 @@ function readHistory(entityId: string): Turn[] {
   }
 }
 
-function writeHistory(entityId: string, turns: Turn[]): void {
+function writeHistory(scope: AiScope, turns: Turn[]): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
-      storageKey(entityId),
+      storageKeyFor(scope),
       JSON.stringify(turns.slice(-MAX_HISTORY_TURNS * 2)),
     );
   } catch {
@@ -100,7 +87,10 @@ function writeHistory(entityId: string, turns: Turn[]): void {
   }
 }
 
-export default function AskPanel({ entityId, bizName }: Props) {
+export default function AskPanel() {
+  const pathname = usePathname() ?? "/";
+  const scope: AiScope = pathToScope(pathname);
+
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
@@ -111,24 +101,30 @@ export default function AskPanel({ entityId, bizName }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Hydrate history on mount + on entity change.
+  // Hydrate history when the SCOPE changes (different URL = different
+  // conversation context). Closing the panel is preserved across scope
+  // changes — opening it again hydrates whichever conversation matches
+  // the current scope.
   useEffect(() => {
-    setTurns(readHistory(entityId));
-  }, [entityId]);
+    setTurns(readHistory(scope));
+    // Don't reset `open` here — the user explicitly opened it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey(scope)]);
 
-  // Persist history whenever it changes.
+  // Persist on every turn change.
   useEffect(() => {
-    writeHistory(entityId, turns);
-  }, [entityId, turns]);
+    writeHistory(scope, turns);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turns, scopeKey(scope)]);
 
-  // Scroll transcript to bottom when streaming or new turn lands.
+  // Auto-scroll transcript on update.
   useEffect(() => {
     const el = transcriptRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [turns, streaming]);
 
-  // Esc closes; focus the textarea on open.
+  // Esc closes drawer (unless streaming, to avoid losing partial reply).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -151,89 +147,71 @@ export default function AskPanel({ entityId, bizName }: Props) {
 
       const history = turns.slice(-MAX_HISTORY_TURNS * 2);
       const userTurn: Turn = { role: "user", content: trimmed };
-
-      // Optimistic append of user turn + an empty assistant placeholder we'll
-      // stream into.
-      setTurns((prev) => [...prev, userTurn, { role: "assistant", content: "" }]);
+      setTurns((prev) => [
+        ...prev,
+        userTurn,
+        { role: "assistant", content: "" },
+      ]);
       setStreaming(true);
 
-      // Abortable fetch — Esc-cancel during streaming would call abortRef.current.abort()
       const controller = new AbortController();
       abortRef.current = controller;
-
       try {
-        const res = await fetch(
-          `/api/customer-360/${encodeURIComponent(entityId)}/ask`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question: trimmed, history }),
-            signal: controller.signal,
-          },
-        );
+        const res = await fetch("/api/ai/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scope, question: trimmed, history }),
+          signal: controller.signal,
+        });
         if (!res.ok || !res.body) {
-          const errBody = await res.json().catch(() => ({ error: res.statusText }));
-          throw new Error(errBody.error || `ask ${res.status}`);
+          const errBody = await res
+            .json()
+            .catch(() => ({ error: res.statusText }));
+          throw new Error(errBody.error || `ai/ask ${res.status}`);
         }
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-
-        // Stream parsing — SSE events arrive as "data: {...}\n\n". We
-        // accumulate raw bytes, split on double-newlines, and process
-        // each event's JSON payload.
         // eslint-disable-next-line no-constant-condition
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-
           const events = buffer.split("\n\n");
-          buffer = events.pop() ?? ""; // keep trailing partial
-
+          buffer = events.pop() ?? "";
           for (const evt of events) {
             const line = evt.trim();
             if (!line.startsWith("data:")) continue;
             const payload = line.slice(5).trim();
             if (!payload) continue;
-            try {
-              const obj = JSON.parse(payload) as {
-                delta?: string;
-                done?: boolean;
-                error?: string;
-              };
-              if (obj.error) {
-                throw new Error(obj.error);
-              }
-              if (obj.delta) {
-                setTurns((prev) => {
-                  const next = [...prev];
-                  const last = next[next.length - 1];
-                  if (last && last.role === "assistant") {
-                    next[next.length - 1] = {
-                      role: "assistant",
-                      content: last.content + obj.delta,
-                    };
-                  }
-                  return next;
-                });
-              }
-              // obj.done — graceful end marker; loop will exit when reader closes
-            } catch (parseErr) {
-              // Surface malformed SSE payloads as a stream error
-              throw parseErr instanceof Error ? parseErr : new Error(String(parseErr));
+            const obj = JSON.parse(payload) as {
+              delta?: string;
+              done?: boolean;
+              error?: string;
+            };
+            if (obj.error) throw new Error(obj.error);
+            if (obj.delta) {
+              setTurns((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === "assistant") {
+                  next[next.length - 1] = {
+                    role: "assistant",
+                    content: last.content + obj.delta,
+                  };
+                }
+                return next;
+              });
             }
           }
         }
       } catch (e) {
         if ((e as Error).name === "AbortError") {
-          // User cancelled — leave whatever partial response in place.
+          // user cancelled — leave partial in place
         } else {
           const msg = e instanceof Error ? e.message : String(e);
           setErrorMsg(msg);
-          // Drop the empty assistant placeholder if the error happened
-          // before any delta arrived.
           setTurns((prev) => {
             const last = prev[prev.length - 1];
             if (last && last.role === "assistant" && !last.content) {
@@ -247,7 +225,7 @@ export default function AskPanel({ entityId, bizName }: Props) {
         setStreaming(false);
       }
     },
-    [entityId, streaming, turns],
+    [scope, streaming, turns],
   );
 
   const onSubmit = useCallback(
@@ -261,17 +239,21 @@ export default function AskPanel({ entityId, bizName }: Props) {
   const clearConversation = useCallback(() => {
     setTurns([]);
     setErrorMsg(null);
-    writeHistory(entityId, []);
-  }, [entityId]);
+    writeHistory(scope, []);
+  }, [scope]);
+
+  if (scope.kind === "hidden") return null;
+
+  const audience = scopeLabel(scope);
+  const quickPrompts = scopeQuickPrompts(scope);
 
   return (
     <>
-      {/* Floating launcher button */}
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Ask Claude about this customer"
+          aria-label={`Ask Claude about ${audience}`}
           style={{
             position: "fixed",
             bottom: 24,
@@ -312,7 +294,6 @@ export default function AskPanel({ entityId, bizName }: Props) {
         </button>
       )}
 
-      {/* Drawer */}
       {open && (
         <div
           role="dialog"
@@ -356,7 +337,7 @@ export default function AskPanel({ entityId, bizName }: Props) {
                 gap: 12,
               }}
             >
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div
                   style={{
                     fontFamily: SERIF,
@@ -381,7 +362,7 @@ export default function AskPanel({ entityId, bizName }: Props) {
                     maxWidth: 360,
                   }}
                 >
-                  About {bizName}
+                  About {audience}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -430,9 +411,8 @@ export default function AskPanel({ entityId, bizName }: Props) {
                       marginBottom: 14,
                     }}
                   >
-                    Ask anything about this customer&apos;s data — signals,
-                    performance trends, open tickets, post-payment verdict.
-                    Pick a starter below or type your own question.
+                    Ask anything about {audience}. Pick a starter below or
+                    type your own question.
                   </div>
                   <div
                     style={{
@@ -441,7 +421,7 @@ export default function AskPanel({ entityId, bizName }: Props) {
                       gap: 6,
                     }}
                   >
-                    {QUICK_PROMPTS.map((q) => (
+                    {quickPrompts.map((q) => (
                       <button
                         key={q.label}
                         type="button"
@@ -468,7 +448,12 @@ export default function AskPanel({ entityId, bizName }: Props) {
               )}
 
               {turns.map((t, i) => (
-                <Bubble key={i} role={t.role} content={t.content} streaming={streaming && i === turns.length - 1} />
+                <Bubble
+                  key={i}
+                  role={t.role}
+                  content={t.content}
+                  streaming={streaming && i === turns.length - 1}
+                />
               ))}
 
               {errorMsg && (
@@ -501,14 +486,13 @@ export default function AskPanel({ entityId, bizName }: Props) {
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  // Cmd/Ctrl+Enter submits
                   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                     e.preventDefault();
                     onSubmit();
                   }
                 }}
                 rows={2}
-                placeholder="Ask about this customer…  (⌘+Enter to send)"
+                placeholder={`Ask about ${audience}…  (⌘+Enter to send)`}
                 disabled={streaming}
                 style={{
                   width: "100%",
@@ -536,9 +520,7 @@ export default function AskPanel({ entityId, bizName }: Props) {
                   color: C.text3,
                 }}
               >
-                <span>
-                  Powered by Haiku · grounded in this customer&apos;s 360 data
-                </span>
+                <span>Powered by Haiku · grounded in {audience}</span>
                 <button
                   type="submit"
                   disabled={streaming || !draft.trim()}
@@ -546,12 +528,14 @@ export default function AskPanel({ entityId, bizName }: Props) {
                     padding: "6px 14px",
                     borderRadius: 8,
                     border: `1px solid ${C.char}`,
-                    background: streaming || !draft.trim() ? C.border : C.char,
+                    background:
+                      streaming || !draft.trim() ? C.border : C.char,
                     color: C.parchment,
                     fontFamily: "inherit",
                     fontSize: 12,
                     fontWeight: 500,
-                    cursor: streaming || !draft.trim() ? "not-allowed" : "pointer",
+                    cursor:
+                      streaming || !draft.trim() ? "not-allowed" : "pointer",
                   }}
                 >
                   {streaming ? "Thinking…" : "Send"}
@@ -564,8 +548,6 @@ export default function AskPanel({ entityId, bizName }: Props) {
     </>
   );
 }
-
-/* ───────── Bubble + utility ───────── */
 
 function Bubble({
   role,
