@@ -51,6 +51,8 @@ import {
   type LoadedContext,
 } from "@/lib/ai/context-loaders";
 import { buildSystemPrompt } from "@/lib/ai/prompts";
+import { CUSTOMER_360_TOOLS, toAnthropicTools } from "@/lib/ai/tools";
+import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -251,16 +253,36 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       };
       let assistantBuf = "";
+      // Phase E-16 Wave 1 — tool use. Only the Customer 360 scope gets
+      // mutation tools wired in. Every other scope stays read-only so
+      // existing behavior is untouched.
+      const wantsTools = scope.kind === "customer-360";
+      const tools = wantsTools ? toAnthropicTools(CUSTOMER_360_TOOLS) : undefined;
       try {
         const sdkStream = anthropic.messages.stream({
           model: MODEL,
           max_tokens: MAX_TOKENS,
           system: buildSystemPrompt(scope, ctx.blob, memoryBlocks, userProfile),
           messages,
+          ...(tools ? { tools } : {}),
         });
         sdkStream.on("text", (delta: string) => {
           assistantBuf += delta;
           send({ delta });
+        });
+        // Phase E-16 Wave 1 — fire a `tool_use` SSE frame for each tool_use
+        // content block once its JSON input has finalized. The client renders
+        // an ActionCard from this and executes ONLY after the AM clicks
+        // Approve (separate /api/ai/action/execute endpoint).
+        sdkStream.on("contentBlock", (block: ContentBlock) => {
+          if (block.type !== "tool_use") return;
+          send({
+            tool_use: {
+              id: block.id,
+              name: block.name,
+              input: block.input,
+            },
+          });
         });
         await sdkStream.finalMessage();
 

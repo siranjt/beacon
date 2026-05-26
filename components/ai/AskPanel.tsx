@@ -41,6 +41,11 @@ import {
 import { BeaconMark } from "@/components/BeaconMark";
 // Phase E-12 (E-12.4) — first-login working-style onboarding nudge.
 import StyleOnboarding from "@/components/ai/StyleOnboarding";
+// Phase E-16 Wave 1 — inline approval card for Beacon AI tool_use blocks.
+import ActionCard, {
+  type ActionCardData,
+  type ActionCardStatus,
+} from "@/components/ai/ActionCard";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -77,6 +82,18 @@ interface Turn {
    * gives us a visible "active" state on the button.
    */
   feedback?: "up" | "down" | null;
+  /**
+   * Phase E-16 Wave 1 — tool_use blocks that streamed in alongside this
+   * assistant turn. Each renders as an ActionCard inline in the transcript.
+   * Approve/Discard mutate the matching entry's status; on success we feed
+   * the tool_result back into the conversation and Claude can follow up.
+   */
+  toolUses?: Array<{
+    data: ActionCardData;
+    status: ActionCardStatus;
+    resultSummary?: string | null;
+    resultError?: string | null;
+  }>;
 }
 
 const MAX_HISTORY_TURNS = 6;
@@ -341,6 +358,11 @@ export default function AskPanel() {
               error?: string;
               turn_id?: number | null;
               feedback_enabled?: boolean;
+              tool_use?: {
+                id: string;
+                name: string;
+                input: Record<string, unknown>;
+              };
             };
             if (obj.error) throw new Error(obj.error);
             if (obj.delta) {
@@ -349,8 +371,47 @@ export default function AskPanel() {
                 const last = next[next.length - 1];
                 if (last && last.role === "assistant") {
                   next[next.length - 1] = {
+                    ...last,
                     role: "assistant",
                     content: last.content + obj.delta,
+                  };
+                }
+                return next;
+              });
+            }
+            // Phase E-16 Wave 1 — tool_use block streamed in. Attach an
+            // ActionCard entry to the in-flight assistant turn so the AM can
+            // approve or discard inline.
+            if (obj.tool_use) {
+              const tu = obj.tool_use;
+              setTurns((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === "assistant") {
+                  // Customer 360 is the only scope that ships tool_use today.
+                  // Pull the entity id + name from the live scope.
+                  const customerId =
+                    scope.kind === "customer-360" ? scope.entityId : "";
+                  // Best-effort display name — input may carry no biz name,
+                  // so we fall back to the scope label which the server set
+                  // ("this customer"). The card's verb still reads clearly.
+                  const customerName =
+                    (typeof tu.input["bizname"] === "string"
+                      ? (tu.input["bizname"] as string)
+                      : null) ?? "this customer";
+                  const newEntry = {
+                    data: {
+                      toolUseId: tu.id,
+                      toolName: tu.name,
+                      input: tu.input,
+                      customerId,
+                      customerName,
+                    } satisfies ActionCardData,
+                    status: "pending" as ActionCardStatus,
+                  };
+                  next[next.length - 1] = {
+                    ...last,
+                    toolUses: [...(last.toolUses ?? []), newEntry],
                   };
                 }
                 return next;
@@ -402,6 +463,171 @@ export default function AskPanel() {
       ask(draft);
     },
     [ask, draft],
+  );
+
+  /**
+   * Phase E-16 Wave 1 — Approve or Discard a proposed tool_use.
+   *
+   * Approve: POST /api/ai/action/execute → on success, set status="approved"
+   * and feed the tool_result back into the conversation so Claude can
+   * follow up naturally.
+   *
+   * Discard: PUT /api/ai/action/execute (audit-only, no DB write) → set
+   * status="discarded" + feed back a `{ok:false, error:"user_declined"}`
+   * tool_result so Claude knows not to retry.
+   */
+  const resolveToolUse = useCallback(
+    async (
+      turnIndex: number,
+      toolUseId: string,
+      decision: "approve" | "discard",
+    ) => {
+      // Snapshot the relevant tool_use entry up-front so the closure doesn't
+      // race with intermediate setTurns calls.
+      let entry:
+        | { data: ActionCardData; status: ActionCardStatus }
+        | undefined;
+      setTurns((prev) => {
+        const next = [...prev];
+        const turn = next[turnIndex];
+        if (!turn || turn.role !== "assistant") return prev;
+        const uses = turn.toolUses ?? [];
+        const idx = uses.findIndex((u) => u.data.toolUseId === toolUseId);
+        if (idx === -1) return prev;
+        entry = uses[idx];
+        if (entry.status !== "pending") return prev;
+        const updatedUses = uses.slice();
+        updatedUses[idx] = {
+          ...entry,
+          status: decision === "approve" ? "approving" : "discarded",
+        };
+        next[turnIndex] = { ...turn, toolUses: updatedUses };
+        return next;
+      });
+      if (!entry || entry.status !== "pending") return;
+      const { data } = entry;
+
+      const writeResult = (
+        status: ActionCardStatus,
+        summary: string | null,
+        error: string | null,
+      ) => {
+        setTurns((prev) => {
+          const next = [...prev];
+          const turn = next[turnIndex];
+          if (!turn || turn.role !== "assistant") return prev;
+          const uses = turn.toolUses ?? [];
+          const idx = uses.findIndex((u) => u.data.toolUseId === toolUseId);
+          if (idx === -1) return prev;
+          const updatedUses = uses.slice();
+          updatedUses[idx] = {
+            ...uses[idx],
+            status,
+            resultSummary: summary,
+            resultError: error,
+          };
+          next[turnIndex] = { ...turn, toolUses: updatedUses };
+          return next;
+        });
+      };
+
+      if (decision === "discard") {
+        // Audit-only PUT; we still let Claude know it was declined so the
+        // follow-up message reads correctly.
+        try {
+          await fetch("/api/ai/action/execute", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tool_use_id: data.toolUseId,
+              tool_name: data.toolName,
+              args: data.input,
+              customer_id: data.customerId,
+            }),
+          });
+        } catch {
+          /* audit-only — failure shouldn't block the UX */
+        }
+        // Continue the conversation: send a fresh user turn carrying the
+        // tool_result so Claude can acknowledge.
+        await askWithToolResult(
+          data,
+          { ok: false, error: "user_declined" },
+        );
+        return;
+      }
+
+      // Approve — actually execute.
+      try {
+        const res = await fetch("/api/ai/action/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tool_use_id: data.toolUseId,
+            tool_name: data.toolName,
+            args: data.input,
+            customer_id: data.customerId,
+          }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          summary?: string;
+          error?: string;
+        };
+        if (!res.ok || json.ok === false) {
+          const errMsg = json.error || `execute ${res.status}`;
+          writeResult("error", null, errMsg);
+          await askWithToolResult(data, { ok: false, error: errMsg });
+          return;
+        }
+        writeResult("approved", json.summary ?? null, null);
+        await askWithToolResult(data, {
+          ok: true,
+          summary: json.summary ?? "Action completed.",
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        writeResult("error", null, msg);
+        await askWithToolResult(data, { ok: false, error: msg });
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scope],
+  );
+
+  /**
+   * Phase E-16 Wave 1 — after an approve/discard resolves, drop a short
+   * "user-side" message into the conversation describing the result and
+   * re-run the streaming /api/ai/ask so Claude can naturally follow up
+   * ("Great — I snoozed Acme Salon. Anything else?").
+   *
+   * We keep this simple: the message that goes back to Claude is plain
+   * text rather than a real tool_result content block. The current /ask
+   * route doesn't carry tool-use threading across requests (each request
+   * is a fresh window). This is documented as a v1.1 gap.
+   */
+  const askWithToolResult = useCallback(
+    async (
+      action: ActionCardData,
+      outcome: { ok: true; summary: string } | { ok: false; error: string },
+    ) => {
+      const verb =
+        ({
+          snooze_customer: "snooze",
+          pin_customer: "pin",
+          mark_contacted_today: "mark-contacted",
+          add_note: "add-note",
+        } as Record<string, string>)[action.toolName] ?? action.toolName;
+      const followUp = outcome.ok
+        ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
+        : `[Beacon's ${verb} proposal was not run — ${outcome.error}.]`;
+      // Reuse the regular ask path so memory + facts + everything stays
+      // consistent. The bracketed prefix signals to Claude this is a
+      // system trace, not a fresh AM question.
+      await ask(followUp);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   /**
@@ -740,19 +966,45 @@ export default function AskPanel() {
               )}
 
               {turns.map((t, i) => (
-                <Bubble
+                <div
                   key={i}
-                  role={t.role}
-                  content={t.content}
-                  streaming={streaming && i === turns.length - 1}
-                  /* Phase E-12 — feedback only on assistant turns that landed
-                     with a turn id (set by the SSE done frame). User turns,
-                     the streaming-in-progress placeholder, and hydrated
-                     historical turns don't get thumbs. */
-                  turnId={t.role === "assistant" ? t.turnId : undefined}
-                  feedback={t.feedback ?? null}
-                  onFeedback={(signal) => sendFeedback(i, signal)}
-                />
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <Bubble
+                    role={t.role}
+                    content={t.content}
+                    streaming={streaming && i === turns.length - 1}
+                    /* Phase E-12 — feedback only on assistant turns that landed
+                       with a turn id (set by the SSE done frame). User turns,
+                       the streaming-in-progress placeholder, and hydrated
+                       historical turns don't get thumbs. */
+                    turnId={t.role === "assistant" ? t.turnId : undefined}
+                    feedback={t.feedback ?? null}
+                    onFeedback={(signal) => sendFeedback(i, signal)}
+                  />
+                  {/* Phase E-16 Wave 1 — inline ActionCards for any tool_use
+                      blocks that streamed in with this assistant turn. */}
+                  {t.role === "assistant" &&
+                    (t.toolUses ?? []).map((u) => (
+                      <ActionCard
+                        key={u.data.toolUseId}
+                        data={u.data}
+                        status={u.status}
+                        resultSummary={u.resultSummary ?? null}
+                        resultError={u.resultError ?? null}
+                        onApprove={() =>
+                          resolveToolUse(i, u.data.toolUseId, "approve")
+                        }
+                        onDiscard={() =>
+                          resolveToolUse(i, u.data.toolUseId, "discard")
+                        }
+                      />
+                    ))}
+                </div>
               ))}
 
               {errorMsg && (
