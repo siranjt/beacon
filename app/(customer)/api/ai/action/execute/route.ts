@@ -49,12 +49,23 @@ export const maxDuration = 30;
 
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MIN = 60;
+// Tools that swallow re-runs of identical args within the idempotent window.
+// Wave 1 keeps snooze/pin/mark-contacted here (re-running them is almost
+// always an accidental double-tap). Wave 2 deliberately omits the draft tools
+// (re-drafting is intentional — the AM wants a different angle) and the
+// lookup tool (read-only, every call returns fresh).
 const IDEMPOTENT_TOOLS = new Set([
   "snooze_customer",
   "pin_customer",
   "mark_contacted_today",
 ]);
 const IDEMPOTENT_WINDOW_SEC = 60;
+
+// Tools whose args do NOT include `customer_id`. The executor's
+// single-customer enforcement (args.customer_id must match top-level
+// customer_id) is bypassed for these — lookup_customer searches across the
+// whole book, so the top-level customer_id is a scope hint, not a target.
+const TOOLS_WITHOUT_CUSTOMER_ID_ARG = new Set(["lookup_customer"]);
 
 interface ExecuteBody {
   tool_use_id?: string;
@@ -191,24 +202,42 @@ export async function POST(req: NextRequest) {
     !tool_name ||
     typeof tool_name !== "string" ||
     !args ||
-    typeof args !== "object" ||
-    !customer_id ||
-    typeof customer_id !== "string"
+    typeof args !== "object"
   ) {
     return NextResponse.json(
       {
         ok: false,
         error:
-          "tool_use_id, tool_name, args (object), and customer_id are required",
+          "tool_use_id, tool_name, and args (object) are required",
       },
       { status: 400 },
     );
   }
+  // customer_id is required for every tool except read-only lookups (Wave 2).
+  // The book-scope tools (mutators) still need a real entity_id; the executor
+  // resolves bizname + Chargebee handle off it for audit + repository writes.
+  const customerIdRequired = !TOOLS_WITHOUT_CUSTOMER_ID_ARG.has(tool_name);
+  if (customerIdRequired && (!customer_id || typeof customer_id !== "string")) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "customer_id is required for this tool",
+      },
+      { status: 400 },
+    );
+  }
+  // Normalize: lookup_customer doesn't act on a single entity, so we tolerate
+  // an empty / missing top-level customer_id and replace it with a stable
+  // placeholder so downstream audit rows still have something coherent.
+  const effectiveCustomerId =
+    customerIdRequired ? (customer_id as string) : (customer_id || "lookup_customer:any");
 
   // Defensive cross-check — args.customer_id must match the top-level
   // customer_id so the model can't fan out to other customers by quietly
-  // changing the argument.
+  // changing the argument. Exempt tools that don't take a customer_id arg
+  // (e.g. lookup_customer searches across the whole book).
   if (
+    !TOOLS_WITHOUT_CUSTOMER_ID_ARG.has(tool_name) &&
     typeof args["customer_id"] === "string" &&
     args["customer_id"] !== customer_id
   ) {
@@ -240,7 +269,7 @@ export async function POST(req: NextRequest) {
       agent: "customer",
       event_name: "beacon_ai:action:rate_limited",
       surface: "customer-360",
-      entity_id: customer_id,
+      entity_id: effectiveCustomerId,
       metadata: {
         tool: tool_name,
         tool_use_id,
@@ -265,7 +294,7 @@ export async function POST(req: NextRequest) {
     const prior = await findRecentIdempotent(
       email,
       tool_name,
-      customer_id,
+      effectiveCustomerId,
       argsHash,
     );
     if (prior) {
@@ -276,7 +305,7 @@ export async function POST(req: NextRequest) {
         agent: "customer",
         event_name: "beacon_ai:action:idempotent_replay",
         surface: "customer-360",
-        entity_id: customer_id,
+        entity_id: effectiveCustomerId,
         metadata: {
           tool: tool_name,
           tool_use_id,
@@ -296,15 +325,22 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Resolve customer name + cb handle from the latest snapshot ────────
+  // lookup_customer doesn't act on a specific customer; skip the snapshot
+  // round-trip — the tool itself reads the snapshot and constructs its own
+  // result list.
   let customerName: string | null = null;
   let cbCustomerId: string | null = null;
-  try {
-    const snap = await readLatestSnapshotV2();
-    const sc = snap?.customers?.find((c) => c.entity_id === customer_id) ?? null;
-    customerName = sc?.company ?? null;
-    cbCustomerId = sc?.customer_id ?? null;
-  } catch {
-    // Best-effort — we still execute even if the snapshot lookup fails.
+  if (customerIdRequired) {
+    try {
+      const snap = await readLatestSnapshotV2();
+      const sc =
+        snap?.customers?.find((c) => c.entity_id === effectiveCustomerId) ??
+        null;
+      customerName = sc?.company ?? null;
+      cbCustomerId = sc?.customer_id ?? null;
+    } catch {
+      // Best-effort — we still execute even if the snapshot lookup fails.
+    }
   }
 
   // ── Execute the tool ──────────────────────────────────────────────────
@@ -312,7 +348,7 @@ export async function POST(req: NextRequest) {
     amEmail: email,
     amName,
     role,
-    customerId: customer_id,
+    customerId: effectiveCustomerId,
     customerName,
     cbCustomerId,
   };
@@ -332,7 +368,7 @@ export async function POST(req: NextRequest) {
       agent: "customer",
       event_name: "beacon_ai:action:executed",
       surface: "customer-360",
-      entity_id: customer_id,
+      entity_id: effectiveCustomerId,
       metadata: {
         tool: tool_name,
         tool_use_id,
@@ -363,7 +399,7 @@ export async function POST(req: NextRequest) {
       agent: "customer",
       event_name: "beacon_ai:action:exception",
       surface: "customer-360",
-      entity_id: customer_id,
+      entity_id: effectiveCustomerId,
       metadata: { tool: tool_name, tool_use_id, error: msg },
     });
     return NextResponse.json(
@@ -411,15 +447,20 @@ export async function PUT(req: NextRequest) {
     );
   }
   const { tool_use_id, tool_name, args, customer_id } = body;
-  if (!tool_use_id || !tool_name || !customer_id) {
+  if (!tool_use_id || !tool_name) {
     return NextResponse.json(
       {
         ok: false,
-        error: "tool_use_id, tool_name, and customer_id are required",
+        error: "tool_use_id and tool_name are required",
       },
       { status: 400 },
     );
   }
+  // Wave 2 — customer_id is optional for tools that don't act on one specific
+  // customer (lookup). For everything else we still require it, but discards
+  // are audit-only so we tolerate a missing value and store an explicit
+  // placeholder rather than erroring.
+  const discardEntityId = customer_id || "(none)";
 
   void logUmbrellaActivity({
     email,
@@ -428,7 +469,7 @@ export async function PUT(req: NextRequest) {
     agent: "customer",
     event_name: `beacon_ai:action:${tool_name}:discarded`,
     surface: "customer-360",
-    entity_id: customer_id,
+    entity_id: discardEntityId,
     metadata: {
       source: "beacon_ai",
       tool: tool_name,

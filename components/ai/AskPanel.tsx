@@ -93,6 +93,12 @@ interface Turn {
     status: ActionCardStatus;
     resultSummary?: string | null;
     resultError?: string | null;
+    /**
+     * Phase E-16 Wave 2 — extended tool-result payload from /execute. Drafts
+     * carry subject/body/recipient; lookup_customer carries the matched
+     * hits. The Wave-1 mutators leave this null.
+     */
+    resultData?: Record<string, unknown> | null;
   }>;
 }
 
@@ -167,6 +173,17 @@ export default function AskPanel() {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Phase E-16 Wave 2 — forward ref for resolveToolUse so the stream handler
+  // (inside `ask`) can auto-approve lookup_customer without a definition
+  // ordering loop with the later useCallback.
+  const resolveToolUseRef = useRef<
+    | ((
+        turnIndex: number,
+        toolUseId: string,
+        decision: "approve" | "discard",
+      ) => Promise<void> | void)
+    | null
+  >(null);
 
   // Hydrate from Postgres on scope change. Cache to localStorage for 5min
   // so revisiting the same scope is instant. Server is the source of truth.
@@ -382,19 +399,36 @@ export default function AskPanel() {
             // Phase E-16 Wave 1 — tool_use block streamed in. Attach an
             // ActionCard entry to the in-flight assistant turn so the AM can
             // approve or discard inline.
+            //
+            // Wave 2 — for multi-customer scopes (book / inbox / escalation /
+            // performance-report / post-payment-*), the entity_id comes from
+            // the tool input rather than the URL. We prefer:
+            //   1. scope.entityId for single-customer scopes (customer-360,
+            //      performance-report).
+            //   2. input.customer_id when the tool carries one (every Wave 1
+            //      mutator + draft tools).
+            //   3. empty string for lookup_customer (the read-only tool that
+            //      doesn't act on a specific customer).
+            // Drafts may also include bizname inside the tool result when
+            // approved; for the pending state we fall back to the scope label.
             if (obj.tool_use) {
               const tu = obj.tool_use;
               setTurns((prev) => {
                 const next = [...prev];
                 const last = next[next.length - 1];
                 if (last && last.role === "assistant") {
-                  // Customer 360 is the only scope that ships tool_use today.
-                  // Pull the entity id + name from the live scope.
+                  const scopeEntityId =
+                    scope.kind === "customer-360"
+                      ? scope.entityId
+                      : scope.kind === "performance-report"
+                        ? scope.entityId
+                        : null;
+                  const inputCustomerId =
+                    typeof tu.input["customer_id"] === "string"
+                      ? (tu.input["customer_id"] as string)
+                      : null;
                   const customerId =
-                    scope.kind === "customer-360" ? scope.entityId : "";
-                  // Best-effort display name — input may carry no biz name,
-                  // so we fall back to the scope label which the server set
-                  // ("this customer"). The card's verb still reads clearly.
+                    inputCustomerId ?? scopeEntityId ?? "";
                   const customerName =
                     (typeof tu.input["bizname"] === "string"
                       ? (tu.input["bizname"] as string)
@@ -413,6 +447,21 @@ export default function AskPanel() {
                     ...last,
                     toolUses: [...(last.toolUses ?? []), newEntry],
                   };
+                  // Wave 2 — lookup_customer is read-only and auto-executes.
+                  // We schedule the approve a tick after setState lands so the
+                  // status flip from "pending" → "approving" → "approved" is
+                  // visible (matches the flow other tools follow on Approve).
+                  if (tu.name === "lookup_customer") {
+                    const turnIdx = next.length - 1;
+                    const toolUseId = tu.id;
+                    queueMicrotask(() => {
+                      resolveToolUseRef.current?.(
+                        turnIdx,
+                        toolUseId,
+                        "approve",
+                      );
+                    });
+                  }
                 }
                 return next;
               });
@@ -511,6 +560,7 @@ export default function AskPanel() {
         status: ActionCardStatus,
         summary: string | null,
         error: string | null,
+        rich: Record<string, unknown> | null = null,
       ) => {
         setTurns((prev) => {
           const next = [...prev];
@@ -525,6 +575,7 @@ export default function AskPanel() {
             status,
             resultSummary: summary,
             resultError: error,
+            resultData: rich,
           };
           next[turnIndex] = { ...turn, toolUses: updatedUses };
           return next;
@@ -573,6 +624,8 @@ export default function AskPanel() {
           ok?: boolean;
           summary?: string;
           error?: string;
+          // Phase E-16 Wave 2 — rich payload (draft subject/body or lookup hits).
+          data?: Record<string, unknown> | null;
         };
         if (!res.ok || json.ok === false) {
           const errMsg = json.error || `execute ${res.status}`;
@@ -580,7 +633,12 @@ export default function AskPanel() {
           await askWithToolResult(data, { ok: false, error: errMsg });
           return;
         }
-        writeResult("approved", json.summary ?? null, null);
+        writeResult(
+          "approved",
+          json.summary ?? null,
+          null,
+          json.data ?? null,
+        );
         await askWithToolResult(data, {
           ok: true,
           summary: json.summary ?? "Action completed.",
@@ -617,6 +675,9 @@ export default function AskPanel() {
           pin_customer: "pin",
           mark_contacted_today: "mark-contacted",
           add_note: "add-note",
+          lookup_customer: "lookup",
+          draft_email_to_contact: "draft-email",
+          draft_slack_message: "draft-slack",
         } as Record<string, string>)[action.toolName] ?? action.toolName;
       const followUp = outcome.ok
         ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
@@ -629,6 +690,13 @@ export default function AskPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  // Phase E-16 Wave 2 — keep the forward ref pointed at the latest
+  // resolveToolUse closure so the stream-handler auto-approve for
+  // lookup_customer doesn't capture a stale reference.
+  useEffect(() => {
+    resolveToolUseRef.current = resolveToolUse;
+  }, [resolveToolUse]);
 
   /**
    * Phase E-12 (E-12.3) — thumbs up/down on an assistant turn. Optimistically
@@ -996,6 +1064,7 @@ export default function AskPanel() {
                         status={u.status}
                         resultSummary={u.resultSummary ?? null}
                         resultError={u.resultError ?? null}
+                        resultData={u.resultData ?? null}
                         onApprove={() =>
                           resolveToolUse(i, u.data.toolUseId, "approve")
                         }

@@ -253,19 +253,22 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       };
       let assistantBuf = "";
-      // Phase E-16 Wave 1.5 — tool use available in every customer-aware
-      // scope: Customer 360 (one customer in URL), Customer Beacon book
-      // (multi-customer list, AI picks from CONTEXT.customers), Performance
-      // Beacon report (one customer in URL), Escalation overview (ticket
-      // queue spans many customers — AI picks from the open-ticket list).
-      // The 4 tools all require customer_id; for multi-customer scopes the
-      // scope prompts teach the model how to resolve "which one" from the
-      // conversation against the customer list already in CONTEXT.
+      // Phase E-16 Wave 2 — tool use available in every customer-aware scope
+      // plus inbox + post-payment surfaces. The new lookup_customer tool lets
+      // the model resolve a customer the inbox / post-payment-book don't
+      // surface yet ("draft an email to Acme Salon" even when Acme isn't on
+      // today's inbox). Mutators (snooze / pin / mark-contacted / add-note /
+      // draft-email / draft-slack) still need a customer_id; the scope
+      // prompts teach the model to call lookup_customer FIRST when the
+      // current CONTEXT doesn't already list the named customer.
       const wantsTools =
         scope.kind === "customer-360" ||
         scope.kind === "customer-book" ||
         scope.kind === "performance-report" ||
-        scope.kind === "escalation-overview";
+        scope.kind === "escalation-overview" ||
+        scope.kind === "inbox" ||
+        scope.kind === "post-payment-book" ||
+        scope.kind === "post-payment-customer";
       const tools = wantsTools ? toAnthropicTools(CUSTOMER_360_TOOLS) : undefined;
       try {
         const sdkStream = anthropic.messages.stream({

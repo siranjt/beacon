@@ -8,14 +8,21 @@
  * `am_activity_log` via `logUmbrellaActivity` so we have a full audit trail
  * of every Beacon-proposed action — approved or not.
  *
- * Wave 1 ships exactly four Customer-360 scoped tools:
+ * Wave 1 ships four Customer-360 scoped tools:
  *   - snooze_customer
  *   - pin_customer
  *   - mark_contacted_today
  *   - add_note
  *
- * Wave 2 (NOT in this phase) will add email drafting, Slack drafting, batch
- * actions, and expansion to other scopes.
+ * Wave 2 adds three more:
+ *   - lookup_customer        (read-only fuzzy search across the book)
+ *   - draft_email_to_contact (Haiku-generated email draft in AM voice)
+ *   - draft_slack_message    (Haiku-generated internal Slack draft)
+ *
+ * The two draft tools call Haiku INSIDE execute() — the streaming /api/ai/ask
+ * route still uses Sonnet for the conversation. Drafts are NOT idempotent
+ * (re-drafting is intentional). lookup_customer has no blast radius so it
+ * skips approval entirely (rate-limited + audit-logged as usual).
  *
  * Architecture notes:
  *   - The model proposes; the AM approves. Tool execution does NOT happen
@@ -35,6 +42,9 @@ import { snoozeCustomerTool } from "./snooze";
 import { pinCustomerTool } from "./pin";
 import { markContactedTodayTool } from "./mark-contacted";
 import { addNoteTool } from "./add-note";
+import { lookupCustomerTool } from "./lookup-customer";
+import { draftEmailToContactTool } from "./draft-email";
+import { draftSlackMessageTool } from "./draft-slack";
 
 /**
  * The execution context passed to every tool's `execute()` handler. Filled
@@ -86,18 +96,33 @@ export interface BeaconTool {
 }
 
 /**
- * Customer-360 scoped tools — Wave 1.
+ * Beacon AI tool registry. Originally Wave-1 Customer-360–scoped; Wave 1.5
+ * extended these same tools to the multi-customer scopes (customer-book,
+ * performance-report, escalation-overview). Wave 2 adds three tools usable
+ * from every customer-aware scope: lookup, draft email, draft Slack.
  *
  * Order is meaningful: Claude can see all tools simultaneously, but in the
- * system prompt we suggest snooze/pin/mark-contacted first because they're
- * the most common AM actions per the Customer 360 design doc.
+ * system prompt we suggest the high-frequency mutators first (snooze / pin /
+ * mark_contacted / note) so the model reaches for them by default. lookup
+ * is a read-only enabling tool and slots in next. Drafts are last because
+ * they're heavier (Haiku call inside execute) and only fire on explicit
+ * outreach asks.
+ *
+ * The export name stays `CUSTOMER_360_TOOLS` for backward compatibility
+ * with the existing /api/ai/ask import.
  */
 export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   snoozeCustomerTool,
   pinCustomerTool,
   markContactedTodayTool,
   addNoteTool,
+  lookupCustomerTool,
+  draftEmailToContactTool,
+  draftSlackMessageTool,
 ];
+
+/** Alias for callers that prefer the umbrella naming. */
+export const BEACON_TOOLS = CUSTOMER_360_TOOLS;
 
 /**
  * Map of tool-name → tool for O(1) lookup during execute. Built lazily so
@@ -127,4 +152,12 @@ export function toAnthropicTools(tools: BeaconTool[]): AnthropicTool[] {
 }
 
 /** Re-export tools so callers can grab a single tool directly if needed. */
-export { snoozeCustomerTool, pinCustomerTool, markContactedTodayTool, addNoteTool };
+export {
+  snoozeCustomerTool,
+  pinCustomerTool,
+  markContactedTodayTool,
+  addNoteTool,
+  lookupCustomerTool,
+  draftEmailToContactTool,
+  draftSlackMessageTool,
+};
