@@ -209,3 +209,76 @@ export async function fetchAllLiveSubsWithEntityMap(): Promise<{
   // Phase 33.scope-fix7 — return per-entity name lookup alongside the entity-id map.
   return { subs: out, customerToEntities: customerToEntitiesArr, entityNameById };
 }
+
+/**
+ * Phase E-19.1a — thin wrapper that returns just the active-entity universe
+ * as a sorted, deduped string[] for callers that don't need the full sub
+ * payload (scale tests, bulk-comms scheduling, parity harnesses, ad-hoc
+ * ops scripts).
+ *
+ * Mirrors Stage B's exact logic: derives entity_ids from each subscription's
+ * `cf_entity_id` custom field across active + non_renewing + in_trial + future.
+ * Excludes the recently-cancelled (30d) bucket — those entities are tracked
+ * separately for retention/resurrected detection.
+ *
+ * Also returns a `meta` object with:
+ *   - subsWithoutEntity: subscriptions that have no cf_entity_id binding —
+ *     real ops data hole; surface to alerting if non-zero.
+ *   - statusBreakdown: count per status, useful for the "live and correct"
+ *     freshness assertion the dashboard makes.
+ *
+ * NOT cached — the whole point is that the active set must be live-current.
+ * Callers wanting cheap repeat reads inside one request should hold the
+ * return value in a local.
+ */
+export async function fetchLiveActiveEntityIds(): Promise<{
+  entityIds: string[];
+  meta: {
+    totalSubs: number;
+    statusBreakdown: Record<string, number>;
+    subsWithoutEntity: { customer_id: string; subscription_id: string; status: string }[];
+    uniqueCustomers: number;
+    multiEntityCustomers: number;
+  };
+}> {
+  const { subs, customerToEntities } = await fetchAllLiveSubsWithEntityMap();
+
+  // Drop the recently-cancelled rows — those are the retention bucket, not
+  // the live universe. They share customer_id with live subs in the
+  // resurrected case, which we don't want fanning into the active set.
+  const liveSubs = subs.filter((s) => !(s as any).recently_cancelled);
+
+  const entityIds = new Set<string>();
+  const statusBreakdown: Record<string, number> = {};
+  const subsWithoutEntity: { customer_id: string; subscription_id: string; status: string }[] = [];
+
+  for (const s of liveSubs) {
+    statusBreakdown[s.status] = (statusBreakdown[s.status] || 0) + 1;
+    const ents = customerToEntities.get(s.customer_id) || [];
+    if (ents.length === 0) {
+      subsWithoutEntity.push({
+        customer_id: s.customer_id,
+        subscription_id: s.subscription_id,
+        status: s.status,
+      });
+      continue;
+    }
+    for (const eid of ents) entityIds.add(eid);
+  }
+
+  let multiEntityCustomers = 0;
+  for (const [, ents] of customerToEntities) {
+    if (ents.length > 1) multiEntityCustomers++;
+  }
+
+  return {
+    entityIds: Array.from(entityIds).sort(),
+    meta: {
+      totalSubs: liveSubs.length,
+      statusBreakdown,
+      subsWithoutEntity,
+      uniqueCustomers: customerToEntities.size,
+      multiEntityCustomers,
+    },
+  };
+}

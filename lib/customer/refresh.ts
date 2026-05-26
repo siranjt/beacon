@@ -61,6 +61,14 @@ import type {
 import type { Tier, Stoplight } from "./config";
 
 import { getHealthCardMap } from "@/lib/customer/health-card";
+// Phase E-19 Wave 1 — dual-source comms ingest (V2 path).
+import { fetchBulkCommsEvents } from "./comms-bulk-fetch";
+import {
+  upsertCommsEvents,
+  deriveCustomerMetricsFromEvents,
+  writeWatermarks,
+  type CommsEventRow,
+} from "./comms-events-store";
 const todayMs = () => Date.now();
 
 // ---------------------------------------------------------------------------
@@ -118,6 +126,27 @@ export type StageBData = {
   perSourceEventCount: Record<string, number>;
   perDirectionCount: { in: number; out: number };
   channelCounts: { d30: Record<string, number>; d90: Record<string, number> };
+
+  /**
+   * Phase E-19 Wave 1 — V2 comms metrics derived from the bulk-events
+   * Metabase question (card 4052) instead of the 5-CSV pipeline. Written
+   * alongside V1 during dual-source so the parity harness can diff them
+   * before UI is flipped over.
+   *
+   * Same shape as commsMetricsByEntity; populated only if the V2 fetch
+   * succeeded. v2Diagnostics carries the raw counters used to debug
+   * any divergence from V1 (row count, ingest time, soft-fail reason).
+   */
+  commsMetricsByEntityV2?: Record<string, CustomerMetrics>;
+  v2Diagnostics?: {
+    enabled: boolean;
+    eventCount: number;
+    entitiesWithEventsV2: number;
+    fetchDurationMs: number;
+    upsertDurationMs: number;
+    deriveDurationMs: number;
+    softFailReason: string | null;
+  };
 };
 
 export type StageCData = {
@@ -470,7 +499,19 @@ export async function runStageA(today: number = todayMs()): Promise<{
 // STAGE B — Comms (5 CSVs) → per-entity comms metrics
 // ===========================================================================
 
-export async function runStageB(today: number = todayMs()): Promise<{
+export async function runStageB(
+  today: number = todayMs(),
+  /**
+   * Phase E-19 W1.5 — optional active-entity set for the V2 dual-source
+   * path. When provided AND METABASE_BULK_USE_DATASET_API=1 (or the
+   * public-CSV fallback is intentional), runStageB ALSO fetches the
+   * new bulk-events question, upserts into comms_events, and derives
+   * a parallel CustomerMetrics map. Soft-fails to V1-only on any error.
+   *
+   * When omitted, V2 path is skipped entirely (current default).
+   */
+  activeEntityIds?: string[],
+): Promise<{
   data: StageBData;
   durationMs: number;
   errors: string[];
@@ -533,6 +574,126 @@ export async function runStageB(today: number = todayMs()): Promise<{
   }
 
   memSnap("B end");
+
+  // ---------------------------------------------------------------------
+  // Phase E-19 Wave 1 — V2 dual-source path.
+  //
+  // If activeEntityIds was provided (called from runStageBAndStore with
+  // Stage A's universe), fetch the bulk-events Metabase question, upsert
+  // into comms_events, and derive a parallel CustomerMetrics map.
+  // Writes alongside the V1 metrics under separate snapshot keys so the
+  // parity harness can diff them before UI cuts over.
+  //
+  // Soft-fails: any failure here logs a warning + sets a softFailReason
+  // on v2Diagnostics. V1 keeps shipping unchanged.
+  // ---------------------------------------------------------------------
+  let commsMetricsByEntityV2: Record<string, CustomerMetrics> | undefined;
+  let v2Diagnostics: NonNullable<StageBData["v2Diagnostics"]> | undefined;
+
+  if (activeEntityIds && activeEntityIds.length > 0) {
+    const v2Started = Date.now();
+    let softFailReason: string | null = null;
+    let eventCount = 0;
+    let entitiesWithEventsV2 = 0;
+    let fetchDurationMs = 0;
+    let upsertDurationMs = 0;
+    let deriveDurationMs = 0;
+
+    try {
+      // Fetch
+      const tFetch = Date.now();
+      const events: CommsEventRow[] = await fetchBulkCommsEvents(activeEntityIds, 90);
+      fetchDurationMs = Date.now() - tFetch;
+      eventCount = events.length;
+
+      if (events.length === 0) {
+        softFailReason = "bulk fetch returned 0 events";
+      } else {
+        // Upsert to Postgres
+        const tUpsert = Date.now();
+        const { written, skipped } = await upsertCommsEvents(events);
+        upsertDurationMs = Date.now() - tUpsert;
+        if (skipped > 0) {
+          console.warn(`[stageB v2] upsert skipped ${skipped} events with missing required fields`);
+        }
+        console.log(`[stageB v2] upserted ${written} events in ${upsertDurationMs}ms`);
+
+        // Group events by entity for derivation + watermark
+        const byEntityV2 = new Map<string, CommsEventRow[]>();
+        for (const e of events) {
+          const arr = byEntityV2.get(e.entity_id) || [];
+          arr.push(e);
+          byEntityV2.set(e.entity_id, arr);
+        }
+        entitiesWithEventsV2 = byEntityV2.size;
+
+        // Derive metrics in-process from the events we just upserted
+        const tDerive = Date.now();
+        const now = new Date(today);
+        commsMetricsByEntityV2 = {};
+        for (const eid of activeEntityIds) {
+          const evs = byEntityV2.get(eid) || [];
+          commsMetricsByEntityV2[eid] = deriveCustomerMetricsFromEvents(evs, now);
+        }
+        deriveDurationMs = Date.now() - tDerive;
+
+        // Watermark: per-entity last_event_at + 90d count
+        const watermarks: Array<{
+          entity_id: string;
+          last_event_at: string | null;
+          event_count_90d: number;
+        }> = [];
+        for (const eid of activeEntityIds) {
+          const evs = byEntityV2.get(eid) || [];
+          const last = evs.length > 0
+            ? evs.reduce((acc, e) => (e.created_at > acc ? e.created_at : acc), evs[0].created_at)
+            : null;
+          watermarks.push({
+            entity_id: eid,
+            last_event_at: last,
+            event_count_90d: evs.length,
+          });
+        }
+        await writeWatermarks(watermarks).catch((e: Error) => {
+          console.warn(`[stageB v2] watermark write soft-failed: ${e.message}`);
+        });
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      softFailReason = `v2 ingest threw: ${message}`;
+      console.warn(`[stageB v2] ${softFailReason}`);
+      // Do NOT push to errors[] — V2 is dual-source, V1 must keep shipping.
+    }
+
+    v2Diagnostics = {
+      enabled: true,
+      eventCount,
+      entitiesWithEventsV2,
+      fetchDurationMs,
+      upsertDurationMs,
+      deriveDurationMs,
+      softFailReason,
+    };
+    console.log(
+      `[stageB v2] complete in ${Date.now() - v2Started}ms — ` +
+        `events=${eventCount}, entities_with_events=${entitiesWithEventsV2}, ` +
+        `fetch=${fetchDurationMs}ms upsert=${upsertDurationMs}ms derive=${deriveDurationMs}ms` +
+        (softFailReason ? ` SOFT-FAIL: ${softFailReason}` : ""),
+    );
+  } else {
+    // No activeEntityIds passed — V2 disabled for this call. This is the
+    // legacy path for any caller that doesn't go through runStageBAndStore.
+    v2Diagnostics = {
+      enabled: false,
+      eventCount: 0,
+      entitiesWithEventsV2: 0,
+      fetchDurationMs: 0,
+      upsertDurationMs: 0,
+      deriveDurationMs: 0,
+      softFailReason: "no activeEntityIds passed",
+    };
+  }
+
   const data: StageBData = {
     commsMetricsByEntity,
     channelCounts30dByEntity,
@@ -540,6 +701,8 @@ export async function runStageB(today: number = todayMs()): Promise<{
     perSourceEventCount,
     perDirectionCount,
     channelCounts,
+    commsMetricsByEntityV2,
+    v2Diagnostics,
   };
   return { data, durationMs: Date.now() - started, errors };
 }
@@ -1646,7 +1809,11 @@ export async function runStageBAndStore(snapshotDate?: string): Promise<{
   const date = snapshotDate ?? todaySnapshotDate();
   const stageA = await readPipelineStage<StageAData>("A", date);
   const anchorToday = stageA?.data?.todayMs ?? todayMs();
-  const { data, durationMs, errors } = await runStageB(anchorToday);
+  // Phase E-19 W1.5 — pass Stage A's active universe so runStageB can also
+  // execute the V2 dual-source path (bulk-events → comms_events Postgres
+  // cache → derived metrics). Falls back to V1-only if stageA is missing.
+  const activeEntityIds = stageA?.data?.activeEntityIds;
+  const { data, durationMs, errors } = await runStageB(anchorToday, activeEntityIds);
   await writePipelineStage("B", date, data, {
     durationMs,
     errors,
