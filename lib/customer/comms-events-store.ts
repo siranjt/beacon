@@ -321,9 +321,12 @@ export function deriveCustomerMetricsFromEvents(
     }
   }
 
-  const fmtChannels = (s: Set<string>): string => Array.from(s).sort().join(", ");
+  // Match V1's formatting exactly so parity-harness format-only diffs disappear:
+  //   - channel separator is "," (no space) to mirror computeMetrics()
+  //   - "never observed" sentinel for days_since_* is 9999 (not 999)
+  const fmtChannels = (s: Set<string>): string => Array.from(s).sort().join(",");
   const daysSince = (last: number): number => {
-    if (!Number.isFinite(last)) return 999;
+    if (!Number.isFinite(last)) return 9999;
     return Math.max(0, Math.floor((nowMs - last) / dayMs));
   };
   const iso = (t: number): string | null =>
