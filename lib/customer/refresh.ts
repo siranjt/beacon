@@ -576,6 +576,26 @@ export async function runStageB(
   memSnap("B end");
 
   // ---------------------------------------------------------------------
+  // Phase E-19 Wave 1 — release V1 raw event buffers before V2 fetch.
+  //
+  // The V1 5-CSV pipeline can pull ~1.6M comms rows (all customers,
+  // all channels, all time). Once computeMetrics + perSourceEventCount
+  // + perDirectionCount are done above, the `events` array is only
+  // holding onto memory. Hanging onto it while V2 fetches another
+  // 60k+ events caused a function OOM during testing.
+  //
+  // We free the array contents (length = 0) — the reference variables
+  // stay in scope but the underlying storage is reclaimable by GC.
+  // ---------------------------------------------------------------------
+  if (commsResult.events.length > 0) {
+    const v1EventCount = commsResult.events.length;
+    commsResult.events.length = 0;
+    byEntity.clear();
+    if (global.gc) global.gc(); // honor --expose-gc flag if set
+    memSnap(`B after V1 release (${v1EventCount} events freed)`);
+  }
+
+  // ---------------------------------------------------------------------
   // Phase E-19 Wave 1 — V2 dual-source path.
   //
   // If activeEntityIds was provided (called from runStageBAndStore with

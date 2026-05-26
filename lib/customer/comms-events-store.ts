@@ -90,16 +90,34 @@ export async function upsertCommsEvents(
     return { written: 0, skipped: events.length };
   }
 
-  // Drop events with missing required fields. Should be zero from the bulk
-  // SQL but defensive.
-  const valid: CommsEventRow[] = [];
+  // Drop events with missing required fields, AND dedupe within the input
+  // by (entity_id, channel, source_id) — Postgres ON CONFLICT DO UPDATE
+  // forbids the same conflict-key tuple appearing twice in a single INSERT.
+  //
+  // Why duplicates exist: the bulk-events Metabase question's ROW_NUMBER
+  // dedup runs per (channel, direction, minute-bucket, source_id). If the
+  // upstream channel tables emit the same source_id twice within different
+  // minute buckets (possible for cross-system races, e.g. webhook + poll),
+  // the SELECT returns both. Our PK is tighter — (entity, channel, sid) —
+  // so we collapse to last-wins here. Until the SQL pushes its dedup to
+  // the same key, this JS step is required.
+  const dedup = new Map<string, CommsEventRow>();
   let skipped = 0;
+  let dupesCollapsed = 0;
   for (const e of events) {
     if (!e.entity_id || !e.channel || !e.source_id || !e.created_at) {
       skipped++;
       continue;
     }
-    valid.push(e);
+    const key = `${e.entity_id}::${e.channel}::${e.source_id}`;
+    if (dedup.has(key)) dupesCollapsed++;
+    dedup.set(key, e); // last-wins
+  }
+  const valid: CommsEventRow[] = Array.from(dedup.values());
+  if (dupesCollapsed > 0) {
+    console.warn(
+      `[comms-events-store] collapsed ${dupesCollapsed} duplicate (entity,channel,source_id) tuples before upsert`,
+    );
   }
 
   if (valid.length === 0) return { written: 0, skipped };
