@@ -143,9 +143,68 @@ export async function loadInboxContext(opts: {
       ? redSilenceDays[Math.floor(redSilenceDays.length / 2)]
       : null;
 
+  // Phase E-17 Wave 3a.1 — citation lookup for inbox. Mirrors customer-360
+  // granularity for the customers actually surfaced in the inbox + ticket
+  // entries for the open-ticket sample + aggregate counts.
+  const citationLookup: CitationLookup = buildCitationLookup({
+    kind: "inbox",
+    counts: {
+      critical: red.length,
+      watching: yellow.length,
+      needs_am_call: needsCall.length,
+      open_tickets: openTickets.length,
+    },
+    critical: red.map((c) => ({
+      entity_id: c.entity_id,
+      company: c.company ?? null,
+      am_name: c.am_name ?? null,
+      composite: c.signals_v2?.composite ?? null,
+      stoplight: c.signals_v2?.stoplight ?? null,
+      reason: c.signals_v2?.reason_one_line ?? null,
+      days_since_in: c.metrics?.days_since_in ?? null,
+      days_since_out: c.metrics?.days_since_out ?? null,
+      sub_scores: {
+        we_silent: c.signals_v2?.sig_we_silent ?? null,
+        client_silent: c.signals_v2?.sig_client_silent ?? null,
+        response_drop: c.signals_v2?.sig_response_drop ?? null,
+        volume_collapse: c.signals_v2?.sig_volume_collapse ?? null,
+        usage: c.signals_v2?.sig_usage ?? null,
+        billing: c.signals_v2?.sig_billing ?? null,
+      },
+    })),
+    watching: yellow.map((c) => ({
+      entity_id: c.entity_id,
+      company: c.company ?? null,
+      am_name: c.am_name ?? null,
+      composite: c.signals_v2?.composite ?? null,
+      stoplight: c.signals_v2?.stoplight ?? null,
+      reason: c.signals_v2?.reason_one_line ?? null,
+      days_since_in: c.metrics?.days_since_in ?? null,
+      days_since_out: c.metrics?.days_since_out ?? null,
+      sub_scores: {
+        we_silent: c.signals_v2?.sig_we_silent ?? null,
+        client_silent: c.signals_v2?.sig_client_silent ?? null,
+        response_drop: c.signals_v2?.sig_response_drop ?? null,
+        volume_collapse: c.signals_v2?.sig_volume_collapse ?? null,
+        usage: c.signals_v2?.sig_usage ?? null,
+        billing: c.signals_v2?.sig_billing ?? null,
+      },
+    })),
+    openTickets: openTickets.map((t) => ({
+      identifier: t.identifier,
+      title: t.title,
+      classification: t.classification ?? null,
+      state: t.state,
+      customer: t.customerName ?? null,
+      am: t.amName ?? null,
+      created_at: t.createdAt,
+    })),
+  });
+
   const blob = JSON.stringify(
     {
       scope: "inbox",
+      _citation_lookup: citationLookup,
       am_filter: opts.amFilter,
       counts: {
         red: scoped.filter((c) => c.signals_v2?.stoplight === "RED").length,
@@ -203,6 +262,7 @@ export async function loadInboxContext(opts: {
       red_count: red.length,
       open_tickets: openTickets.length,
     },
+    citationLookup,
   };
 }
 
@@ -545,15 +605,45 @@ export async function loadCustomerBookContext(opts: {
  * performance-landing — no per-customer data; just product knowledge
  * ────────────────────────────────────────────────────────────── */
 export async function loadPerformanceLandingContext(): Promise<LoadedContext> {
-  // Intentionally minimal — landing page questions are typically meta
-  // ("explain how X works"), not data-driven. Recent reports list is the
-  // one thing we can offer, sourced from localStorage on the client only;
-  // skip server-side.
+  // Mostly conceptual surface. We surface a tiny set of aggregate
+  // metrics (total active book, median composite) the AI can ground
+  // light-touch comparisons in; recent-reports is client-side only so
+  // we skip it here.
+  const snap = await readLatestSnapshotV2().catch(() => null);
+  const all = (snap?.customers ?? []).filter(
+    (c) => c.lifecycle_state !== "recently_churned",
+  );
+  const composites = all
+    .map((c) => c.signals_v2?.composite)
+    .filter((n): n is number => typeof n === "number")
+    .sort((a, b) => a - b);
+  const median =
+    composites.length > 0
+      ? composites[Math.floor(composites.length / 2)]
+      : null;
+
+  const citationLookup: CitationLookup = buildCitationLookup({
+    kind: "performance-landing",
+    total_active_customers: all.length,
+    // Reports-generated-this-week lives in localStorage on the client
+    // (see PerformanceLanding's recent_reports). Server has no view of
+    // it — leave null so the entry is skipped.
+    reports_generated_this_week: null,
+    median_composite_score: median,
+  });
+
   const blob = JSON.stringify(
     {
       scope: "performance-landing",
+      _citation_lookup: citationLookup,
       note:
         "User is on the Performance Beacon landing page. They haven't picked a customer yet. They're likely asking conceptual questions about how Performance Beacon works, what its metrics mean, or how to interpret a typical report.",
+      counts: {
+        total_active_customers: all.length,
+      },
+      health_summary: {
+        median_composite_score: median,
+      },
     },
     null,
     2,
@@ -561,7 +651,8 @@ export async function loadPerformanceLandingContext(): Promise<LoadedContext> {
   return {
     audience: "Performance Beacon",
     blob,
-    meta: { scope: "performance-landing" },
+    meta: { scope: "performance-landing", total_active_customers: all.length },
+    citationLookup,
   };
 }
 
@@ -578,9 +669,91 @@ export async function loadPerformanceReportContext(
 
   const perf = await fetchEntityReportData(entityId).catch(() => null);
 
+  // Phase E-17 Wave 3a.1 — derive citation-friendly performance numbers.
+  // Peak/current/dip computed on the full available series (the loader
+  // already includes the in-progress month — surfaced separately to the
+  // model via gbp_clicks_last_6_months). Per the project memory, peak/dip
+  // should be computed on COMPLETE months only — we treat all but the
+  // last month as complete; the last-month entry is the in-progress one.
+  let gbpClicksCurrent: { month: string; clicks: number } | null = null;
+  let gbpClicksPeak: { month: string; clicks: number } | null = null;
+  let gbpDipPct: number | null = null;
+  if (perf && perf.gbpClicks.length > 0) {
+    const series = perf.gbpClicks;
+    const lastIdx = series.length - 1;
+    const currentEntry = series[lastIdx];
+    gbpClicksCurrent = {
+      month: currentEntry.month,
+      clicks: currentEntry.profileClicks,
+    };
+    const completed = series.slice(0, lastIdx);
+    if (completed.length > 0) {
+      const peakEntry = completed.reduce((acc, m) =>
+        m.profileClicks > acc.profileClicks ? m : acc,
+      );
+      gbpClicksPeak = {
+        month: peakEntry.month,
+        clicks: peakEntry.profileClicks,
+      };
+      if (peakEntry.profileClicks > 0) {
+        gbpDipPct =
+          ((currentEntry.profileClicks - peakEntry.profileClicks) /
+            peakEntry.profileClicks) *
+          100;
+      }
+    }
+  }
+  const topKeywords = perf
+    ? perf.keywords
+        .filter(
+          (k) =>
+            typeof k.rankCurrent === "number" &&
+            k.rankCurrent !== null &&
+            k.rankCurrent > 0,
+        )
+        .sort((a, b) => (a.rankCurrent ?? 999) - (b.rankCurrent ?? 999))
+        .slice(0, 3)
+        .map((k) => ({
+          keyword: k.keyword,
+          rank: k.rankCurrent ?? null,
+        }))
+    : [];
+  const activeKeywordRankings = perf
+    ? perf.keywords.filter(
+        (k) => typeof k.rankCurrent === "number" && k.rankCurrent !== null,
+      ).length
+    : 0;
+  // Year-to-date leads — count leads with createdAt in the current calendar year.
+  const currentYear = new Date().getUTCFullYear();
+  const ytdLeads = perf
+    ? perf.leads.filter((l) => {
+        const t = Date.parse(l.createdAt ?? "");
+        if (!Number.isFinite(t)) return false;
+        return new Date(t).getUTCFullYear() === currentYear;
+      }).length
+    : 0;
+
+  const citationLookup: CitationLookup = buildCitationLookup({
+    kind: "performance-report",
+    entity_id: entityId,
+    ytd_leads: perf ? ytdLeads : null,
+    predicted_6_month_leads: perf?.forecast?.predicted6MonthLeads ?? null,
+    gbp_clicks_current: gbpClicksCurrent,
+    gbp_clicks_peak: gbpClicksPeak,
+    gbp_dip_pct: gbpDipPct,
+    active_keyword_rankings: activeKeywordRankings,
+    top_keywords: topKeywords,
+    review_target: perf?.forecast?.reviewTarget ?? null,
+    // EntityReportData doesn't carry reviews aggregates yet — leave null so
+    // the entries are skipped.
+    reviews_total: null,
+    reviews_avg_rating: null,
+  });
+
   const blob = JSON.stringify(
     {
       scope: "performance-report",
+      _citation_lookup: citationLookup,
       identity: {
         entity_id: entityId,
         biz_name: sc?.company ?? perf?.identity?.title ?? null,
@@ -634,6 +807,7 @@ export async function loadPerformanceReportContext(
     audience: sc?.company ?? perf?.identity?.title ?? entityId,
     blob,
     meta: { entity_id: entityId, biz_name: sc?.company ?? null },
+    citationLookup,
   };
 }
 
@@ -666,9 +840,42 @@ export async function loadEscalationOverviewContext(): Promise<LoadedContext> {
       (byClass[t.classification ?? "(unknown)"] ?? 0) + 1;
   }
 
+  const ageOf = (iso: string): number | null => {
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return null;
+    return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+  };
+  const aged14 = open.filter((t) => (ageOf(t.createdAt) ?? 0) >= 14).length;
+  const aged30 = open.filter((t) => (ageOf(t.createdAt) ?? 0) >= 30).length;
+
+  const topTickets = open
+    .slice()
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    .slice(0, TICKETS_TOP_N);
+
+  const citationLookup: CitationLookup = buildCitationLookup({
+    kind: "escalation-overview",
+    open_total: open.length,
+    by_am: byAm,
+    by_classification: byClass,
+    aged_14d_plus: aged14,
+    aged_30d_plus: aged30,
+    tickets: topTickets.map((t) => ({
+      identifier: t.identifier,
+      title: t.title,
+      classification: t.classification ?? null,
+      state: t.state,
+      customer: t.customerName ?? null,
+      am: t.amName ?? null,
+      created_at: t.createdAt,
+      age_days: ageOf(t.createdAt),
+    })),
+  });
+
   const blob = JSON.stringify(
     {
       scope: "escalation-overview",
+      _citation_lookup: citationLookup,
       counts: {
         open_total: open.length,
         closed_last_7d: closed7d,
@@ -699,6 +906,7 @@ export async function loadEscalationOverviewContext(): Promise<LoadedContext> {
     audience: "the escalation queue",
     blob,
     meta: { open_total: open.length },
+    citationLookup,
   };
 }
 
@@ -719,9 +927,34 @@ export async function loadPostPaymentBookContext(): Promise<LoadedContext> {
     needs_am_call: customers.filter((c) => c.needs_am_call).length,
   };
 
+  // Plan label derived from the first sub item price id (best-effort);
+  // first-payment amount comes from sub_total_cents.
+  const pickPlan = (priceIds: string[] | null): string | null => {
+    if (!priceIds || priceIds.length === 0) return null;
+    return priceIds[0] ?? null;
+  };
+
+  const citationLookup: CitationLookup = buildCitationLookup({
+    kind: "post-payment-book",
+    counts: {
+      icp: counts.icp,
+      review: counts.review,
+      not_icp: counts.not_icp,
+      needs_am_call: counts.needs_am_call,
+    },
+    customers: slice.map((c) => ({
+      cb_customer_id: c.cb_customer_id,
+      biz_name: c.biz_name,
+      verdict: c.verdict,
+      plan: pickPlan(c.sub_item_price_ids),
+      first_payment_amount_cents: c.sub_total_cents,
+    })),
+  });
+
   const blob = JSON.stringify(
     {
       scope: "post-payment-book",
+      _citation_lookup: citationLookup,
       counts,
       recent: slice.map((c) => ({
         cb_customer_id: c.cb_customer_id,
@@ -748,6 +981,7 @@ export async function loadPostPaymentBookContext(): Promise<LoadedContext> {
     audience: "recent post-payment reviews",
     blob,
     meta: { total: customers.length },
+    citationLookup,
   };
 }
 
@@ -767,11 +1001,24 @@ export async function loadPostPaymentCustomerContext(
         2,
       ),
       meta: { cb_customer_id: cbCustomerId, not_found: true },
+      citationLookup: {},
     };
   }
+  const plan = c.sub_item_price_ids?.[0] ?? null;
+  const citationLookup: CitationLookup = buildCitationLookup({
+    kind: "post-payment-customer",
+    cb_customer_id: c.cb_customer_id,
+    biz_name: c.biz_name,
+    verdict: c.verdict,
+    verdict_one_line: c.verdict_one_line,
+    plan,
+    first_payment_amount_cents: c.sub_total_cents,
+    key_flags: c.key_flags,
+  });
   const blob = JSON.stringify(
     {
       scope: "post-payment-customer",
+      _citation_lookup: citationLookup,
       cb_customer_id: c.cb_customer_id,
       biz_name: c.biz_name,
       am_name: c.am_name,
@@ -801,5 +1048,6 @@ export async function loadPostPaymentCustomerContext(
     audience: c.biz_name ?? cbCustomerId,
     blob,
     meta: { cb_customer_id: cbCustomerId, biz_name: c.biz_name },
+    citationLookup,
   };
 }

@@ -25,8 +25,10 @@
  * keys + values it can cite; the client receives the same lookup via the
  * SSE `citations` frame at stream start.
  *
- * v1: customer-360 + customer-book scopes only. Other scopes return an
- * empty lookup — the model still produces prose, just without inline chips.
+ * v3a.2 (Phase E-17 Wave 3a.1): all 8 scopes now build a citation lookup —
+ * inbox, customer-360, customer-book, performance-landing, performance-report,
+ * escalation-overview, post-payment-book, post-payment-customer. The model
+ * still emits no chips on `hidden` (no surface-data context).
  */
 
 import type { AiScope } from "./scopes";
@@ -487,6 +489,574 @@ function buildCustomerBookLookup(args: {
 }
 
 /* ────────────────────────────────────────────────────────────────
+ * v3a.2 — additional scope builders (inbox / performance-landing /
+ * performance-report / escalation-overview / post-payment-book /
+ * post-payment-customer). Each follows the same shape as customer-360
+ * (per-entity entries keyed by entity/customer id + aggregate counts
+ * without a suffix).
+ * ──────────────────────────────────────────────────────────────── */
+
+interface InboxCustomer {
+  entity_id: string;
+  company: string | null;
+  am_name?: string | null;
+  composite: number | null;
+  stoplight: string | null;
+  reason?: string | null;
+  days_since_in?: number | null;
+  days_since_out?: number | null;
+  /** Optional sub-scores. Used to pick the dominant signal per customer. */
+  sub_scores?: {
+    we_silent?: number | null;
+    client_silent?: number | null;
+    response_drop?: number | null;
+    volume_collapse?: number | null;
+    usage?: number | null;
+    billing?: number | null;
+  } | null;
+}
+
+interface InboxOpenTicket {
+  identifier: string;
+  title: string;
+  classification: string | null;
+  state: string;
+  customer?: string | null;
+  am?: string | null;
+  created_at: string;
+}
+
+function ageDays(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
+
+function pickDominantSignal(
+  sub: InboxCustomer["sub_scores"],
+): { name: string; score: number } | null {
+  if (!sub) return null;
+  const entries: Array<[string, number | null | undefined]> = [
+    ["we_silent", sub.we_silent],
+    ["client_silent", sub.client_silent],
+    ["response_drop", sub.response_drop],
+    ["volume_collapse", sub.volume_collapse],
+    ["usage", sub.usage],
+    ["billing", sub.billing],
+  ];
+  let best: { name: string; score: number } | null = null;
+  for (const [name, score] of entries) {
+    if (typeof score !== "number" || score <= 0) continue;
+    if (best === null || score > best.score) {
+      best = { name, score };
+    }
+  }
+  return best;
+}
+
+function buildInboxLookup(args: {
+  counts: {
+    critical: number;
+    watching: number;
+    needs_am_call: number;
+    open_tickets: number;
+  };
+  critical: InboxCustomer[];
+  watching: InboxCustomer[];
+  openTickets: InboxOpenTicket[];
+}): CitationLookup {
+  const out: CitationLookup = {};
+
+  // Aggregate counts (no entity suffix).
+  out[makeCitationKey("count", "critical_count")] = {
+    category: "count",
+    label: "Critical customers in inbox",
+    value: String(args.counts.critical),
+  };
+  out[makeCitationKey("count", "watching_count")] = {
+    category: "count",
+    label: "Watching customers in inbox",
+    value: String(args.counts.watching),
+  };
+  out[makeCitationKey("count", "needs_am_call_count")] = {
+    category: "count",
+    label: "Post-payment needs AM call",
+    value: String(args.counts.needs_am_call),
+  };
+  out[makeCitationKey("count", "open_tickets_total")] = {
+    category: "count",
+    label: "Open tickets in inbox",
+    value: String(args.counts.open_tickets),
+  };
+
+  // Per-customer entries — critical + watching share the same shape.
+  const surfaced = [...args.critical, ...args.watching];
+  for (const c of surfaced) {
+    const eid = c.entity_id;
+    if (typeof c.composite === "number") {
+      out[makeCitationKey("metric", `composite_score:${eid}`)] = {
+        category: "metric",
+        label: `Composite — ${c.company ?? eid}`,
+        value: c.stoplight
+          ? `${c.composite}, ${c.stoplight}`
+          : String(c.composite),
+        raw: {
+          stoplight: c.stoplight ?? null,
+          biz_name: c.company ?? null,
+          am_name: c.am_name ?? null,
+        },
+      };
+    }
+    if (typeof c.days_since_out === "number") {
+      out[makeCitationKey("metric", `days_since_out:${eid}`)] = {
+        category: "metric",
+        label: `Days since outbound — ${c.company ?? eid}`,
+        value: `${c.days_since_out} days`,
+      };
+    }
+    if (typeof c.days_since_in === "number") {
+      out[makeCitationKey("metric", `days_since_in:${eid}`)] = {
+        category: "metric",
+        label: `Days since inbound — ${c.company ?? eid}`,
+        value: `${c.days_since_in} days`,
+      };
+    }
+    // Dominant signal (per the spec — only emit when we can identify one).
+    const dom = pickDominantSignal(c.sub_scores ?? null);
+    if (dom) {
+      const label = SUB_SCORE_LABELS[dom.name] ?? dom.name;
+      out[makeCitationKey("signal", `${dom.name}:${eid}`)] = {
+        category: "signal",
+        label: `${label} — ${c.company ?? eid}`,
+        value: String(dom.score),
+        raw: {
+          sub_score: dom.score,
+          sub_score_name: dom.name,
+          reason: c.reason ?? null,
+        },
+      };
+    } else if (c.reason) {
+      // Fallback: use the reason_one_line as a generic signal anchor.
+      out[makeCitationKey("signal", `reason:${eid}`)] = {
+        category: "signal",
+        label: `Top signal — ${c.company ?? eid}`,
+        value: c.reason,
+      };
+    }
+  }
+
+  // Open ticket entries.
+  for (const t of args.openTickets) {
+    if (!t.identifier) continue;
+    const age = ageDays(t.created_at);
+    out[makeCitationKey("ticket", t.identifier)] = {
+      category: "ticket",
+      label: t.identifier,
+      value: t.title,
+      raw: {
+        classification: t.classification ?? null,
+        state: t.state,
+        age_days: age,
+        customer: t.customer ?? null,
+        am: t.am ?? null,
+      },
+    };
+  }
+
+  return out;
+}
+
+function buildPerformanceLandingLookup(args: {
+  total_active_customers: number;
+  reports_generated_this_week: number | null;
+  median_composite_score: number | null;
+}): CitationLookup {
+  const out: CitationLookup = {};
+  out[makeCitationKey("count", "total_active_customers")] = {
+    category: "count",
+    label: "Total active customers",
+    value: String(args.total_active_customers),
+  };
+  if (args.reports_generated_this_week !== null) {
+    out[makeCitationKey("count", "reports_generated_this_week")] = {
+      category: "count",
+      label: "Reports generated this week",
+      value: String(args.reports_generated_this_week),
+    };
+  }
+  if (args.median_composite_score !== null) {
+    out[makeCitationKey("metric", "median_composite_score")] = {
+      category: "metric",
+      label: "Median composite (book)",
+      value: String(args.median_composite_score),
+    };
+  }
+  return out;
+}
+
+interface PerformanceReportCitationInputData {
+  entity_id: string;
+  ytd_leads: number | null;
+  predicted_6_month_leads: number | null;
+  gbp_clicks_current: { month: string; clicks: number } | null;
+  gbp_clicks_peak: { month: string; clicks: number } | null;
+  /** Percent dip from peak → current (negative = drop). Pre-computed by loader. */
+  gbp_dip_pct: number | null;
+  active_keyword_rankings: number;
+  top_keywords: Array<{ keyword: string; rank: number | null }>;
+  review_target: number | null;
+  /** Reviews data — loader returns null when not surfaced. */
+  reviews_total: number | null;
+  reviews_avg_rating: number | null;
+}
+
+function keywordSlug(keyword: string): string {
+  return keyword
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+}
+
+function buildPerformanceReportLookup(
+  d: PerformanceReportCitationInputData,
+): CitationLookup {
+  const out: CitationLookup = {};
+  const eid = d.entity_id;
+  if (typeof d.ytd_leads === "number") {
+    out[makeCitationKey("metric", `ytd_leads:${eid}`)] = {
+      category: "metric",
+      label: "YTD leads",
+      value: String(d.ytd_leads),
+    };
+  }
+  if (typeof d.predicted_6_month_leads === "number") {
+    out[makeCitationKey("metric", `predicted_6_month_leads:${eid}`)] = {
+      category: "metric",
+      label: "Predicted 6-month leads",
+      value: String(d.predicted_6_month_leads),
+    };
+  }
+  if (d.gbp_clicks_current) {
+    out[makeCitationKey("metric", `gbp_clicks_current:${eid}`)] = {
+      category: "metric",
+      label: "GBP clicks (current month)",
+      value: `${d.gbp_clicks_current.clicks} (${d.gbp_clicks_current.month})`,
+      raw: {
+        month: d.gbp_clicks_current.month,
+        clicks: d.gbp_clicks_current.clicks,
+      },
+    };
+  }
+  if (d.gbp_clicks_peak) {
+    out[makeCitationKey("metric", `gbp_clicks_peak:${eid}`)] = {
+      category: "metric",
+      label: "GBP clicks (peak month)",
+      value: `${d.gbp_clicks_peak.clicks} (${d.gbp_clicks_peak.month})`,
+      raw: {
+        month: d.gbp_clicks_peak.month,
+        clicks: d.gbp_clicks_peak.clicks,
+      },
+    };
+  }
+  if (typeof d.gbp_dip_pct === "number") {
+    out[makeCitationKey("metric", `gbp_dip_pct:${eid}`)] = {
+      category: "metric",
+      label: "GBP click dip vs peak",
+      value: `${d.gbp_dip_pct.toFixed(1)}%`,
+      raw: {
+        peak_month: d.gbp_clicks_peak?.month ?? null,
+        current_month: d.gbp_clicks_current?.month ?? null,
+      },
+    };
+  }
+  out[makeCitationKey("count", `active_keyword_rankings:${eid}`)] = {
+    category: "count",
+    label: "Active keyword rankings",
+    value: String(d.active_keyword_rankings),
+  };
+  if (d.top_keywords.length > 0) {
+    const top = d.top_keywords[0];
+    if (top && typeof top.rank === "number") {
+      out[makeCitationKey("metric", `top_keyword_rank:${eid}`)] = {
+        category: "metric",
+        label: "Top keyword rank",
+        value: `#${top.rank} — "${top.keyword}"`,
+        raw: { keyword: top.keyword, rank: top.rank },
+      };
+    }
+  }
+  if (typeof d.review_target === "number") {
+    out[makeCitationKey("metric", `review_target:${eid}`)] = {
+      category: "metric",
+      label: "Weekly review target",
+      value: String(d.review_target),
+    };
+  }
+  if (typeof d.reviews_total === "number") {
+    out[makeCitationKey("metric", `reviews_total:${eid}`)] = {
+      category: "metric",
+      label: "Total reviews",
+      value: String(d.reviews_total),
+    };
+  }
+  if (typeof d.reviews_avg_rating === "number") {
+    out[makeCitationKey("metric", `reviews_avg_rating:${eid}`)] = {
+      category: "metric",
+      label: "Avg review rating",
+      value: d.reviews_avg_rating.toFixed(2),
+    };
+  }
+  // Per-keyword rank entries (top 3).
+  for (const k of d.top_keywords.slice(0, 3)) {
+    if (typeof k.rank !== "number") continue;
+    const slug = keywordSlug(k.keyword);
+    if (!slug) continue;
+    out[makeCitationKey("metric", `keyword_rank:${slug}:${eid}`)] = {
+      category: "metric",
+      label: `Rank — "${k.keyword}"`,
+      value: `#${k.rank}`,
+      raw: { keyword: k.keyword, rank: k.rank },
+    };
+  }
+  return out;
+}
+
+interface EscalationTicketCitationInput {
+  identifier: string;
+  title: string;
+  classification: string | null;
+  state: string;
+  customer: string | null;
+  am: string | null;
+  created_at: string;
+  age_days: number | null;
+}
+
+function buildEscalationOverviewLookup(args: {
+  tickets: EscalationTicketCitationInput[];
+  open_total: number;
+  by_am: Record<string, number>;
+  by_classification: Record<string, number>;
+  aged_14d_plus: number;
+  aged_30d_plus: number;
+}): CitationLookup {
+  const out: CitationLookup = {};
+
+  out[makeCitationKey("count", "open_tickets_total")] = {
+    category: "count",
+    label: "Open tickets",
+    value: String(args.open_total),
+  };
+  out[makeCitationKey("count", "tickets_aged_14d_plus")] = {
+    category: "count",
+    label: "Open tickets aged 14d+",
+    value: String(args.aged_14d_plus),
+  };
+  out[makeCitationKey("count", "tickets_aged_30d_plus")] = {
+    category: "count",
+    label: "Open tickets aged 30d+",
+    value: String(args.aged_30d_plus),
+  };
+
+  for (const [am, n] of Object.entries(args.by_am)) {
+    if (!am) continue;
+    out[makeCitationKey("count", `tickets_by_am:${am}`)] = {
+      category: "count",
+      label: `Open tickets — ${am}`,
+      value: String(n),
+      raw: { am_name: am },
+    };
+  }
+  for (const [cls, n] of Object.entries(args.by_classification)) {
+    if (!cls) continue;
+    out[makeCitationKey("count", `tickets_by_classification:${cls}`)] = {
+      category: "count",
+      label: `${cls} tickets`,
+      value: String(n),
+      raw: { classification: cls },
+    };
+  }
+
+  for (const t of args.tickets) {
+    if (!t.identifier) continue;
+    out[makeCitationKey("ticket", t.identifier)] = {
+      category: "ticket",
+      label: t.identifier,
+      value: t.title,
+      raw: {
+        classification: t.classification ?? null,
+        state: t.state,
+        age_days: t.age_days,
+        customer: t.customer ?? null,
+        am: t.am ?? null,
+      },
+    };
+  }
+
+  return out;
+}
+
+interface PostPaymentBookCitationCustomer {
+  cb_customer_id: string;
+  biz_name: string | null;
+  verdict: string | null;
+  plan: string | null;
+  first_payment_amount_cents: number | null;
+}
+
+function formatCents(cents: number | null): string {
+  if (cents === null) return "—";
+  const dollars = cents / 100;
+  return `$${dollars.toFixed(2)}`;
+}
+
+const VERDICT_DISPLAY: Record<string, string> = {
+  icp: "ICP",
+  review: "Review",
+  not_icp: "Not ICP",
+};
+
+function displayVerdict(v: string | null): string {
+  if (!v) return "—";
+  return VERDICT_DISPLAY[v] ?? v;
+}
+
+function buildPostPaymentBookLookup(args: {
+  counts: {
+    icp: number;
+    review: number;
+    not_icp: number;
+    needs_am_call: number;
+  };
+  customers: PostPaymentBookCitationCustomer[];
+}): CitationLookup {
+  const out: CitationLookup = {};
+  out[makeCitationKey("count", "icp_verdict")] = {
+    category: "count",
+    label: "ICP verdicts",
+    value: String(args.counts.icp),
+  };
+  out[makeCitationKey("count", "review_verdict")] = {
+    category: "count",
+    label: "Review verdicts",
+    value: String(args.counts.review),
+  };
+  out[makeCitationKey("count", "not_icp_verdict")] = {
+    category: "count",
+    label: "Not ICP verdicts",
+    value: String(args.counts.not_icp),
+  };
+  out[makeCitationKey("count", "needs_am_call_count")] = {
+    category: "count",
+    label: "Needs AM call",
+    value: String(args.counts.needs_am_call),
+  };
+
+  for (const c of args.customers) {
+    const id = c.cb_customer_id;
+    if (!id) continue;
+    if (c.verdict !== null) {
+      out[makeCitationKey("metric", `verdict:${id}`)] = {
+        category: "metric",
+        label: `Verdict — ${c.biz_name ?? id}`,
+        value: displayVerdict(c.verdict),
+        raw: { cb_customer_id: id, biz_name: c.biz_name ?? null },
+      };
+    }
+    if (c.plan) {
+      out[makeCitationKey("billing", `plan:${id}`)] = {
+        category: "billing",
+        label: `Plan — ${c.biz_name ?? id}`,
+        value: c.plan,
+      };
+    }
+    if (typeof c.first_payment_amount_cents === "number") {
+      out[makeCitationKey("billing", `first_payment_amount:${id}`)] = {
+        category: "billing",
+        label: `First payment — ${c.biz_name ?? id}`,
+        value: formatCents(c.first_payment_amount_cents),
+        raw: {
+          amount_cents: c.first_payment_amount_cents,
+        },
+      };
+    }
+  }
+  return out;
+}
+
+interface PostPaymentCustomerCitationInput {
+  cb_customer_id: string;
+  biz_name: string | null;
+  verdict: string | null;
+  verdict_one_line: string | null;
+  plan: string | null;
+  first_payment_amount_cents: number | null;
+  key_flags: string[] | null;
+}
+
+function flagKey(flag: string): string {
+  return flag
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+}
+
+function buildPostPaymentCustomerLookup(
+  d: PostPaymentCustomerCitationInput,
+): CitationLookup {
+  const out: CitationLookup = {};
+  const id = d.cb_customer_id;
+  if (!id) return out;
+  if (d.verdict !== null) {
+    out[makeCitationKey("metric", `verdict:${id}`)] = {
+      category: "metric",
+      label: "Verdict",
+      value: displayVerdict(d.verdict),
+      raw: { biz_name: d.biz_name ?? null },
+    };
+  }
+  if (d.verdict_one_line) {
+    out[makeCitationKey("metric", `verdict_one_line:${id}`)] = {
+      category: "metric",
+      label: "Verdict summary",
+      value: d.verdict_one_line,
+    };
+  }
+  if (d.plan) {
+    out[makeCitationKey("billing", `plan:${id}`)] = {
+      category: "billing",
+      label: "Plan",
+      value: d.plan,
+    };
+  }
+  if (typeof d.first_payment_amount_cents === "number") {
+    out[makeCitationKey("billing", `first_payment_amount:${id}`)] = {
+      category: "billing",
+      label: "First payment",
+      value: formatCents(d.first_payment_amount_cents),
+      raw: { amount_cents: d.first_payment_amount_cents },
+    };
+  }
+  if (Array.isArray(d.key_flags)) {
+    for (const flag of d.key_flags) {
+      if (!flag) continue;
+      const slug = flagKey(flag);
+      if (!slug) continue;
+      out[makeCitationKey("signal", `${slug}:${id}`)] = {
+        category: "signal",
+        label: "ICP flag",
+        value: flag,
+        raw: { flag_raw: flag },
+      };
+    }
+  }
+  return out;
+}
+
+/* ────────────────────────────────────────────────────────────────
  * Scope dispatcher
  * ──────────────────────────────────────────────────────────────── */
 
@@ -518,14 +1088,70 @@ export interface CustomerBookCitationInput {
   }>;
 }
 
+export interface InboxCitationInput {
+  kind: "inbox";
+  counts: {
+    critical: number;
+    watching: number;
+    needs_am_call: number;
+    open_tickets: number;
+  };
+  critical: InboxCustomer[];
+  watching: InboxCustomer[];
+  openTickets: InboxOpenTicket[];
+}
+
+export interface PerformanceLandingCitationInput {
+  kind: "performance-landing";
+  total_active_customers: number;
+  reports_generated_this_week: number | null;
+  median_composite_score: number | null;
+}
+
+export interface PerformanceReportCitationInput
+  extends PerformanceReportCitationInputData {
+  kind: "performance-report";
+}
+
+export interface EscalationOverviewCitationInput {
+  kind: "escalation-overview";
+  tickets: EscalationTicketCitationInput[];
+  open_total: number;
+  by_am: Record<string, number>;
+  by_classification: Record<string, number>;
+  aged_14d_plus: number;
+  aged_30d_plus: number;
+}
+
+export interface PostPaymentBookCitationInput {
+  kind: "post-payment-book";
+  counts: {
+    icp: number;
+    review: number;
+    not_icp: number;
+    needs_am_call: number;
+  };
+  customers: PostPaymentBookCitationCustomer[];
+}
+
+export interface PostPaymentCustomerCitationInputWrap
+  extends PostPaymentCustomerCitationInput {
+  kind: "post-payment-customer";
+}
+
 export type CitationLookupInput =
   | Customer360CitationInput
-  | CustomerBookCitationInput;
+  | CustomerBookCitationInput
+  | InboxCitationInput
+  | PerformanceLandingCitationInput
+  | PerformanceReportCitationInput
+  | EscalationOverviewCitationInput
+  | PostPaymentBookCitationInput
+  | PostPaymentCustomerCitationInputWrap;
 
 /**
  * Build a citation lookup for any supported scope. Unsupported scopes
- * return an empty object (model will emit no chips for those surfaces in
- * v1).
+ * (currently only `hidden`) return an empty object.
  */
 export function buildCitationLookup(input: CitationLookupInput): CitationLookup {
   switch (input.kind) {
@@ -543,14 +1169,52 @@ export function buildCitationLookup(input: CitationLookupInput): CitationLookup 
         health: input.health,
         topAtRisk: input.topAtRisk,
       });
+    case "inbox":
+      return buildInboxLookup({
+        counts: input.counts,
+        critical: input.critical,
+        watching: input.watching,
+        openTickets: input.openTickets,
+      });
+    case "performance-landing":
+      return buildPerformanceLandingLookup({
+        total_active_customers: input.total_active_customers,
+        reports_generated_this_week: input.reports_generated_this_week,
+        median_composite_score: input.median_composite_score,
+      });
+    case "performance-report":
+      return buildPerformanceReportLookup(input);
+    case "escalation-overview":
+      return buildEscalationOverviewLookup({
+        tickets: input.tickets,
+        open_total: input.open_total,
+        by_am: input.by_am,
+        by_classification: input.by_classification,
+        aged_14d_plus: input.aged_14d_plus,
+        aged_30d_plus: input.aged_30d_plus,
+      });
+    case "post-payment-book":
+      return buildPostPaymentBookLookup({
+        counts: input.counts,
+        customers: input.customers,
+      });
+    case "post-payment-customer":
+      return buildPostPaymentCustomerLookup({
+        cb_customer_id: input.cb_customer_id,
+        biz_name: input.biz_name,
+        verdict: input.verdict,
+        verdict_one_line: input.verdict_one_line,
+        plan: input.plan,
+        first_payment_amount_cents: input.first_payment_amount_cents,
+        key_flags: input.key_flags,
+      });
   }
 }
 
 /**
- * Return whether the given scope has citation support in v1. The ask route
- * checks this before emitting the `citations` SSE frame; scopes without
- * support send an empty lookup, which is cheaper than computing one.
+ * Return whether the given scope has citation support. As of v3a.2 every
+ * non-hidden scope builds a lookup.
  */
 export function scopeHasCitationSupport(scope: AiScope): boolean {
-  return scope.kind === "customer-360" || scope.kind === "customer-book";
+  return scope.kind !== "hidden";
 }
