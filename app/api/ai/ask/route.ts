@@ -270,6 +270,14 @@ export async function POST(req: NextRequest) {
         scope.kind === "post-payment-book" ||
         scope.kind === "post-payment-customer";
       const tools = wantsTools ? toAnthropicTools(CUSTOMER_360_TOOLS) : undefined;
+      // Phase E-17 Wave 3a — emit the citation lookup at stream start so the
+      // client can render `[cite:KEY]` chips in deltas as they arrive. Empty
+      // lookups (scopes without v1 support) still send the frame so the
+      // client always knows the start of the stream is reached.
+      if (ctx.citationLookup && Object.keys(ctx.citationLookup).length > 0) {
+        send({ citations: ctx.citationLookup });
+      }
+
       try {
         const sdkStream = anthropic.messages.stream({
           model: MODEL,

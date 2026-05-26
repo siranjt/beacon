@@ -46,6 +46,17 @@ import ActionCard, {
   type ActionCardData,
   type ActionCardStatus,
 } from "@/components/ai/ActionCard";
+// Phase E-17 Wave 3a — inline citations + confidence calibration.
+import CitationChip from "@/components/ai/CitationChip";
+import ConfidenceBadge, {
+  type ConfidenceData,
+} from "@/components/ai/ConfidenceBadge";
+import {
+  CITATION_PATTERN_SOURCE,
+  CONFIDENCE_PATTERN_SOURCE,
+  type CitationEntry,
+  type CitationLookup,
+} from "@/lib/ai/citations";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -100,6 +111,12 @@ interface Turn {
      */
     resultData?: Record<string, unknown> | null;
   }>;
+  /**
+   * Phase E-17 Wave 3a — citation lookup for this assistant turn. Received
+   * via the `citations` SSE frame at stream start. Used to resolve
+   * `[cite:KEY]` markers when rendering this turn's content.
+   */
+  citationLookup?: CitationLookup;
 }
 
 const MAX_HISTORY_TURNS = 6;
@@ -154,6 +171,85 @@ function invalidateCache(scope: AiScope): void {
   } catch {
     /* ignore */
   }
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * Phase E-17 Wave 3a — helpers to parse `<confidence: ...>` markers and
+ * `[cite:KEY]` markers out of streaming assistant text.
+ *
+ * Confidence parsing strips ALL markers from the prose; the first one
+ * found becomes the displayed badge. Citation parsing keeps markers in
+ * place but tokenizes them out so they can be rendered as React chips.
+ * ──────────────────────────────────────────────────────────────── */
+
+interface ParsedAssistantContent {
+  /** Prose with `<confidence:...>` markers removed. Citation markers stay. */
+  text: string;
+  /** First confidence marker (if any) — driver of ConfidenceBadge. */
+  confidence: ConfidenceData | null;
+}
+
+function parseAssistantContent(raw: string): ParsedAssistantContent {
+  const re = new RegExp(CONFIDENCE_PATTERN_SOURCE, "g");
+  let firstMatch: ConfidenceData | null = null;
+  const stripped = raw.replace(re, (full, pctStr: string, reasonsStr: string) => {
+    if (!firstMatch) {
+      const pct = Number.parseInt(pctStr, 10);
+      const reasons = reasonsStr
+        .split("/")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (Number.isFinite(pct)) {
+        firstMatch = {
+          percent: Math.max(0, Math.min(100, pct)),
+          reasons,
+          raw: full,
+        };
+      }
+    }
+    return "";
+  });
+  // Collapse the extra whitespace the marker leaves behind.
+  const cleaned = stripped
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ");
+  return { text: cleaned, confidence: firstMatch };
+}
+
+/**
+ * Tokenize a string into alternating text + citation-chip pieces.
+ * Returns an array suitable for direct React rendering.
+ */
+function renderWithCitations(
+  text: string,
+  lookup: CitationLookup | undefined,
+): React.ReactNode[] {
+  if (!text) return [];
+  const re = new RegExp(CITATION_PATTERN_SOURCE, "g");
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let chipIndex = 0;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    const key = match[1];
+    const entry: CitationEntry | undefined = lookup ? lookup[key] : undefined;
+    nodes.push(
+      <CitationChip
+        key={`cite-${chipIndex}-${key}`}
+        citationKey={key}
+        entry={entry}
+      />,
+    );
+    chipIndex += 1;
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+  return nodes;
 }
 
 export default function AskPanel() {
@@ -380,8 +476,30 @@ export default function AskPanel() {
                 name: string;
                 input: Record<string, unknown>;
               };
+              /**
+               * Phase E-17 Wave 3a — citation lookup for this turn. Arrives
+               * once at the start of the stream (or not at all for scopes
+               * without citation support in v1). Attached to the in-flight
+               * assistant turn so `[cite:KEY]` markers in subsequent deltas
+               * resolve to real entries.
+               */
+              citations?: CitationLookup;
             };
             if (obj.error) throw new Error(obj.error);
+            if (obj.citations) {
+              const citationLookup = obj.citations;
+              setTurns((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === "assistant") {
+                  next[next.length - 1] = {
+                    ...last,
+                    citationLookup,
+                  };
+                }
+                return next;
+              });
+            }
             if (obj.delta) {
               setTurns((prev) => {
                 const next = [...prev];
@@ -1041,48 +1159,74 @@ export default function AskPanel() {
                 </div>
               )}
 
-              {turns.map((t, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  <Bubble
-                    role={t.role}
-                    content={t.content}
-                    streaming={streaming && i === turns.length - 1}
-                    /* Phase E-12 — feedback only on assistant turns that landed
-                       with a turn id (set by the SSE done frame). User turns,
-                       the streaming-in-progress placeholder, and hydrated
-                       historical turns don't get thumbs. */
-                    turnId={t.role === "assistant" ? t.turnId : undefined}
-                    feedback={t.feedback ?? null}
-                    onFeedback={(signal) => sendFeedback(i, signal)}
-                  />
-                  {/* Phase E-16 Wave 1 — inline ActionCards for any tool_use
-                      blocks that streamed in with this assistant turn. */}
-                  {t.role === "assistant" &&
-                    (t.toolUses ?? []).map((u) => (
-                      <ActionCard
-                        key={u.data.toolUseId}
-                        data={u.data}
-                        status={u.status}
-                        resultSummary={u.resultSummary ?? null}
-                        resultError={u.resultError ?? null}
-                        resultData={u.resultData ?? null}
-                        onApprove={() =>
-                          resolveToolUse(i, u.data.toolUseId, "approve")
-                        }
-                        onDiscard={() =>
-                          resolveToolUse(i, u.data.toolUseId, "discard")
-                        }
-                      />
-                    ))}
-                </div>
-              ))}
+              {turns.map((t, i) => {
+                // Phase E-17 Wave 3a — parse assistant content for the
+                // `<confidence:...>` marker (stripped from prose, surfaced as
+                // a badge) and for `[cite:KEY]` markers (kept inline, replaced
+                // with chips at render time). User turns pass through.
+                const parsed =
+                  t.role === "assistant"
+                    ? parseAssistantContent(t.content)
+                    : { text: t.content, confidence: null };
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    <Bubble
+                      role={t.role}
+                      content={parsed.text}
+                      streaming={streaming && i === turns.length - 1}
+                      citationLookup={
+                        t.role === "assistant" ? t.citationLookup : undefined
+                      }
+                      /* Phase E-12 — feedback only on assistant turns that landed
+                         with a turn id (set by the SSE done frame). User turns,
+                         the streaming-in-progress placeholder, and hydrated
+                         historical turns don't get thumbs. */
+                      turnId={t.role === "assistant" ? t.turnId : undefined}
+                      feedback={t.feedback ?? null}
+                      onFeedback={(signal) => sendFeedback(i, signal)}
+                    />
+                    {/* Phase E-17 Wave 3a — free-text confidence badge.
+                        Renders below the bubble when the assistant produced
+                        a `<confidence:...>` marker but no tool_use card. */}
+                    {parsed.confidence &&
+                      t.role === "assistant" &&
+                      (t.toolUses?.length ?? 0) === 0 && (
+                        <div style={{ alignSelf: "flex-start" }}>
+                          <ConfidenceBadge data={parsed.confidence} variant="inline" />
+                        </div>
+                      )}
+                    {/* Phase E-16 Wave 1 — inline ActionCards for any tool_use
+                        blocks that streamed in with this assistant turn.
+                        Phase E-17 Wave 3a — pipe parsed confidence into the
+                        first card so the AM sees it before approving. */}
+                    {t.role === "assistant" &&
+                      (t.toolUses ?? []).map((u, ui) => (
+                        <ActionCard
+                          key={u.data.toolUseId}
+                          data={u.data}
+                          status={u.status}
+                          resultSummary={u.resultSummary ?? null}
+                          resultError={u.resultError ?? null}
+                          resultData={u.resultData ?? null}
+                          confidence={ui === 0 ? parsed.confidence : null}
+                          onApprove={() =>
+                            resolveToolUse(i, u.data.toolUseId, "approve")
+                          }
+                          onDiscard={() =>
+                            resolveToolUse(i, u.data.toolUseId, "discard")
+                          }
+                        />
+                      ))}
+                  </div>
+                );
+              })}
 
               {errorMsg && (
                 <div
@@ -1181,6 +1325,7 @@ function Bubble({
   role,
   content,
   streaming,
+  citationLookup,
   turnId,
   feedback,
   onFeedback,
@@ -1188,6 +1333,11 @@ function Bubble({
   role: "user" | "assistant";
   content: string;
   streaming: boolean;
+  /**
+   * Phase E-17 Wave 3a — citation lookup attached to this assistant turn.
+   * Used to resolve `[cite:KEY]` markers when rendering content.
+   */
+  citationLookup?: CitationLookup;
   /**
    * Phase E-12 — assistant turn id. Presence enables the thumbs UI.
    * Absent on user turns, streaming-in-progress placeholder, hydrated
@@ -1226,7 +1376,16 @@ function Bubble({
           wordBreak: "break-word",
         }}
       >
-        {content || (streaming ? <BlinkingCursor /> : "")}
+        {content
+          ? // Phase E-17 Wave 3a — only assistant turns carry citation markers.
+            // User turns rendered as plain text to preserve their literal input
+            // (a user typing "[cite:foo]" shouldn't get parsed).
+            isUser
+            ? content
+            : renderWithCitations(content, citationLookup)
+          : streaming
+            ? <BlinkingCursor />
+            : ""}
         {streaming && content && (
           <span style={{ display: "inline-block", width: 0 }}>
             <BlinkingCursor />

@@ -21,6 +21,10 @@ import {
   getCustomer,
 } from "@/lib/post-payment/db/queries";
 import type { ScoredCustomerV2 } from "@/lib/customer/types";
+import {
+  buildCitationLookup,
+  type CitationLookup,
+} from "@/lib/ai/citations";
 
 const AM_BOOK_TOP_N = 80;
 const TICKETS_TOP_N = 40;
@@ -33,6 +37,15 @@ export interface LoadedContext {
   blob: string;
   /** Extra metadata captured for telemetry. */
   meta: Record<string, unknown>;
+  /**
+   * Phase E-17 Wave 3a — citation lookup keyed by `<category>:<id>`. The
+   * model sees these keys + values inside CONTEXT under `_citation_lookup`
+   * and emits `[cite:KEY]` markers when claiming the underlying fact. The
+   * client receives the same lookup via a `citations` SSE frame so it can
+   * render the chip tooltip. Scopes without citation support (v1: anything
+   * other than customer-360 and customer-book) omit this field.
+   */
+  citationLookup?: CitationLookup;
 }
 
 function findInSnapshot(
@@ -210,9 +223,46 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
   const escalations = escR.status === "fulfilled" ? escR.value : [];
   const postPayment = ppR.status === "fulfilled" ? ppR.value : null;
 
+  // Phase E-17 Wave 3a — build citation lookup ahead of the blob so we can
+  // inject the legal-keys map into CONTEXT under `_citation_lookup`. The
+  // model sees this and learns which `[cite:KEY]` markers it can emit.
+  const performanceForCite = perf
+    ? {
+        predicted_6_month_leads:
+          perf.forecast?.predicted6MonthLeads ?? null,
+        review_target: perf.forecast?.reviewTarget ?? null,
+        leads_total: perf.leads.length,
+        keywords_count: perf.keywords.length,
+        keywords_top3: perf.keywords.filter(
+          (k) =>
+            k.rankCurrent != null && k.rankCurrent > 0 && k.rankCurrent <= 3,
+        ).length,
+        keywords_top10: perf.keywords.filter(
+          (k) =>
+            k.rankCurrent != null && k.rankCurrent > 0 && k.rankCurrent <= 10,
+        ).length,
+      }
+    : null;
+  const citationLookup: CitationLookup = sc
+    ? buildCitationLookup({
+        kind: "customer-360",
+        sc,
+        performance: performanceForCite,
+        tickets: escalations,
+        postPayment: postPayment
+          ? {
+              verdict: postPayment.verdict,
+              needs_am_call: postPayment.needs_am_call,
+              verdict_one_line: postPayment.verdict_one_line,
+            }
+          : null,
+      })
+    : {};
+
   const blob = JSON.stringify(
     {
       scope: "customer-360",
+      _citation_lookup: citationLookup,
       identity: {
         entity_id: entityId,
         biz_name: sc?.company ?? null,
@@ -327,6 +377,7 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
       biz_name: sc?.company ?? null,
       cb_customer_id: sc?.customer_id ?? null,
     },
+    citationLookup,
   };
 }
 
@@ -425,9 +476,32 @@ export async function loadCustomerBookContext(opts: {
     (c) => (c.metrics?.days_since_out ?? 0) >= 30,
   ).length;
 
+  // Phase E-17 Wave 3a — citation lookup for the book scope. Counts +
+  // per-row composites/days-since for everything we surface in `top_at_risk`.
+  const citationLookup: CitationLookup = buildCitationLookup({
+    kind: "customer-book",
+    counts,
+    trajectory: { worsening, improving },
+    health: {
+      median_composite: median ?? null,
+      outbound_silence_14d: silent_14d_count,
+      outbound_silence_30d: silent_30d_count,
+    },
+    topAtRisk: top.map((c) => ({
+      entity_id: c.entity_id,
+      company: c.company ?? null,
+      composite: c.signals_v2?.composite ?? null,
+      stoplight: c.signals_v2?.stoplight ?? null,
+      reason: c.signals_v2?.reason_one_line ?? null,
+      days_since_in: c.metrics?.days_since_in ?? null,
+      days_since_out: c.metrics?.days_since_out ?? null,
+    })),
+  });
+
   const blob = JSON.stringify(
     {
       scope: "customer-book",
+      _citation_lookup: citationLookup,
       am_filter: opts.amFilter,
       counts,
       trajectory: { worsening, improving },
@@ -463,6 +537,7 @@ export async function loadCustomerBookContext(opts: {
       total_customers: counts.total,
       red_count: counts.red,
     },
+    citationLookup,
   };
 }
 

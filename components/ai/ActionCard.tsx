@@ -17,6 +17,9 @@
  */
 
 import { useCallback, useState } from "react";
+import ConfidenceBadge, {
+  type ConfidenceData,
+} from "@/components/ai/ConfidenceBadge";
 
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -68,6 +71,13 @@ interface Props {
    * undefined and the trailer pill is sufficient.
    */
   resultData?: Record<string, unknown> | null;
+  /**
+   * Phase E-17 Wave 3a — optional confidence data parsed from the
+   * assistant's `<confidence: NN% — reasons>` marker. When present we render
+   * a ConfidenceBadge at the top of the card so the AM can see Beacon AI's
+   * read of the evidence before approving the action.
+   */
+  confidence?: ConfidenceData | null;
   /** Parent handles approval — posts to /execute and threads tool_result back. */
   onApprove: () => void;
   /** Parent handles discard — PUTs to /execute audit endpoint + threads tool_result. */
@@ -223,6 +233,7 @@ export default function ActionCard({
   resultSummary,
   resultError,
   resultData,
+  confidence,
   onApprove,
   onDiscard,
 }: Props) {
@@ -364,6 +375,14 @@ export default function ActionCard({
           Beacon AI proposes
         </span>
       </div>
+
+      {/* Phase E-17 Wave 3a — confidence badge surfaces the model's read of
+          the evidence before the AM clicks Approve. */}
+      {confidence && (
+        <div style={{ marginBottom: 8 }}>
+          <ConfidenceBadge data={confidence} variant="card" />
+        </div>
+      )}
 
       <div style={{ marginBottom: 10 }}>{describeParams(data.toolName, data.input)}</div>
 
