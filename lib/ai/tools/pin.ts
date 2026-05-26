@@ -32,8 +32,14 @@ export const pinCustomerTool: BeaconTool = {
         description:
           "Desired pin state. `true` to pin (add to top-of-book list), `false` to unpin (remove).",
       },
+      bizname: {
+        type: "string",
+        description:
+          "ALWAYS include — the customer's business name from CONTEXT (e.g. 'Acme Salon'). Shown on the approval card so the AM sees who they're pinning.",
+        maxLength: 200,
+      },
     },
-    required: ["customer_id", "pin"],
+    required: ["customer_id", "pin", "bizname"],
     additionalProperties: false,
   },
 

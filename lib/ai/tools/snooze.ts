@@ -37,8 +37,14 @@ export const snoozeCustomerTool: BeaconTool = {
           "Short, plain-English reason for the snooze (e.g. 'Owner on vacation until Monday', 'Waiting on billing dispute resolution'). Helps the AM audit later.",
         maxLength: 280,
       },
+      bizname: {
+        type: "string",
+        description:
+          "ALWAYS include — the customer's business name from CONTEXT (e.g. 'Acme Salon'). Shown on the approval card so the AM sees who they're snoozing.",
+        maxLength: 200,
+      },
     },
-    required: ["customer_id", "days"],
+    required: ["customer_id", "days", "bizname"],
     additionalProperties: false,
   },
 

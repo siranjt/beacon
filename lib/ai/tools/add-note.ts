@@ -34,8 +34,14 @@ export const addNoteTool: BeaconTool = {
         minLength: 1,
         maxLength: 4000,
       },
+      bizname: {
+        type: "string",
+        description:
+          "ALWAYS include — the customer's business name from CONTEXT (e.g. 'Acme Salon'). Shown on the approval card so the AM sees who the note is for.",
+        maxLength: 200,
+      },
     },
-    required: ["customer_id", "body"],
+    required: ["customer_id", "body", "bizname"],
     additionalProperties: false,
   },
 

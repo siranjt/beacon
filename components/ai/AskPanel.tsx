@@ -429,10 +429,15 @@ export default function AskPanel() {
                       : null;
                   const customerId =
                     inputCustomerId ?? scopeEntityId ?? "";
-                  const customerName =
-                    (typeof tu.input["bizname"] === "string"
-                      ? (tu.input["bizname"] as string)
-                      : null) ?? "this customer";
+                  // FIX E-16.A — schemas now require `bizname` on mutation
+                  // tools, but be defensive: fall back to the in-conversation
+                  // text or "this customer" if the model still omits it.
+                  const biznameFromArgs =
+                    typeof tu.input["bizname"] === "string" &&
+                    (tu.input["bizname"] as string).trim()
+                      ? (tu.input["bizname"] as string).trim()
+                      : null;
+                  const customerName = biznameFromArgs ?? "this customer";
                   const newEntry = {
                     data: {
                       toolUseId: tu.id,
@@ -599,12 +604,10 @@ export default function AskPanel() {
         } catch {
           /* audit-only — failure shouldn't block the UX */
         }
-        // Continue the conversation: send a fresh user turn carrying the
-        // tool_result so Claude can acknowledge.
-        await askWithToolResult(
-          data,
-          { ok: false, error: "user_declined" },
-        );
+        // FIX E-16.B — fire-and-forget. Don't await the follow-up ask, so
+        // the card's "discarded" state is final even if the next streaming
+        // turn races with concurrent approves on other cards.
+        void askWithToolResult(data, { ok: false, error: "user_declined" });
         return;
       }
 
@@ -630,7 +633,8 @@ export default function AskPanel() {
         if (!res.ok || json.ok === false) {
           const errMsg = json.error || `execute ${res.status}`;
           writeResult("error", null, errMsg);
-          await askWithToolResult(data, { ok: false, error: errMsg });
+          // FIX E-16.B — fire-and-forget, see above.
+          void askWithToolResult(data, { ok: false, error: errMsg });
           return;
         }
         writeResult(
@@ -639,14 +643,18 @@ export default function AskPanel() {
           null,
           json.data ?? null,
         );
-        await askWithToolResult(data, {
+        // FIX E-16.B — fire-and-forget. The card's "approved" state is
+        // already committed by writeResult above; the follow-up ask is for
+        // Claude's narration only and must not block the UI.
+        void askWithToolResult(data, {
           ok: true,
           summary: json.summary ?? "Action completed.",
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         writeResult("error", null, msg);
-        await askWithToolResult(data, { ok: false, error: msg });
+        // FIX E-16.B — fire-and-forget, see above.
+        void askWithToolResult(data, { ok: false, error: msg });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

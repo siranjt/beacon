@@ -44,7 +44,12 @@ const VOICE = `VOICE & STYLE:
 - For action-oriented asks (draft an email, what to say), produce the deliverable directly — don't preface with "Here's an email:".
 - When relevant, end with one short suggested next step, not a generic "let me know if you need more".`;
 
-const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}`;
+const TOOL_USE_CONTRACT = `TOOL USE — HARD RULES (apply when tools are enabled in your scope):
+- ONE TOOL CALL PER TURN. Never propose multiple tool_use blocks in a single response, even if the user asks for several actions at once. If the user asks for multiple actions ("pin all three", "snooze these 5"), pick the single highest-leverage one, call ONE tool for it, and in your text reply explain in one sentence what you did and offer to do the next one on a follow-up turn. The product enforces this server-side — extra tool_use blocks are dropped — so multi-tool responses just confuse the AM.
+- ALWAYS include the customer's \`bizname\` argument when a tool takes one (snooze_customer, pin_customer, mark_contacted_today, add_note). The bizname renders on the approval card so the AM sees who the action targets. Pull bizname from CONTEXT (identity.bizname for single-customer scopes, the matched row's bizname for multi-customer scopes).
+- Do NOT echo the action back in your text reply when you propose a tool ("I'll pin Acme..."). The approval card already shows the action — your prose should add useful context the card doesn't show (why this action, what to watch for next).`;
+
+const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${TOOL_USE_CONTRACT}`;
 
 export function buildSystemPrompt(
   scope: AiScope,

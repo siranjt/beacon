@@ -43,8 +43,14 @@ export const markContactedTodayTool: BeaconTool = {
           "Optional 1-line note about what was discussed or attempted (e.g. 'Confirmed onboarding for Thursday', 'Left VM about overdue invoice'). Stored on the am_actions row and appears in the AM-activity digest.",
         maxLength: 500,
       },
+      bizname: {
+        type: "string",
+        description:
+          "ALWAYS include — the customer's business name from CONTEXT (e.g. 'Acme Salon'). Shown on the approval card so the AM sees who they're logging a touch for.",
+        maxLength: 200,
+      },
     },
-    required: ["customer_id", "channel"],
+    required: ["customer_id", "channel", "bizname"],
     additionalProperties: false,
   },
 

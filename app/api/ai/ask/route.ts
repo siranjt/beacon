@@ -286,8 +286,29 @@ export async function POST(req: NextRequest) {
         // content block once its JSON input has finalized. The client renders
         // an ActionCard from this and executes ONLY after the AM clicks
         // Approve (separate /api/ai/action/execute endpoint).
+        //
+        // FIX E-16.C — enforce a HARD one-tool-per-turn cap. Even when the
+        // prompt says "act on one at a time", Sonnet sometimes emits multiple
+        // tool_use blocks in a single response (e.g. "pin all three"). Letting
+        // them all through would (a) violate the contract the prompt promises
+        // the AM and (b) cause concurrent approve cards that race the
+        // follow-up streaming turn. Cap to the first; tell the AM via a
+        // delta what happened so the conversation reads cleanly.
+        let toolUsesEmitted = 0;
         sdkStream.on("contentBlock", (block: ContentBlock) => {
           if (block.type !== "tool_use") return;
+          if (toolUsesEmitted >= 1) {
+            // Note: we don't have a clean way to send "this is a system
+            // note from Beacon, not a model token" — surfacing via the same
+            // delta channel keeps the UX coherent. The AI will see it on
+            // its next turn (as part of the conversation transcript) and
+            // adjust naturally.
+            const skipped = `\n\n_(Beacon: I can only act on one customer at a time. Skipping the rest — start with this one, then ask me again for the next.)_`;
+            assistantBuf += skipped;
+            send({ delta: skipped });
+            return;
+          }
+          toolUsesEmitted += 1;
           send({
             tool_use: {
               id: block.id,
