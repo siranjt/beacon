@@ -1155,6 +1155,44 @@ export async function composeSnapshot(
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Phase E-18 — hydrate comms_perspective from the Haiku cache. READ-ONLY:
+  // composeSnapshot must never trigger Haiku — that would burn through
+  // Vercel's function budget at ~927 calls per refresh. The on-demand
+  // /api/customer/perspective endpoint lazily populates rows when an AM
+  // opens a customer.
+  // -------------------------------------------------------------------------
+  try {
+    const { readPerspectivesForEntities } = await import(
+      "./comms-perspective-store"
+    );
+    const eids = scored.map((c) => c.entity_id);
+    const perspectives = await readPerspectivesForEntities(eids);
+    let hits = 0;
+    for (const c of scored) {
+      const p = perspectives.get(c.entity_id);
+      c.comms_perspective = p
+        ? {
+            sentiment: p.sentiment,
+            topics: p.topics,
+            substance_score: p.substance_score,
+            initiator_pattern: p.initiator_pattern,
+            response_latency_hours: p.response_latency_hours,
+          }
+        : null;
+      if (p) hits += 1;
+    }
+    console.log(
+      `[E-18] comms perspective hydration: ${hits}/${scored.length} cache hits`,
+    );
+  } catch (e) {
+    console.warn(
+      "[E-18] comms perspective hydration skipped:",
+      e instanceof Error ? e.message : String(e),
+    );
+    for (const c of scored) c.comms_perspective = c.comms_perspective ?? null;
+  }
+
   // Sort by composite desc, then comms volume desc
   scored.sort((a, b) => {
     if (b.signals_v2.composite !== a.signals_v2.composite) return b.signals_v2.composite - a.signals_v2.composite;

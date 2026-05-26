@@ -678,6 +678,15 @@ function V2CustomerCardInner({
                 ✓ Contacted recently
               </span>
             )}
+            {/* Phase E-18 — Haiku-derived comms sentiment chip. Reads
+                ScoredCustomerV2.comms_perspective, populated on demand
+                via /api/customer/perspective. Watchfire palette only:
+                warm → patina, neutral → smoke, tense → ember soft,
+                escalating → ember bold. */}
+            <CommsSentimentChip
+              perspective={customer.comms_perspective}
+              bizName={customer.company}
+            />
             {trajectoryBadge.label && (
               <span
                 className={`rounded-zoca-sm px-1.5 py-0.5 text-[10px] font-semibold ${trajectoryBadge.className}`}
@@ -724,6 +733,11 @@ function V2CustomerCardInner({
               </>
             )}
           </div>
+          {/* Phase E-18 — comms-perspective topic glyphs. Watchfire-styled
+              brass-tinted micro-pills with the top 1-3 topics surfaced by
+              Haiku ("billing", "no-shows", etc.). Hidden when no
+              perspective is cached. */}
+          <CommsTopicRow perspective={customer.comms_perspective} />
           {/* Phase 20 — one-click contact launchers */}
           {(customer.email || customer.phone) && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
@@ -1610,3 +1624,92 @@ export default V2CustomerCard;
 // Phase E-15.4b — performanceChipSummary extracted to V2CardChips.tsx.
 // Phase E-15.6 — BiznameLink + ContactsSection extracted to V2CardBizname.tsx
 // (~110 lines off V2CustomerCard).
+
+/* ────────────────────────────────────────────────────────────────
+ * Phase E-18 — comms perspective chip + topic glyphs.
+ *
+ * Watchfire palette mapping (per spec — no new colors):
+ *   warm        → patina  (#4A7C59) text on bg-patina/18
+ *   neutral     → smoke   (text-zoca-text-2 on parchment tint)
+ *   tense       → ember soft (border + 18% bg, text-ember-700)
+ *   escalating  → ember bold (solid ember bg, char text)
+ *
+ * Both components soft-render — null perspective = nothing rendered.
+ * ──────────────────────────────────────────────────────────────── */
+
+type LightPerspective = NonNullable<
+  import("@/lib/customer/types").ScoredCustomerV2["comms_perspective"]
+>;
+
+const SENTIMENT_LABEL: Record<LightPerspective["sentiment"], string> = {
+  warm: "warm",
+  neutral: "neutral",
+  tense: "tense",
+  escalating: "escalating",
+};
+
+const SENTIMENT_EMOJI: Record<LightPerspective["sentiment"], string> = {
+  warm: "◐",
+  neutral: "·",
+  tense: "▲",
+  escalating: "●",
+};
+
+function CommsSentimentChip({
+  perspective,
+  bizName,
+}: {
+  perspective: LightPerspective | null | undefined;
+  bizName: string | null;
+}) {
+  if (!perspective) return null;
+  const { sentiment } = perspective;
+  const className =
+    sentiment === "warm"
+      ? "bg-emerald-700/12 text-emerald-800 border border-emerald-700/25"
+      : sentiment === "neutral"
+        ? "bg-zoca-bg-tint text-zoca-text-2 border border-zoca-border"
+        : sentiment === "tense"
+          ? "bg-orange-600/15 text-orange-800 border border-orange-600/30"
+          : "bg-red-700/22 text-red-900 border border-red-700/45 font-semibold";
+  const tip =
+    `Comms sentiment over the last 90 days: ${SENTIMENT_LABEL[sentiment]}. ` +
+    `Substance ${perspective.substance_score}/100 · initiator ${perspective.initiator_pattern.replace(/_/g, " ")}` +
+    (perspective.response_latency_hours !== null
+      ? ` · median reply ${perspective.response_latency_hours}h`
+      : "") +
+    `. Derived by Haiku${bizName ? ` for ${bizName}` : ""}.`;
+  return (
+    <span
+      className={`rounded-zoca-pill px-2 py-0.5 text-[10px] uppercase tracking-wider ${className}`}
+      title={tip}
+    >
+      <span aria-hidden style={{ marginRight: 2 }}>
+        {SENTIMENT_EMOJI[sentiment]}
+      </span>
+      {SENTIMENT_LABEL[sentiment]}
+    </span>
+  );
+}
+
+function CommsTopicRow({
+  perspective,
+}: {
+  perspective: LightPerspective | null | undefined;
+}) {
+  if (!perspective || perspective.topics.length === 0) return null;
+  const topics = perspective.topics.slice(0, 3);
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {topics.map((t) => (
+        <span
+          key={t}
+          className="rounded-zoca-sm bg-amber-700/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 border border-amber-700/20"
+          title={`Comms topic surfaced by Haiku: ${t}`}
+        >
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}

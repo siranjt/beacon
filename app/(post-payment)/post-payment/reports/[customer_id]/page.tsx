@@ -23,6 +23,10 @@ import { ReanalyzeButton } from "../../_components/ReanalyzeButton";
 import ReportVisual from "../../_components/ReportVisual";
 import PageViewLogger from "@/components/PageViewLogger";
 import SuggestedActions from "@/components/ai/SuggestedActions";
+// Phase E-18 — Haiku-derived comms perspective surfaced next to verdict.
+// Resolves cb_customer_id → entity_id via the post-payment row (entity_id
+// is populated after BaseSheet sync) and reads cache-only.
+import { readPerspective } from "@/lib/customer/comms-perspective-store";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +120,12 @@ export default async function ReportPage({ params }: { params: { customer_id: st
     fetchText(c.report_blob_md_url),
   ]);
 
+  // Phase E-18 — cache-only perspective lookup. entity_id is null until
+  // BaseSheet sync completes (status === "pending_entity"); skip the read.
+  const perspective = c.entity_id
+    ? await readPerspective(c.entity_id).catch(() => null)
+    : null;
+
   return (
     <BeaconPageShell>
       <PageViewLogger
@@ -179,6 +189,38 @@ export default async function ReportPage({ params }: { params: { customer_id: st
       <div className="anim-rise" style={{ animationDelay: "0.12s" }}>
         <VerdictBlock verdict={c.verdict} needsAmCall={c.needs_am_call} oneLine={c.verdict_one_line} />
       </div>
+
+      {perspective && (
+        <div
+          className="anim-rise flex flex-wrap items-center gap-2 text-xs"
+          style={{ animationDelay: "0.15s" }}
+        >
+          <span className="uppercase tracking-wider text-ink-dim">Comms:</span>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold uppercase tracking-wider ${
+              perspective.sentiment === "warm"
+                ? "bg-accent-green-bg text-accent-green"
+                : perspective.sentiment === "neutral"
+                  ? "bg-elevated text-ink-dim"
+                  : perspective.sentiment === "tense"
+                    ? "bg-accent-yellow-bg text-accent-yellow"
+                    : "bg-accent-red-bg text-accent-red"
+            }`}
+            title={`Haiku-derived sentiment over the last 90 days of comms. Substance ${perspective.substance_score}/100.`}
+          >
+            {perspective.sentiment}
+          </span>
+          {perspective.topics.slice(0, 3).map((t) => (
+            <span
+              key={t}
+              className="rounded border border-line bg-surface px-2 py-0.5 text-ink-muted"
+              title={`Comms topic: ${t}`}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="anim-rise" style={{ animationDelay: "0.18s" }}>
         <h3 className="text-lg font-semibold mb-3 text-ink">Key facts</h3>

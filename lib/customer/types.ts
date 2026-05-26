@@ -367,6 +367,24 @@ export type ScoredCustomerV2 = ScoredCustomer & {
    *                      in >25h). Applied at compose time when freshness gates fail.
    */
   signal_state?: "fresh" | "warming" | "ready" | "stale_signals";
+  /**
+   * Phase E-18 — Haiku-derived comms perspective summary. Lightweight
+   * subset of `beacon_ai_comms_perspective` — just the fields the
+   * V2CustomerCard / list rows render (sentiment chip + topic glyphs +
+   * substance bar). The full row (with sentiment_evidence, conversation
+   * arcs, haiku_summary) is fetched on demand via /api/customer/perspective.
+   *
+   * null = no cached perspective yet for this entity. Reads are
+   * cache-only at composeSnapshot time — the on-demand API endpoint
+   * lazily populates rows when an AM opens a customer.
+   */
+  comms_perspective?: {
+    sentiment: "warm" | "neutral" | "tense" | "escalating";
+    topics: string[];
+    substance_score: number;
+    initiator_pattern: "mostly_us" | "mostly_them" | "balanced";
+    response_latency_hours: number | null;
+  } | null;
 };
 
 export type AmTierRow = {

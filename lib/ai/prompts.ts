@@ -130,6 +130,9 @@ SCOPE-SPECIFIC HEURISTICS:
 - "Patterns" → identify cross-cutting signals (e.g. "4 of your 7 RED customers haven't been contacted in 14+ days — your team is silent, not them").
 - "What can wait?" → name specific items + reasons. Don't dodge with "all are important".
 
+COMMS PERSPECTIVE (Phase E-18):
+critical_customers + watching rows carry a comms_perspective field when one is cached. When the AM asks about tone or topics across the inbox ("anyone escalating?", "what are they talking about today?"), cite comm:sentiment:<entity_id> and comm:topic:<slug>:<entity_id> rather than guessing from raw messages. Tense + escalating sentiments are inbox-worthy on their own — surface them explicitly when ranking. Null comms_perspective = no Haiku cached yet; do not invent.
+
 ${header}
 
 ${profileSection}${memorySection}CONTEXT (JSON):
@@ -162,6 +165,9 @@ SCOPE-SPECIFIC HEURISTICS:
 - "Remember that ..." (a fact about this customer) → propose add_note with a dated, concrete body.
 - "Make sure I don't forget about this one" → propose pin_customer with pin=true.
 
+COMMS PERSPECTIVE (Phase E-18):
+When the user asks about a customer's emotional state ("how do they feel about us?", "are they happy?", "what's the vibe?") or what they're talking about ("what topics?", "what's on their mind?", "what have they been bringing up?"), cite the comm:sentiment:<entity_id> and comm:topic:<slug>:<entity_id> perspective fields rather than re-scanning raw messages. These come from a Haiku pass over the last 90 days of comms, are cached daily, and live in CONTEXT.comms_perspective (when present). Use haiku_summary for the narrative answer, topics for what they care about, substance_score for whether the relationship is dense or perfunctory, and initiator_pattern for who's driving the conversation. If comms_perspective is null, the perspective hasn't been computed yet — say "no Haiku perspective cached for this customer; open their detail page to generate one" rather than guessing.
+
 ${header}
 
 ${profileSection}${memorySection}CONTEXT (JSON):
@@ -189,6 +195,9 @@ SCOPE-SPECIFIC HEURISTICS:
 - "Common patterns across RED" → identify shared signals (e.g. "5 of 8 RED customers are failing on we_silent — outbound isn't happening"). Suggest a single intervention that could help multiple.
 - "Who haven't I contacted?" → look at days_since_out, sort by composite-risk × days-silent product. Surface the worst 5.
 - Don't list 20 customers — keep lists short (5-8 max) and ranked.
+
+COMMS PERSPECTIVE (Phase E-18):
+top_at_risk rows now carry a comms_perspective field when one is cached for that entity. When the user asks about emotional tone across the book ("any tense relationships?", "what topics keep coming up?", "who's escalating?"), prefer scanning these fields and citing comm:sentiment:<entity_id> / comm:topic:<slug>:<entity_id> over re-reading raw messages. Counts well: "4 of your top 8 at-risk customers are 'tense' on comms sentiment." Don't fabricate sentiment for entities with null comms_perspective — flag those explicitly as "no perspective cached".
 
 ${header}
 

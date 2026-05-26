@@ -18,6 +18,13 @@
  *   - usage    — a Mixpanel usage event. id = "<event_name>:<entity_id>"
  *   - count    — a derived count. id = "<readable_name>"
  *
+ * Phase E-18 (Haiku comms perspective) adds three new comm-flavored shapes
+ * the model can reference, all under the existing `comm` category so
+ * client-side popover styling is consistent:
+ *   - comm:sentiment:<entity_id>           — warm/neutral/tense/escalating
+ *   - comm:topic:<slug>:<entity_id>        — one per perspective topic
+ *   - comm:substance:<entity_id>           — 0-100 substance score
+ *
  * Both the server (when building the system prompt) and the client (when
  * rendering chips) derive the citation lookup from the SAME loader output,
  * so the keys + their values are guaranteed to agree. The server injects
@@ -165,6 +172,83 @@ const SUB_SCORE_LABELS: Record<string, string> = {
   usage: "App usage drop",
   billing: "Billing pressure",
 };
+
+/* ────────────────────────────────────────────────────────────────
+ * Phase E-18 — comms perspective citation helpers.
+ *
+ * The shape that lands here is the LIGHT subset of the perspective
+ * (sentiment, topics, substance_score, initiator_pattern, response_latency)
+ * — the same subset hydrated onto ScoredCustomerV2.comms_perspective.
+ * The full row (haiku_summary, conversation_arcs, sentiment_evidence)
+ * lives behind /api/customer/perspective and isn't surfaced via citation.
+ * ──────────────────────────────────────────────────────────────── */
+
+export interface CommsPerspectiveCitationData {
+  sentiment: "warm" | "neutral" | "tense" | "escalating";
+  topics: string[];
+  substance_score: number;
+  initiator_pattern: "mostly_us" | "mostly_them" | "balanced";
+  response_latency_hours: number | null;
+}
+
+function topicSlug(topic: string): string {
+  return topic
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32);
+}
+
+/**
+ * Emit comm:sentiment, comm:topic:*, comm:substance entries for a single
+ * entity. The bizname suffix on labels makes the popover scannable when
+ * cited inside a multi-customer scope (inbox, book).
+ *
+ * Returns an empty object when `perspective` is null/undefined — caller
+ * can safely spread `{...buildCommsPerspectiveCitations(...)}` without an
+ * existence check.
+ */
+export function buildCommsPerspectiveCitations(args: {
+  entityId: string;
+  bizName: string | null;
+  perspective: CommsPerspectiveCitationData | null | undefined;
+}): CitationLookup {
+  const out: CitationLookup = {};
+  const p = args.perspective;
+  if (!p) return out;
+  const eid = args.entityId;
+  const suffix = args.bizName ? ` — ${args.bizName}` : "";
+
+  out[makeCitationKey("comm", `sentiment:${eid}`)] = {
+    category: "comm",
+    label: `Comms sentiment${suffix}`,
+    value: p.sentiment,
+    raw: {
+      initiator_pattern: p.initiator_pattern,
+      response_latency_hours: p.response_latency_hours,
+    },
+  };
+
+  out[makeCitationKey("comm", `substance:${eid}`)] = {
+    category: "comm",
+    label: `Comms substance${suffix}`,
+    value: `${p.substance_score}/100`,
+    raw: { substance_score: p.substance_score },
+  };
+
+  for (const t of p.topics.slice(0, 5)) {
+    const slug = topicSlug(t);
+    if (!slug) continue;
+    out[makeCitationKey("comm", `topic:${slug}:${eid}`)] = {
+      category: "comm",
+      label: `Topic${suffix}`,
+      value: t,
+      raw: { topic_raw: t },
+    };
+  }
+
+  return out;
+}
 
 /**
  * Build a citation lookup for a single-customer (customer-360) scope.

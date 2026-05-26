@@ -200,6 +200,50 @@ export default function EscalationsBrowser() {
   const [sinceDays, setSinceDays] = useState("90");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<ApiResponse | null>(null);
+  // Phase E-18 — Haiku-derived comms perspective for the looked-up customer.
+  // Fetches /api/customer/perspective/{entityId} on customer load; that
+  // route is read-through cache (lazy Haiku fill on first AM visit).
+  const [perspective, setPerspective] = useState<{
+    sentiment: "warm" | "neutral" | "tense" | "escalating";
+    topics: string[];
+    substance_score: number;
+  } | null>(null);
+  useEffect(() => {
+    const eid = response?.customer?.entityId;
+    if (!eid) {
+      setPerspective(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(
+          `/api/customer/perspective/${encodeURIComponent(eid)}`,
+          { cache: "no-store" },
+        );
+        if (!r.ok) return;
+        const json = (await r.json()) as {
+          ok: boolean;
+          perspective?: {
+            sentiment: "warm" | "neutral" | "tense" | "escalating";
+            topics: string[];
+            substance_score: number;
+          };
+        };
+        if (cancelled || !json.ok || !json.perspective) return;
+        setPerspective({
+          sentiment: json.perspective.sentiment,
+          topics: json.perspective.topics,
+          substance_score: json.perspective.substance_score,
+        });
+      } catch {
+        /* soft-fail: perspective is a nice-to-have on this surface */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [response?.customer?.entityId]);
   const [commsState, setCommsState] = useState<CommsLoadState>({ status: "idle" });
   const [triage, setTriage] = useState<TriageState>({ status: "idle", sourceMessage: null, result: null });
   const [retrying, setRetrying] = useState<Set<Channel>>(new Set());
@@ -605,6 +649,48 @@ export default function EscalationsBrowser() {
                 <div className="text-[38px] font-extrabold tracking-[-0.025em] leading-[1.0] truncate">
                   {response.customer.bizName || "(no name)"}
                 </div>
+                {perspective && (
+                  <div
+                    className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px]"
+                    title={`Haiku-derived comms perspective. Substance ${perspective.substance_score}/100.`}
+                  >
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider"
+                      style={{
+                        background:
+                          perspective.sentiment === "warm"
+                            ? "rgba(74,124,89,0.16)"
+                            : perspective.sentiment === "neutral"
+                              ? "rgba(110,95,80,0.12)"
+                              : perspective.sentiment === "tense"
+                                ? "rgba(200,67,29,0.16)"
+                                : "rgba(124,45,18,0.22)",
+                        color:
+                          perspective.sentiment === "warm"
+                            ? "#4A7C59"
+                            : perspective.sentiment === "neutral"
+                              ? "#6E5F50"
+                              : perspective.sentiment === "tense"
+                                ? "#C8431D"
+                                : "#7C2D12",
+                      }}
+                    >
+                      <span
+                        className="inline-block w-1.5 h-1.5 rounded-full bg-current"
+                        aria-hidden
+                      />
+                      {perspective.sentiment}
+                    </span>
+                    {perspective.topics.slice(0, 3).map((t) => (
+                      <span
+                        key={t}
+                        className="px-2 py-0.5 rounded border border-border bg-panel2 text-muted2"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="text-[14px] text-muted2 mt-2.5 truncate">
                   {response.customer.email || "—"}
                   {response.customer.phone ? ` · ${response.customer.phone}` : ""}

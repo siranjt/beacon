@@ -8,6 +8,11 @@ import BeaconPageShell from "@/components/BeaconPageShell";
 import ReportPreview from "../../_components/ReportPreview";
 import RecordRecentReport from "../../_components/RecordRecentReport";
 import SuggestedActions from "@/components/ai/SuggestedActions";
+// Phase E-18 — comms perspective chip in the report header. Cache-read
+// only; we don't block the report render on Haiku. If today's row exists
+// we paint the chip; otherwise the section stays empty and the on-demand
+// /api endpoint fills the cache when an AM opens Customer 360.
+import { readPerspective } from "@/lib/customer/comms-perspective-store";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +61,9 @@ export default async function ReportPage({
 
   const report = composeReport(data, {});
   const i = report.identity;
+
+  // Phase E-18 — cache-only perspective read. Don't await Haiku here.
+  const perspective = await readPerspective(entityId).catch(() => null);
 
   return (
     <BeaconPageShell>
@@ -150,6 +158,63 @@ export default async function ReportPage({
           {i.city ? `${i.city}${i.state ? ", " + i.state : ""}` : "Unknown location"}
           {i.verticalDisplay ? ` · ${i.verticalDisplay}` : ""}
         </p>
+        {perspective && (
+          <div
+            style={{
+              marginTop: 10,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: SANS,
+                fontSize: 10,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                padding: "3px 9px",
+                borderRadius: 999,
+                background:
+                  perspective.sentiment === "warm"
+                    ? "rgba(74,124,89,0.15)"
+                    : perspective.sentiment === "neutral"
+                      ? "rgba(110,95,80,0.10)"
+                      : perspective.sentiment === "tense"
+                        ? "rgba(200,67,29,0.15)"
+                        : "rgba(124,45,18,0.20)",
+                color:
+                  perspective.sentiment === "warm"
+                    ? "#4A7C59"
+                    : perspective.sentiment === "neutral"
+                      ? MUTED
+                      : perspective.sentiment === "tense"
+                        ? "#C8431D"
+                        : "#7C2D12",
+                fontWeight: 600,
+              }}
+            >
+              {perspective.sentiment}
+            </span>
+            {perspective.topics.slice(0, 3).map((t) => (
+              <span
+                key={t}
+                style={{
+                  fontFamily: SANS,
+                  fontSize: 11,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(217,164,65,0.15)",
+                  border: `1px solid ${BORDER}`,
+                  color: TEXT,
+                }}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Phase E-9 — Beacon AI proactive recommendations for this report */}

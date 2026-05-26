@@ -23,8 +23,33 @@ import {
 import type { ScoredCustomerV2 } from "@/lib/customer/types";
 import {
   buildCitationLookup,
+  buildCommsPerspectiveCitations,
   type CitationLookup,
+  type CommsPerspectiveCitationData,
 } from "@/lib/ai/citations";
+import {
+  readPerspective,
+  readPerspectivesForEntities,
+  type PerspectiveRow,
+} from "@/lib/customer/comms-perspective-store";
+
+/**
+ * Phase E-18 — collapse a PerspectiveRow into the lightweight shape the
+ * citation helper + context blob both consume. Returning null short-
+ * circuits everywhere downstream.
+ */
+function asCitationPerspective(
+  row: PerspectiveRow | null | undefined,
+): CommsPerspectiveCitationData | null {
+  if (!row) return null;
+  return {
+    sentiment: row.sentiment,
+    topics: row.topics,
+    substance_score: row.substance_score,
+    initiator_pattern: row.initiator_pattern,
+    response_latency_hours: row.response_latency_hours,
+  };
+}
 
 const AM_BOOK_TOP_N = 80;
 const TICKETS_TOP_N = 40;
@@ -143,10 +168,22 @@ export async function loadInboxContext(opts: {
       ? redSilenceDays[Math.floor(redSilenceDays.length / 2)]
       : null;
 
+  // Phase E-18 — bulk cache read for critical + watching entities.
+  const inboxEntityIds = [
+    ...red.map((c) => c.entity_id),
+    ...yellow.map((c) => c.entity_id),
+    ...needsCall
+      .map((c) => c.entity_id ?? null)
+      .filter((eid): eid is string => typeof eid === "string" && eid.length > 0),
+  ];
+  const perspectiveMap = await readPerspectivesForEntities(
+    Array.from(new Set(inboxEntityIds)),
+  );
+
   // Phase E-17 Wave 3a.1 — citation lookup for inbox. Mirrors customer-360
   // granularity for the customers actually surfaced in the inbox + ticket
   // entries for the open-ticket sample + aggregate counts.
-  const citationLookup: CitationLookup = buildCitationLookup({
+  const baseCitations = buildCitationLookup({
     kind: "inbox",
     counts: {
       critical: red.length,
@@ -200,6 +237,22 @@ export async function loadInboxContext(opts: {
       created_at: t.createdAt,
     })),
   });
+  const commsCitations: CitationLookup = {};
+  for (const c of [...red, ...yellow]) {
+    const persp = perspectiveMap.get(c.entity_id);
+    Object.assign(
+      commsCitations,
+      buildCommsPerspectiveCitations({
+        entityId: c.entity_id,
+        bizName: c.company ?? null,
+        perspective: asCitationPerspective(persp),
+      }),
+    );
+  }
+  const citationLookup: CitationLookup = {
+    ...baseCitations,
+    ...commsCitations,
+  };
 
   const blob = JSON.stringify(
     {
@@ -216,24 +269,46 @@ export async function loadInboxContext(opts: {
         outbound_silence_30d: silent30,
         red_median_days_since_outbound: redMedianSilence,
       },
-      critical_customers: red.map((c) => ({
-        entity_id: c.entity_id,
-        biz_name: c.company,
-        am_name: c.am_name,
-        composite: c.signals_v2?.composite,
-        stoplight: c.signals_v2?.stoplight,
-        reason: c.signals_v2?.reason_one_line,
-        suggested_action: c.signals_v2?.suggested_action,
-        days_since_in: c.metrics?.days_since_in,
-        days_since_out: c.metrics?.days_since_out,
-      })),
-      watching: yellow.map((c) => ({
-        entity_id: c.entity_id,
-        biz_name: c.company,
-        am_name: c.am_name,
-        composite: c.signals_v2?.composite,
-        reason: c.signals_v2?.reason_one_line,
-      })),
+      critical_customers: red.map((c) => {
+        const persp = perspectiveMap.get(c.entity_id);
+        return {
+          entity_id: c.entity_id,
+          biz_name: c.company,
+          am_name: c.am_name,
+          composite: c.signals_v2?.composite,
+          stoplight: c.signals_v2?.stoplight,
+          reason: c.signals_v2?.reason_one_line,
+          suggested_action: c.signals_v2?.suggested_action,
+          days_since_in: c.metrics?.days_since_in,
+          days_since_out: c.metrics?.days_since_out,
+          comms_perspective: persp
+            ? {
+                sentiment: persp.sentiment,
+                topics: persp.topics,
+                substance_score: persp.substance_score,
+                initiator_pattern: persp.initiator_pattern,
+                response_latency_hours: persp.response_latency_hours,
+              }
+            : null,
+        };
+      }),
+      watching: yellow.map((c) => {
+        const persp = perspectiveMap.get(c.entity_id);
+        return {
+          entity_id: c.entity_id,
+          biz_name: c.company,
+          am_name: c.am_name,
+          composite: c.signals_v2?.composite,
+          reason: c.signals_v2?.reason_one_line,
+          comms_perspective: persp
+            ? {
+                sentiment: persp.sentiment,
+                topics: persp.topics,
+                substance_score: persp.substance_score,
+              }
+            : null,
+        };
+      }),
       needs_am_call: needsCall.map((c) => ({
         cb_customer_id: c.cb_customer_id,
         biz_name: c.biz_name,
@@ -273,15 +348,17 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
   const snap = await readLatestSnapshotV2().catch(() => null);
   const sc = findInSnapshot(snap, entityId);
 
-  const [perfR, escR, ppR] = await Promise.allSettled([
+  const [perfR, escR, ppR, perspectiveR] = await Promise.allSettled([
     fetchEntityReportData(entityId),
     fetchTicketsForCustomer({ entityId }),
     sc?.customer_id ? getCustomer(sc.customer_id) : Promise.resolve(null),
+    readPerspective(entityId),
   ]);
 
   const perf = perfR.status === "fulfilled" ? perfR.value : null;
   const escalations = escR.status === "fulfilled" ? escR.value : [];
   const postPayment = ppR.status === "fulfilled" ? ppR.value : null;
+  const perspective = perspectiveR.status === "fulfilled" ? perspectiveR.value : null;
 
   // Phase E-17 Wave 3a — build citation lookup ahead of the blob so we can
   // inject the legal-keys map into CONTEXT under `_citation_lookup`. The
@@ -304,19 +381,26 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
       }
     : null;
   const citationLookup: CitationLookup = sc
-    ? buildCitationLookup({
-        kind: "customer-360",
-        sc,
-        performance: performanceForCite,
-        tickets: escalations,
-        postPayment: postPayment
-          ? {
-              verdict: postPayment.verdict,
-              needs_am_call: postPayment.needs_am_call,
-              verdict_one_line: postPayment.verdict_one_line,
-            }
-          : null,
-      })
+    ? {
+        ...buildCitationLookup({
+          kind: "customer-360",
+          sc,
+          performance: performanceForCite,
+          tickets: escalations,
+          postPayment: postPayment
+            ? {
+                verdict: postPayment.verdict,
+                needs_am_call: postPayment.needs_am_call,
+                verdict_one_line: postPayment.verdict_one_line,
+              }
+            : null,
+        }),
+        ...buildCommsPerspectiveCitations({
+          entityId,
+          bizName: sc.company ?? null,
+          perspective: asCitationPerspective(perspective),
+        }),
+      }
     : {};
 
   const blob = JSON.stringify(
@@ -422,6 +506,22 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
             predicted_6_month_leads: postPayment.predicted_6_month_leads,
             cb_created_at: postPayment.cb_created_at,
             updated_at: postPayment.updated_at,
+          }
+        : null,
+      // Phase E-18 — Haiku-derived comms perspective (90-day window).
+      // null when no perspective row exists yet for this entity — the AM
+      // hasn't opened the customer detail page since the table was
+      // populated. Don't fabricate sentiment from absence.
+      comms_perspective: perspective
+        ? {
+            sentiment: perspective.sentiment,
+            topics: perspective.topics,
+            substance_score: perspective.substance_score,
+            initiator_pattern: perspective.initiator_pattern,
+            response_latency_hours: perspective.response_latency_hours,
+            haiku_summary: perspective.haiku_summary,
+            conversation_arcs: perspective.conversation_arcs,
+            computed_at: perspective.computed_at,
           }
         : null,
     },
@@ -536,9 +636,15 @@ export async function loadCustomerBookContext(opts: {
     (c) => (c.metrics?.days_since_out ?? 0) >= 30,
   ).length;
 
+  // Phase E-18 — bulk cache read for the top-at-risk customers. Cache-only;
+  // never triggers Haiku from the AI ask path.
+  const perspectiveMap = await readPerspectivesForEntities(
+    top.map((c) => c.entity_id),
+  );
+
   // Phase E-17 Wave 3a — citation lookup for the book scope. Counts +
   // per-row composites/days-since for everything we surface in `top_at_risk`.
-  const citationLookup: CitationLookup = buildCitationLookup({
+  const baseCitations = buildCitationLookup({
     kind: "customer-book",
     counts,
     trajectory: { worsening, improving },
@@ -557,6 +663,19 @@ export async function loadCustomerBookContext(opts: {
       days_since_out: c.metrics?.days_since_out ?? null,
     })),
   });
+  const commsCitations: CitationLookup = {};
+  for (const c of top) {
+    const persp = perspectiveMap.get(c.entity_id);
+    Object.assign(
+      commsCitations,
+      buildCommsPerspectiveCitations({
+        entityId: c.entity_id,
+        bizName: c.company ?? null,
+        perspective: asCitationPerspective(persp),
+      }),
+    );
+  }
+  const citationLookup: CitationLookup = { ...baseCitations, ...commsCitations };
 
   const blob = JSON.stringify(
     {
@@ -571,19 +690,32 @@ export async function loadCustomerBookContext(opts: {
         outbound_silence_14d: silent_14d_count,
         outbound_silence_30d: silent_30d_count,
       },
-      top_at_risk: top.map((c) => ({
-        entity_id: c.entity_id,
-        biz_name: c.company,
-        am_name: c.am_name,
-        composite: c.signals_v2?.composite,
-        stoplight: c.signals_v2?.stoplight,
-        tier: c.signals_v2?.tier,
-        reason: c.signals_v2?.reason_one_line,
-        suggested: c.signals_v2?.suggested_action,
-        trajectory: c.signals_v2?.trajectory_7d,
-        days_since_in: c.metrics?.days_since_in,
-        days_since_out: c.metrics?.days_since_out,
-      })),
+      top_at_risk: top.map((c) => {
+        const persp = perspectiveMap.get(c.entity_id);
+        return {
+          entity_id: c.entity_id,
+          biz_name: c.company,
+          am_name: c.am_name,
+          composite: c.signals_v2?.composite,
+          stoplight: c.signals_v2?.stoplight,
+          tier: c.signals_v2?.tier,
+          reason: c.signals_v2?.reason_one_line,
+          suggested: c.signals_v2?.suggested_action,
+          trajectory: c.signals_v2?.trajectory_7d,
+          days_since_in: c.metrics?.days_since_in,
+          days_since_out: c.metrics?.days_since_out,
+          // Phase E-18 — light perspective subset for top-at-risk rows.
+          comms_perspective: persp
+            ? {
+                sentiment: persp.sentiment,
+                topics: persp.topics,
+                substance_score: persp.substance_score,
+                initiator_pattern: persp.initiator_pattern,
+                response_latency_hours: persp.response_latency_hours,
+              }
+            : null,
+        };
+      }),
     },
     null,
     2,
@@ -667,7 +799,13 @@ export async function loadPerformanceReportContext(
   const snap = await readLatestSnapshotV2().catch(() => null);
   const sc = findInSnapshot(snap, entityId);
 
-  const perf = await fetchEntityReportData(entityId).catch(() => null);
+  const [perfR, perspectiveR] = await Promise.allSettled([
+    fetchEntityReportData(entityId),
+    readPerspective(entityId),
+  ]);
+  const perf = perfR.status === "fulfilled" ? perfR.value : null;
+  const perspective =
+    perspectiveR.status === "fulfilled" ? perspectiveR.value : null;
 
   // Phase E-17 Wave 3a.1 — derive citation-friendly performance numbers.
   // Peak/current/dip computed on the full available series (the loader
@@ -733,22 +871,29 @@ export async function loadPerformanceReportContext(
       }).length
     : 0;
 
-  const citationLookup: CitationLookup = buildCitationLookup({
-    kind: "performance-report",
-    entity_id: entityId,
-    ytd_leads: perf ? ytdLeads : null,
-    predicted_6_month_leads: perf?.forecast?.predicted6MonthLeads ?? null,
-    gbp_clicks_current: gbpClicksCurrent,
-    gbp_clicks_peak: gbpClicksPeak,
-    gbp_dip_pct: gbpDipPct,
-    active_keyword_rankings: activeKeywordRankings,
-    top_keywords: topKeywords,
-    review_target: perf?.forecast?.reviewTarget ?? null,
-    // EntityReportData doesn't carry reviews aggregates yet — leave null so
-    // the entries are skipped.
-    reviews_total: null,
-    reviews_avg_rating: null,
-  });
+  const citationLookup: CitationLookup = {
+    ...buildCitationLookup({
+      kind: "performance-report",
+      entity_id: entityId,
+      ytd_leads: perf ? ytdLeads : null,
+      predicted_6_month_leads: perf?.forecast?.predicted6MonthLeads ?? null,
+      gbp_clicks_current: gbpClicksCurrent,
+      gbp_clicks_peak: gbpClicksPeak,
+      gbp_dip_pct: gbpDipPct,
+      active_keyword_rankings: activeKeywordRankings,
+      top_keywords: topKeywords,
+      review_target: perf?.forecast?.reviewTarget ?? null,
+      // EntityReportData doesn't carry reviews aggregates yet — leave null so
+      // the entries are skipped.
+      reviews_total: null,
+      reviews_avg_rating: null,
+    }),
+    ...buildCommsPerspectiveCitations({
+      entityId,
+      bizName: sc?.company ?? perf?.identity?.title ?? null,
+      perspective: asCitationPerspective(perspective),
+    }),
+  };
 
   const blob = JSON.stringify(
     {
@@ -796,6 +941,19 @@ export async function loadPerformanceReportContext(
                 perf.forecast?.withoutZoca6MonthProfileClicks ?? null,
               review_target: perf.forecast?.reviewTarget ?? null,
             },
+          }
+        : null,
+      // Phase E-18 — Haiku-derived comms perspective alongside the
+      // performance metrics. Lets the AI reason about whether SEO wins
+      // are landing in a warm relationship or a tense one.
+      comms_perspective: perspective
+        ? {
+            sentiment: perspective.sentiment,
+            topics: perspective.topics,
+            substance_score: perspective.substance_score,
+            initiator_pattern: perspective.initiator_pattern,
+            response_latency_hours: perspective.response_latency_hours,
+            haiku_summary: perspective.haiku_summary,
           }
         : null,
     },
@@ -853,7 +1011,19 @@ export async function loadEscalationOverviewContext(): Promise<LoadedContext> {
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .slice(0, TICKETS_TOP_N);
 
-  const citationLookup: CitationLookup = buildCitationLookup({
+  // Phase E-18 — bulk-fetch perspectives for the customers attached to
+  // surfaced tickets. Cache-only; skip if entity_id is missing on the
+  // ticket (the older v1 feed didn't carry it on every row).
+  const escEntityIds = Array.from(
+    new Set(
+      topTickets
+        .map((t) => t.entityId)
+        .filter((eid): eid is string => typeof eid === "string" && eid.length > 0),
+    ),
+  );
+  const perspectiveMap = await readPerspectivesForEntities(escEntityIds);
+
+  const baseCitations = buildCitationLookup({
     kind: "escalation-overview",
     open_total: open.length,
     by_am: byAm,
@@ -871,6 +1041,23 @@ export async function loadEscalationOverviewContext(): Promise<LoadedContext> {
       age_days: ageOf(t.createdAt),
     })),
   });
+  const commsCitations: CitationLookup = {};
+  for (const t of topTickets) {
+    if (!t.entityId) continue;
+    const persp = perspectiveMap.get(t.entityId);
+    Object.assign(
+      commsCitations,
+      buildCommsPerspectiveCitations({
+        entityId: t.entityId,
+        bizName: t.customerName ?? null,
+        perspective: asCitationPerspective(persp),
+      }),
+    );
+  }
+  const citationLookup: CitationLookup = {
+    ...baseCitations,
+    ...commsCitations,
+  };
 
   const blob = JSON.stringify(
     {
@@ -885,18 +1072,33 @@ export async function loadEscalationOverviewContext(): Promise<LoadedContext> {
       open_sample: open
         .slice(0, TICKETS_TOP_N)
         .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
-        .map((t) => ({
-          identifier: t.identifier,
-          title: t.title,
-          state: t.state,
-          customer: t.customerName,
-          am: t.amName,
-          classification: t.classification,
-          created_at: t.createdAt,
-          age_days: Math.floor(
-            (Date.now() - Date.parse(t.createdAt)) / 86_400_000,
-          ),
-        })),
+        .map((t) => {
+          const persp = t.entityId
+            ? perspectiveMap.get(t.entityId)
+            : undefined;
+          return {
+            identifier: t.identifier,
+            title: t.title,
+            state: t.state,
+            customer: t.customerName,
+            am: t.amName,
+            classification: t.classification,
+            created_at: t.createdAt,
+            age_days: Math.floor(
+              (Date.now() - Date.parse(t.createdAt)) / 86_400_000,
+            ),
+            // Phase E-18 — sentiment + topics on the customer behind this
+            // ticket. Helps AI distinguish "stalled ticket on a warm
+            // account" from "stalled ticket on an already-escalating one".
+            comms_perspective: persp
+              ? {
+                  sentiment: persp.sentiment,
+                  topics: persp.topics,
+                  substance_score: persp.substance_score,
+                }
+              : null,
+          };
+        }),
     },
     null,
     2,
@@ -934,7 +1136,19 @@ export async function loadPostPaymentBookContext(): Promise<LoadedContext> {
     return priceIds[0] ?? null;
   };
 
-  const citationLookup: CitationLookup = buildCitationLookup({
+  // Phase E-18 — bulk-fetch perspectives for surfaced post-payment customers.
+  // Cache-only; only customers with a resolved entity_id are eligible (BaseSheet
+  // sync may still be pending for net-new rows — see `pending_entity` status).
+  const ppEntityIds = Array.from(
+    new Set(
+      slice
+        .map((c) => c.entity_id)
+        .filter((eid): eid is string => typeof eid === "string" && eid.length > 0),
+    ),
+  );
+  const perspectiveMap = await readPerspectivesForEntities(ppEntityIds);
+
+  const baseCitations = buildCitationLookup({
     kind: "post-payment-book",
     counts: {
       icp: counts.icp,
@@ -950,28 +1164,57 @@ export async function loadPostPaymentBookContext(): Promise<LoadedContext> {
       first_payment_amount_cents: c.sub_total_cents,
     })),
   });
+  const commsCitations: CitationLookup = {};
+  for (const c of slice) {
+    if (!c.entity_id) continue;
+    const persp = perspectiveMap.get(c.entity_id);
+    Object.assign(
+      commsCitations,
+      buildCommsPerspectiveCitations({
+        entityId: c.entity_id,
+        bizName: c.biz_name ?? null,
+        perspective: asCitationPerspective(persp),
+      }),
+    );
+  }
+  const citationLookup: CitationLookup = {
+    ...baseCitations,
+    ...commsCitations,
+  };
 
   const blob = JSON.stringify(
     {
       scope: "post-payment-book",
       _citation_lookup: citationLookup,
       counts,
-      recent: slice.map((c) => ({
-        cb_customer_id: c.cb_customer_id,
-        biz_name: c.biz_name,
-        am_name: c.am_name,
-        ae_name: c.ae_name,
-        status: c.status,
-        verdict: c.verdict,
-        needs_am_call: c.needs_am_call,
-        verdict_one_line: c.verdict_one_line,
-        key_flags: c.key_flags,
-        booking_platform: c.booking_platform,
-        primary_category: c.primary_category,
-        predicted_6_month_leads: c.predicted_6_month_leads,
-        cb_created_at: c.cb_created_at,
-        updated_at: c.updated_at,
-      })),
+      recent: slice.map((c) => {
+        const persp = c.entity_id
+          ? perspectiveMap.get(c.entity_id)
+          : undefined;
+        return {
+          cb_customer_id: c.cb_customer_id,
+          biz_name: c.biz_name,
+          am_name: c.am_name,
+          ae_name: c.ae_name,
+          status: c.status,
+          verdict: c.verdict,
+          needs_am_call: c.needs_am_call,
+          verdict_one_line: c.verdict_one_line,
+          key_flags: c.key_flags,
+          booking_platform: c.booking_platform,
+          primary_category: c.primary_category,
+          predicted_6_month_leads: c.predicted_6_month_leads,
+          cb_created_at: c.cb_created_at,
+          updated_at: c.updated_at,
+          comms_perspective: persp
+            ? {
+                sentiment: persp.sentiment,
+                topics: persp.topics,
+                substance_score: persp.substance_score,
+              }
+            : null,
+        };
+      }),
     },
     null,
     2,
@@ -1005,21 +1248,43 @@ export async function loadPostPaymentCustomerContext(
     };
   }
   const plan = c.sub_item_price_ids?.[0] ?? null;
-  const citationLookup: CitationLookup = buildCitationLookup({
-    kind: "post-payment-customer",
-    cb_customer_id: c.cb_customer_id,
-    biz_name: c.biz_name,
-    verdict: c.verdict,
-    verdict_one_line: c.verdict_one_line,
-    plan,
-    first_payment_amount_cents: c.sub_total_cents,
-    key_flags: c.key_flags,
-  });
+  // Phase E-18 — perspective when the entity has been resolved + cached.
+  const perspective = c.entity_id ? await readPerspective(c.entity_id) : null;
+  const citationLookup: CitationLookup = {
+    ...buildCitationLookup({
+      kind: "post-payment-customer",
+      cb_customer_id: c.cb_customer_id,
+      biz_name: c.biz_name,
+      verdict: c.verdict,
+      verdict_one_line: c.verdict_one_line,
+      plan,
+      first_payment_amount_cents: c.sub_total_cents,
+      key_flags: c.key_flags,
+    }),
+    ...(c.entity_id
+      ? buildCommsPerspectiveCitations({
+          entityId: c.entity_id,
+          bizName: c.biz_name ?? null,
+          perspective: asCitationPerspective(perspective),
+        })
+      : {}),
+  };
   const blob = JSON.stringify(
     {
       scope: "post-payment-customer",
       _citation_lookup: citationLookup,
       cb_customer_id: c.cb_customer_id,
+      entity_id: c.entity_id ?? null,
+      comms_perspective: perspective
+        ? {
+            sentiment: perspective.sentiment,
+            topics: perspective.topics,
+            substance_score: perspective.substance_score,
+            initiator_pattern: perspective.initiator_pattern,
+            response_latency_hours: perspective.response_latency_hours,
+            haiku_summary: perspective.haiku_summary,
+          }
+        : null,
       biz_name: c.biz_name,
       am_name: c.am_name,
       ae_name: c.ae_name,

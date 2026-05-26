@@ -196,6 +196,10 @@ export default function Customer360({ entityId }: { entityId: string }) {
         <SuggestedActions scope={{ kind: "customer-360", entityId }} />
       </SectionErrorBoundary>
 
+      <SectionErrorBoundary label="Comms perspective">
+        <CommsPerspectivePanel entityId={entityId} />
+      </SectionErrorBoundary>
+
       <SectionErrorBoundary label="Signals">
         <SignalsSection signals={data.signals} error={data.errors.snapshot} />
       </SectionErrorBoundary>
@@ -1045,5 +1049,278 @@ function SkeletonSection() {
         opacity: 0.4,
       }}
     />
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+ * Phase E-18 — comms perspective panel
+ * Fetches /api/customer/perspective/{entityId}. The GET endpoint is
+ * read-through cache: if today's row is missing it triggers Haiku +
+ * persists. From the AM's perspective this means the FIRST visit
+ * lights up the panel; subsequent visits are instant.
+ * ───────────────────────────────────────────────────────────────*/
+
+interface PerspectiveResponse {
+  ok: boolean;
+  perspective?: {
+    entity_id: string;
+    snapshot_date: string;
+    message_count: number;
+    channel_mix: Record<string, number>;
+    direction_mix: { inbound: number; outbound: number; system: number };
+    sentiment: "warm" | "neutral" | "tense" | "escalating";
+    sentiment_evidence: Array<{ snippet: string; source_id: string; why: string }>;
+    topics: string[];
+    substance_score: number;
+    initiator_pattern: "mostly_us" | "mostly_them" | "balanced";
+    response_latency_hours: number | null;
+    conversation_arcs: Array<{
+      start_iso: string;
+      peak_iso: string;
+      end_iso: string;
+      topic: string;
+      resolved: boolean;
+    }>;
+    haiku_summary: string;
+    computed_at: string;
+  };
+  error?: string;
+}
+
+const SENTIMENT_ACCENT: Record<
+  "warm" | "neutral" | "tense" | "escalating",
+  string
+> = {
+  warm: C.patina,
+  neutral: C.text2,
+  tense: C.ember,
+  escalating: C.crimson,
+};
+
+function CommsPerspectivePanel({ entityId }: { entityId: string }) {
+  const [resp, setResp] = useState<PerspectiveResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(
+          `/api/customer/perspective/${encodeURIComponent(entityId)}`,
+          { cache: "no-store" },
+        );
+        const json = (await r.json()) as PerspectiveResponse;
+        if (!cancelled) setResp(json);
+      } catch (e) {
+        if (!cancelled) setResp({ ok: false, error: String(e) });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [entityId]);
+
+  return (
+    <Card title="Comms perspective" accent={C.lapis}>
+      {loading && (
+        <div style={{ fontFamily: SANS, fontSize: 12, color: C.text3 }}>
+          Generating Haiku perspective from the last 90 days of comms…
+        </div>
+      )}
+      {!loading && (!resp || !resp.ok || !resp.perspective) && (
+        <Empty
+          message={
+            resp?.error
+              ? `Couldn't load perspective: ${resp.error}`
+              : "No comms perspective available yet."
+          }
+        />
+      )}
+      {!loading && resp?.ok && resp.perspective && (
+        <PerspectiveBody perspective={resp.perspective} />
+      )}
+    </Card>
+  );
+}
+
+function PerspectiveBody({
+  perspective: p,
+}: {
+  perspective: NonNullable<PerspectiveResponse["perspective"]>;
+}) {
+  const accent = SENTIMENT_ACCENT[p.sentiment];
+  return (
+    <>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: SANS,
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "4px 12px",
+            borderRadius: 999,
+            background: `${accent}1F`,
+            color: accent,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+          }}
+        >
+          {p.sentiment}
+        </span>
+        <span style={{ fontFamily: SANS, fontSize: 12, color: C.text2 }}>
+          {p.message_count} messages · {p.initiator_pattern.replace(/_/g, " ")}
+          {p.response_latency_hours !== null
+            ? ` · median reply ${p.response_latency_hours}h`
+            : ""}
+        </span>
+      </div>
+
+      {p.topics.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            marginBottom: 12,
+          }}
+        >
+          {p.topics.map((t) => (
+            <span
+              key={t}
+              style={{
+                fontFamily: SANS,
+                fontSize: 11,
+                color: C.text2,
+                background: "#F0E4CC",
+                border: "1px solid " + C.border,
+                borderRadius: 4,
+                padding: "2px 8px",
+              }}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Substance gauge — simple bar */}
+      <div style={{ marginBottom: 12 }}>
+        <div
+          style={{
+            fontFamily: SANS,
+            fontSize: 11,
+            color: C.text3,
+            marginBottom: 4,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
+          Substance · {p.substance_score}/100
+        </div>
+        <div
+          style={{
+            height: 6,
+            background: "#F0E4CC",
+            borderRadius: 3,
+            overflow: "hidden",
+            border: "1px solid " + C.border,
+          }}
+        >
+          <div
+            style={{
+              width: `${Math.max(0, Math.min(100, p.substance_score))}%`,
+              height: "100%",
+              background: accent,
+            }}
+          />
+        </div>
+      </div>
+
+      <p
+        style={{
+          fontFamily: SERIF,
+          fontSize: 14,
+          fontStyle: "italic",
+          color: C.text,
+          margin: "0 0 12px",
+          lineHeight: 1.5,
+        }}
+      >
+        {p.haiku_summary}
+      </p>
+
+      {p.conversation_arcs.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            marginTop: 8,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 11,
+              color: C.text3,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            Recent conversation arcs
+          </div>
+          {p.conversation_arcs.map((arc, i) => (
+            <div
+              key={i}
+              style={{
+                fontFamily: SANS,
+                fontSize: 12,
+                color: C.text2,
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: arc.resolved ? C.patina : C.ember,
+                }}
+                aria-hidden
+              />
+              <strong style={{ color: C.text }}>{arc.topic}</strong>
+              <span style={{ color: C.text3, fontSize: 11 }}>
+                {fmtDate(arc.start_iso)} → {fmtDate(arc.end_iso)} ·{" "}
+                {arc.resolved ? "resolved" : "open"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        style={{
+          marginTop: 12,
+          fontFamily: SANS,
+          fontSize: 10,
+          color: C.text3,
+        }}
+      >
+        Computed by Haiku · last refresh{" "}
+        {new Date(p.computed_at).toLocaleString()}
+      </div>
+    </>
   );
 }
