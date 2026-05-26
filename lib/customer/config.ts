@@ -216,6 +216,23 @@ export const ACTIVE_AMS = [
 export const INCOMING_AMS = ["Taanya Solanki"] as const;
 
 // ---------------------------------------------------------------------------
+// Phase E-17 Wave 3b — Slack user-id map for proactive Beacon AI DMs.
+//
+// The proactive briefing + daily anomaly digest crons need to DM each AM
+// individually. Slack's chat.postMessage accepts a user id (U…) as the
+// `channel` argument and opens (or reuses) the IM channel automatically.
+//
+// This map is intentionally empty in code — Slack workspace IDs are NOT
+// public and shouldn't be checked in until we've collected them from the
+// team. The proactive crons skip + log "no_slack_id" when an AM is not in
+// the map, so they degrade gracefully until this is populated.
+//
+// Once we know the IDs, populate from a Slack admin tool (users.list scope
+// on the bot token) or by collecting via /whoami in a test channel.
+// ---------------------------------------------------------------------------
+export const AM_SLACK_IDS: Record<string, string> = {};
+
+// ---------------------------------------------------------------------------
 // Postgres (Neon) — for v2 snapshot history + AM actions + signal feedback
 // POSTGRES_URL is auto-injected by Vercel when Neon is connected as Storage
 // ---------------------------------------------------------------------------

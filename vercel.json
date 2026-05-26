@@ -62,6 +62,14 @@
     {
       "path": "/api/ai/cron/extract-facts",
       "schedule": "30 */12 * * *"
+    },
+    {
+      "path": "/api/cron/beacon-ai/monday-briefing",
+      "schedule": "30 2 * * 1"
+    },
+    {
+      "path": "/api/cron/beacon-ai/daily-digest",
+      "schedule": "30 2 * * *"
     }
   ],
   "functions": {
@@ -120,6 +128,14 @@
     "app/(customer)/api/v2/actions/escalate/route.ts": {
       "memory": 512,
       "maxDuration": 15
+    },
+    "app/(customer)/api/cron/beacon-ai/monday-briefing/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
+    },
+    "app/(customer)/api/cron/beacon-ai/daily-digest/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
     }
   }
 }
