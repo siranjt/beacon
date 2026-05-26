@@ -292,6 +292,7 @@ export const MANAGER_EMAILS: string[] = [
   "kripali@zoca.com",
   "saibal.p@zoca.com",
   "vaibhav.v@zoca.com",
+  "shakti.s@zoca.com",
 ];
 
 // AM — locked to their own book only. Phase 33.B.1: Siddhi removed (promoted
