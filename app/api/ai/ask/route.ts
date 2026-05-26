@@ -253,10 +253,19 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       };
       let assistantBuf = "";
-      // Phase E-16 Wave 1 — tool use. Only the Customer 360 scope gets
-      // mutation tools wired in. Every other scope stays read-only so
-      // existing behavior is untouched.
-      const wantsTools = scope.kind === "customer-360";
+      // Phase E-16 Wave 1.5 — tool use available in every customer-aware
+      // scope: Customer 360 (one customer in URL), Customer Beacon book
+      // (multi-customer list, AI picks from CONTEXT.customers), Performance
+      // Beacon report (one customer in URL), Escalation overview (ticket
+      // queue spans many customers — AI picks from the open-ticket list).
+      // The 4 tools all require customer_id; for multi-customer scopes the
+      // scope prompts teach the model how to resolve "which one" from the
+      // conversation against the customer list already in CONTEXT.
+      const wantsTools =
+        scope.kind === "customer-360" ||
+        scope.kind === "customer-book" ||
+        scope.kind === "performance-report" ||
+        scope.kind === "escalation-overview";
       const tools = wantsTools ? toAnthropicTools(CUSTOMER_360_TOOLS) : undefined;
       try {
         const sdkStream = anthropic.messages.stream({
