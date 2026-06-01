@@ -20,10 +20,6 @@
       "schedule": "0 22 * * *"
     },
     {
-      "path": "/api/cron/refresh/stage-b-v2",
-      "schedule": "0 22 * * *"
-    },
-    {
       "path": "/api/cron/refresh/stage-c",
       "schedule": "0 22 * * *"
     },

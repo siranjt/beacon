@@ -498,7 +498,29 @@ export async function runStageA(today: number = todayMs()): Promise<{
 // STAGE B — Comms (5 CSVs) → per-entity comms metrics
 // ===========================================================================
 
-export async function runStageB(today: number = todayMs()): Promise<{
+/**
+ * Phase E-19 W2 (Cutover) — Stage B now ingests from the bulk-events Metabase
+ * question via the chunked Dataset API (lib/customer/comms-bulk-fetch.ts),
+ * not the legacy 5-CSV pipeline. V1's fetchAllCommsSequential + computeMetrics
+ * + groupCommsByEntity are retired as of this commit because:
+ *   1. V1's 1.6M-row in-memory buffer OOMed even at 3GB.
+ *   2. V2 ran cleanly with 972 entity metrics, ~245s wall time at 3GB.
+ *   3. V1's 5-CSV exports were stale anyway (4-hour timestamp drift vs Postgres).
+ *
+ * The cutover preserves the StageBData shape so composeSnapshot, the v2
+ * dashboard, and the HubSpot phone-drift detection (Phase 14B) all keep
+ * working without changes. Comms-stats fields that were CSV-specific
+ * (rawRows / eventsKept / eventsDeduped) are filled with V2's per-channel
+ * event counts as a reasonable equivalent.
+ *
+ * Stage A's activeEntityIds is required — if Stage A hasn't run, we return
+ * an empty StageBData with errors[] populated. The cron schedule guarantees
+ * Stage A runs before Stage B.
+ */
+export async function runStageB(
+  today: number = todayMs(),
+  activeEntityIds: string[] = [],
+): Promise<{
   data: StageBData;
   durationMs: number;
   errors: string[];
@@ -507,46 +529,79 @@ export async function runStageB(today: number = todayMs()): Promise<{
   const errors: string[] = [];
   memSnap("B start");
 
-  const commsResult = await fetchAllCommsSequential(today).catch((e: Error) => {
-    errors.push(`Comms: ${e.message}`);
+  // Empty universe → empty result with error. Composer will surface in degraded_reasons.
+  if (activeEntityIds.length === 0) {
+    errors.push("runStageB: no activeEntityIds — Stage A likely hasn't run");
     return {
-      events: [] as CommsEvent[],
-      stats: {
-        rawRows: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
-        eventsKept: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
-        eventsDeduped: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
-        totalDuplicatesRemoved: 0,
+      data: {
+        commsMetricsByEntity: {},
+        channelCounts30dByEntity: {},
+        commsStats: {
+          rawRows: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+          eventsKept: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+          eventsDeduped: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+          totalDuplicatesRemoved: 0,
+        },
+        perSourceEventCount: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+        perDirectionCount: { in: 0, out: 0 },
+        channelCounts: { d30: {}, d90: {} },
       },
+      durationMs: Date.now() - started,
+      errors,
     };
+  }
+
+  // Fetch via Metabase Dataset API (chunked + parallel).
+  const events = await fetchBulkCommsEvents(activeEntityIds, 90).catch((e: Error) => {
+    errors.push(`Comms (V2 bulk): ${e.message}`);
+    return [] as CommsEventRow[];
   });
-  memSnap("B after fetch");
+  memSnap(`B after fetch (${events.length} events)`);
 
-  const events = commsResult.events;
-  const byEntity = groupCommsByEntity(events);
-  memSnap("B after group");
+  // Upsert to comms_events Postgres cache (idempotent on (entity,channel,source_id)).
+  if (events.length > 0) {
+    await upsertCommsEvents(events).catch((e: Error) => {
+      errors.push(`Comms (V2 upsert): ${e.message}`);
+    });
+    memSnap("B after upsert");
+  }
 
-  // Compute per-entity comms metrics. The raw events array can be GC'd after this.
+  // Group events by entity for derivation + watermark
+  const byEntity = new Map<string, CommsEventRow[]>();
+  for (const e of events) {
+    const arr = byEntity.get(e.entity_id) || [];
+    arr.push(e);
+    byEntity.set(e.entity_id, arr);
+  }
+
+  // Derive per-entity metrics
   const commsMetricsByEntity: Record<string, CustomerMetrics> = {};
-  // Phase 14B: per-entity, per-channel 30d counts (built in the same pass over
-  // grouped events so we don't have to retain the raw events array).
   const channelCounts30dByEntity: Record<string, Record<string, number>> = {};
   const cutoff30d = today - 30 * 86400 * 1000;
-  for (const [eid, evs] of byEntity) {
-    commsMetricsByEntity[eid] = computeMetrics(evs, today);
+  const now = new Date(today);
+
+  for (const eid of activeEntityIds) {
+    const evs = byEntity.get(eid) || [];
+    commsMetricsByEntity[eid] = deriveCustomerMetricsFromEvents(evs, now);
     const perCh: Record<string, number> = { chat: 0, email: 0, phone: 0, video: 0, sms: 0 };
     for (const e of evs) {
-      if (e.ts >= cutoff30d) perCh[e.channel] = (perCh[e.channel] || 0) + 1;
+      const t = Date.parse(e.created_at);
+      if (Number.isFinite(t) && t >= cutoff30d) {
+        perCh[e.channel] = (perCh[e.channel] || 0) + 1;
+      }
     }
     channelCounts30dByEntity[eid] = perCh;
   }
   memSnap("B after metrics");
 
-  // Diagnostic aggregates from raw events (computed in one pass)
+  // Diagnostic aggregates from raw events
   const perSourceEventCount = { chat: 0, email: 0, phone: 0, video: 0, sms: 0 } as Record<string, number>;
   const perDirectionCount = { in: 0, out: 0 };
   for (const e of events) {
-    perSourceEventCount[e.channel]++;
-    perDirectionCount[e.direction]++;
+    perSourceEventCount[e.channel] = (perSourceEventCount[e.channel] || 0) + 1;
+    // V2 returns "inbound"/"outbound"/"system"; map to V1's "in"/"out" shape.
+    if (e.direction === "inbound") perDirectionCount.in++;
+    else if (e.direction === "outbound") perDirectionCount.out++;
   }
 
   // Channel counts across active book (d30/d90 distinct customers per channel)
@@ -560,15 +615,46 @@ export async function runStageB(today: number = todayMs()): Promise<{
     }
   }
 
+  // Watermarks (per-entity last_event_at + 90d count) — keeps freshness
+  // banner working on customer cards.
+  const watermarks: Array<{
+    entity_id: string;
+    last_event_at: string | null;
+    event_count_90d: number;
+  }> = [];
+  for (const eid of activeEntityIds) {
+    const evs = byEntity.get(eid) || [];
+    const last = evs.length > 0
+      ? evs.reduce((acc, e) => (e.created_at > acc ? e.created_at : acc), evs[0].created_at)
+      : null;
+    watermarks.push({ entity_id: eid, last_event_at: last, event_count_90d: evs.length });
+  }
+  await writeWatermarks(watermarks).catch((e: Error) => {
+    console.warn(`[stageB] watermark write soft-failed: ${e.message}`);
+  });
+
   memSnap("B end");
   const data: StageBData = {
     commsMetricsByEntity,
     channelCounts30dByEntity,
-    commsStats: commsResult.stats,
+    // V1's commsStats fields were CSV-row-level counts; V2 doesn't have those.
+    // Use V2's per-channel event counts as the closest equivalent so anything
+    // reading these fields for diagnostics gets a non-zero meaningful value.
+    commsStats: {
+      rawRows: { ...perSourceEventCount } as { chat: number; email: number; phone: number; video: number; sms: number },
+      eventsKept: { ...perSourceEventCount } as { chat: number; email: number; phone: number; video: number; sms: number },
+      eventsDeduped: { chat: 0, email: 0, phone: 0, video: 0, sms: 0 },
+      totalDuplicatesRemoved: 0,
+    },
     perSourceEventCount,
     perDirectionCount,
     channelCounts,
   };
+
+  console.log(
+    `[stageB] V2 ingest complete in ${Date.now() - started}ms — ` +
+      `events=${events.length}, entities_with_events=${byEntity.size}/${activeEntityIds.length}`,
+  );
   return { data, durationMs: Date.now() - started, errors };
 }
 
@@ -1674,7 +1760,11 @@ export async function runStageBAndStore(snapshotDate?: string): Promise<{
   const date = snapshotDate ?? todaySnapshotDate();
   const stageA = await readPipelineStage<StageAData>("A", date);
   const anchorToday = stageA?.data?.todayMs ?? todayMs();
-  const { data, durationMs, errors } = await runStageB(anchorToday);
+  // Phase E-19 W2 cutover — runStageB now ingests via the V2 bulk-events
+  // Metabase question and needs Stage A's active universe to know which
+  // entities to query. composeSnapshot reads from stage='B' as before.
+  const activeEntityIds = stageA?.data?.activeEntityIds ?? [];
+  const { data, durationMs, errors } = await runStageB(anchorToday, activeEntityIds);
   await writePipelineStage("B", date, data, {
     durationMs,
     errors,
