@@ -32,6 +32,10 @@
       "schedule": "5 * * * *"
     },
     {
+      "path": "/api/cron/refresh-watchdog",
+      "schedule": "35 22 * * *"
+    },
+    {
       "path": "/api/cron/prune",
       "schedule": "30 0 * * *"
     },
@@ -100,6 +104,10 @@
     "app/(customer)/api/cron/refresh/route.ts": {
       "memory": 2048,
       "maxDuration": 180
+    },
+    "app/(customer)/api/cron/refresh-watchdog/route.ts": {
+      "memory": 2048,
+      "maxDuration": 300
     },
     "app/(customer)/api/cron/outcome-backfill/route.ts": {
       "memory": 1024,
