@@ -339,12 +339,22 @@ export async function runPair(
   let aiResponse = "";
   let aiResponseMs = 0;
   try {
+    // Vercel Deployment Protection is in front of /api/ai/ask in production.
+    // Server-to-server cron calls bypass it via the project's "Protection
+    // Bypass for Automation" token. Pass-through header is documented at
+    // https://vercel.com/docs/security/deployment-protection/methods-to-bypass-deployment-protection
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-eval-runner-token": evalToken,
+    };
+    const protectionBypass = process.env.VERCEL_PROTECTION_BYPASS_TOKEN;
+    if (protectionBypass) {
+      headers["x-vercel-protection-bypass"] = protectionBypass;
+      headers["x-vercel-set-bypass-cookie"] = "false";
+    }
     const res = await fetch(`${apiBaseUrl}/api/ai/ask`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-eval-runner-token": evalToken,
-      },
+      headers,
       body: JSON.stringify({
         scope,
         question: pair.question,
