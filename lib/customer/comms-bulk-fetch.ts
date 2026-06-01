@@ -50,20 +50,21 @@ const PER_ENTITY_CARD_ID = Number(process.env.METABASE_PER_ENTITY_COMMS_CARD_ID 
 /**
  * Dataset-API chunk size. Measured scaling (May 2026):
  *   n=3  → 5.4s   n=10 → 9.8s   n=100 → >40s timeout
- * Per-entity cost ~0.4-0.5s on top of ~5s fixed. The SQL doesn't push
- * the entity_ids filter through its dedup CTE efficiently, so batches
- * above ~50 entities hit Vercel function timeouts. Batch=30 hits ~15s
- * per call, leaving headroom.
+ * Per-entity cost ~0.4-0.5s on top of ~5s fixed.
  *
- * If/when the SQL is optimized (push the IN-filter into each channel
- * subquery before UNION + ROW_NUMBER), this can grow back toward
- * single-call. Tracked as Wave 1 follow-up.
+ * Reduced from 30 to 15 in W1.6.3 after raising the Metabase row cap
+ * caused Vercel function OOM. Smaller chunks = smaller peak memory
+ * per parallel slot. 60 chunks at concurrency 3 ≈ ~3 min wall time.
  */
-const BULK_DATASET_CHUNK_SIZE = 30;
-/** Parallel chunk fetches. Metabase + Aurora tolerate ~6-8 concurrent
- *  query executions before queueing. 6 keeps headroom. */
-const BULK_DATASET_CONCURRENCY = 6;
+const BULK_DATASET_CHUNK_SIZE = 15;
+/** Parallel chunk fetches. Reduced from 6 to 3 alongside row-cap
+ *  increase to stay under Vercel function memory ceiling. */
+const BULK_DATASET_CONCURRENCY = 3;
 const BULK_DATASET_TIMEOUT_MS = 60_000;
+/** Metabase Dataset API row cap override. Default session cap is 2000
+ *  which silently truncates high-volume entities. 25k covers >99% of
+ *  realistic 90-day windows even in the densest chunks. */
+const BULK_DATASET_MAX_RESULTS = 25_000;
 
 /** Public CSV chunk size — stays under Metabase's ~8KB URL cap. */
 const PUBLIC_CSV_CHUNK_SIZE = 150;
@@ -174,8 +175,8 @@ async function fetchOneDatasetApiChunkAttempt(
       },
     ],
     constraints: {
-      "max-results": 100000,
-      "max-results-bare-rows": 100000,
+      "max-results": BULK_DATASET_MAX_RESULTS,
+      "max-results-bare-rows": BULK_DATASET_MAX_RESULTS,
     },
   };
 
