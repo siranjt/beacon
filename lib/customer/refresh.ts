@@ -1003,6 +1003,34 @@ export async function composeSnapshot(
   // Cutoff used for closed_last_30d_count below.
   const cutoff30d = today - 30 * 86400 * 1000;
 
+  // Phase E-19.3 — pre-fetch comms_perspective rows for ALL active entities
+  // up front so scoreCustomer can apply sentiment/substance adjustments to
+  // the composite. Was previously hydrated AFTER scoring (read-only into the
+  // snapshot blob for the UI sentiment chip). Now it influences tier too.
+  //
+  // READ-ONLY: composeSnapshot never triggers Haiku (would be ~927 calls per
+  // refresh). The on-demand /api/customer/perspective endpoint lazily
+  // populates rows when an AM opens a customer. Missing rows → null → no
+  // perspective adjustment applied.
+  type PerspectiveRowMap = Awaited<ReturnType<
+    typeof import("./comms-perspective-store").readPerspectivesForEntities
+  >>;
+  let perspectivesByEntity: PerspectiveRowMap = new Map();
+  try {
+    const { readPerspectivesForEntities } = await import(
+      "./comms-perspective-store"
+    );
+    perspectivesByEntity = await readPerspectivesForEntities(stageA.activeEntityIds);
+    console.log(
+      `[E-19.3] perspectives pre-loaded: ${perspectivesByEntity.size}/${stageA.activeEntityIds.length}`,
+    );
+  } catch (e) {
+    console.warn(
+      "[E-19.3] perspective pre-load failed (scoring will skip sentiment adjustment):",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
   for (const entityId of stageA.activeEntityIds) {
     const meta = stageA.entityMeta[entityId];
     const bs = stageA.baseSheetByEntityId[entityId];
@@ -1095,6 +1123,8 @@ export async function composeSnapshot(
       commsMetrics: cMetrics,
       mixpanelHasData: usage !== null,
       preLaunch,
+      // Phase E-19.3 — sentiment + substance adjustment from Haiku cache.
+      perspective: perspectivesByEntity.get(entityId) ?? null,
     });
 
     // Phase 33.scope — recently churned customers are already gone;
@@ -1270,21 +1300,15 @@ export async function composeSnapshot(
   }
 
   // -------------------------------------------------------------------------
-  // Phase E-18 — hydrate comms_perspective from the Haiku cache. READ-ONLY:
-  // composeSnapshot must never trigger Haiku — that would burn through
-  // Vercel's function budget at ~927 calls per refresh. The on-demand
-  // /api/customer/perspective endpoint lazily populates rows when an AM
-  // opens a customer.
+  // Phase E-18 — hydrate the slim comms_perspective shape into each scored
+  // customer for the UI sentiment chip + Haiku-summary panel. Reuses the
+  // perspectivesByEntity Map populated above in the scoring loop, so no
+  // second DB round-trip.
   // -------------------------------------------------------------------------
-  try {
-    const { readPerspectivesForEntities } = await import(
-      "./comms-perspective-store"
-    );
-    const eids = scored.map((c) => c.entity_id);
-    const perspectives = await readPerspectivesForEntities(eids);
+  {
     let hits = 0;
     for (const c of scored) {
-      const p = perspectives.get(c.entity_id);
+      const p = perspectivesByEntity.get(c.entity_id);
       c.comms_perspective = p
         ? {
             sentiment: p.sentiment,
@@ -1299,12 +1323,6 @@ export async function composeSnapshot(
     console.log(
       `[E-18] comms perspective hydration: ${hits}/${scored.length} cache hits`,
     );
-  } catch (e) {
-    console.warn(
-      "[E-18] comms perspective hydration skipped:",
-      e instanceof Error ? e.message : String(e),
-    );
-    for (const c of scored) c.comms_perspective = c.comms_perspective ?? null;
   }
 
   // Sort by composite desc, then comms volume desc

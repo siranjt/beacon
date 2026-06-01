@@ -19,8 +19,63 @@ import type {
   TicketsMetrics,
 } from "./types";
 import type { Tier } from "./config";
+import type { CommsPerspective, Sentiment } from "./comms-perspective";
 
 const DAY_MS = 86400 * 1000;
+
+/**
+ * Phase E-19.3 — translate Haiku sentiment + substance into a numeric
+ * adjustment applied to the V2 composite score.
+ *
+ * Rationale:
+ *   - "escalating" tone is the strongest churn signal we have outside of
+ *     literal zero-comms. A customer whose conversations are getting more
+ *     tense over time is on a trajectory the comms-count signals can't see
+ *     (they only count messages, not their content).
+ *   - "tense" is a milder signal of friction.
+ *   - "warm" tone counterweights other signals — a customer venting once is
+ *     different from one consistently positive about the relationship.
+ *   - Low substance score (shallow conversations under 30) suggests
+ *     disengagement even when message volume looks fine.
+ *
+ * The function returns the additive adjustment ([-10, +40] range) plus a
+ * human-readable reason string for the notes/narrative.
+ */
+export function computePerspectiveAdjustment(perspective: CommsPerspective | null | undefined): {
+  delta: number;
+  reason: string | null;
+  forceHigh: boolean;
+} {
+  if (!perspective) return { delta: 0, reason: null, forceHigh: false };
+  let delta = 0;
+  const parts: string[] = [];
+  let forceHigh = false;
+
+  const sentiment: Sentiment = perspective.sentiment;
+  if (sentiment === "escalating") {
+    delta += 30;
+    forceHigh = true;
+    parts.push("escalating tone");
+  } else if (sentiment === "tense") {
+    delta += 15;
+    parts.push("tense tone");
+  } else if (sentiment === "warm") {
+    delta -= 10;
+    parts.push("warm tone");
+  }
+
+  // Shallow comms bump — but only meaningful with enough messages to judge.
+  if (perspective.substance_score < 30 && perspective.message_count >= 5) {
+    delta += 10;
+    parts.push(`shallow comms (substance ${perspective.substance_score})`);
+  }
+
+  return {
+    delta,
+    reason: parts.length > 0 ? parts.join(", ") : null,
+    forceHigh,
+  };
+}
 
 /** Compute per-window comms metrics for a customer given their events */
 export function computeMetrics(events: CommsEvent[], todayMs: number): CustomerMetrics {
@@ -221,8 +276,16 @@ export function composeHybridSignals(args: {
   commsMetrics: CustomerMetrics;
   mixpanelHasData: boolean;
   preLaunch?: boolean;
+  /**
+   * Phase E-19.3 — Haiku-derived comms perspective. When present, sentiment
+   * adjusts the composite (+30 for escalating, +15 tense, -10 warm, +10
+   * shallow). "escalating" tone also force-promotes to HIGH tier regardless
+   * of composite. Null/undefined → no influence (e.g. perspective row not
+   * yet computed for this customer).
+   */
+  perspective?: CommsPerspective | null;
 }): CustomerSignalsV2 {
-  const { commsSignals, usageScore, billingScore, performance, tickets, commsMetrics, mixpanelHasData, preLaunch } = args;
+  const { commsSignals, usageScore, billingScore, performance, tickets, commsMetrics, mixpanelHasData, preLaunch, perspective } = args;
 
   // Pre-launch: Chargebee sub status is "future" or activated_at is null/future.
   // Skip normal churn-scoring entirely — these entities have legitimately zero
@@ -252,7 +315,7 @@ export function composeHybridSignals(args: {
     };
   }
 
-  const composite = Math.round(
+  let composite = Math.round(
     SIG_WEIGHTS_V2.weSilent * commsSignals.sig_we_silent +
       SIG_WEIGHTS_V2.clientSilent * commsSignals.sig_client_silent +
       SIG_WEIGHTS_V2.responseDrop * commsSignals.sig_response_drop +
@@ -261,6 +324,10 @@ export function composeHybridSignals(args: {
       SIG_WEIGHTS_V2.billing * billingScore,
   );
 
+  // Phase E-19.3 — perspective adjustment from Haiku sentiment + substance.
+  const perspectiveAdj = computePerspectiveAdjustment(perspective);
+  composite = Math.max(0, Math.min(100, composite + perspectiveAdj.delta));
+
   // Modifier flags
   const flagPerformance = !!(performance && performance.flag);
   const flagTickets = !!(tickets && tickets.flag);
@@ -268,12 +335,14 @@ export function composeHybridSignals(args: {
 
   // Determine tier — same internal model as v1, with WATCH lane awareness
   let tier: Tier;
-  // HIGH triggers: composite >= 65, OR (zero comms 90d AND no Mixpanel data)
-  //  — "no Mixpanel data" alone is a coverage gap, not a churn signal.
-  //  The WATCH lane (via flag_count) still surfaces these as YELLOW.
+  // HIGH triggers: composite >= 65, OR (zero comms 90d AND no Mixpanel data),
+  //  OR (Phase E-19.3) Haiku detected "escalating" sentiment — tone-based
+  //  promotion overrides composite because escalating signals churn even
+  //  when message volume looks healthy.
   if (
     composite >= TIER_CUTS.high ||
-    (commsMetrics.total_90d === 0 && !mixpanelHasData)
+    (commsMetrics.total_90d === 0 && !mixpanelHasData) ||
+    perspectiveAdj.forceHigh
   ) {
     tier = "HIGH";
   } else if (composite >= TIER_CUTS.medium) {
@@ -300,6 +369,17 @@ export function composeHybridSignals(args: {
     mixpanelHasData,
   });
 
+  // Phase E-19.3 — fold perspective reason into notes so AMs see it in the
+  // signal tooltip + reason_one_line gets pre-pended for escalating cases.
+  let finalReason = reasonOneLine;
+  if (perspectiveAdj.reason) {
+    notes.push(`perspective: ${perspectiveAdj.reason}`);
+    if (perspectiveAdj.forceHigh) {
+      // Escalating tone is the single most important fact — surface it first.
+      finalReason = `Tone is escalating. ${reasonOneLine}`;
+    }
+  }
+
   return {
     composite,
     tier,
@@ -315,7 +395,7 @@ export function composeHybridSignals(args: {
     flag_count: flagCount,
     trajectory_7d: "unknown",          // filled by snapshot writer if prev exists
     composite_7d_ago: null,             // filled by snapshot writer
-    reason_one_line: reasonOneLine,
+    reason_one_line: finalReason,
     suggested_action: suggestedAction,
     notes: notes.join("; "),
     pre_launch: false,
