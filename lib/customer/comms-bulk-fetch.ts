@@ -147,18 +147,19 @@ function rowsToEvents(
 // Transport: Dataset API (preferred, blocked on Metabase RBAC as of writing)
 // ---------------------------------------------------------------------------
 
-/**
- * Fire one Dataset API call for `entityIds`. Returns events on success
- * or null on transport failure (perms, network, parse). Per-chunk used
- * by fetchViaDatasetApi().
- */
-async function fetchOneDatasetApiChunk(
+/** Single attempt at the chunk fetch — no retry layer here. */
+async function fetchOneDatasetApiChunkAttempt(
   entityIds: string[],
   lookbackDays: number,
-): Promise<CommsEventRow[] | null> {
+): Promise<{ ok: true; events: CommsEventRow[] } | { ok: false; status: number; message: string }> {
   const apiKey = process.env.METABASE_API_KEY;
-  if (!apiKey || !BULK_CARD_ID) return null;
+  if (!apiKey || !BULK_CARD_ID) {
+    return { ok: false, status: 0, message: "missing METABASE_API_KEY or card_id" };
+  }
 
+  // constraints.max-results overrides Metabase's session-level row cap
+  // (default 2000). Without this, high-volume customers in a single chunk
+  // get their older events silently truncated.
   const body = {
     parameters: [
       {
@@ -172,11 +173,14 @@ async function fetchOneDatasetApiChunk(
         target: ["variable", ["template-tag", "lookback_days"]],
       },
     ],
+    constraints: {
+      "max-results": 100000,
+      "max-results-bare-rows": 100000,
+    },
   };
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), BULK_DATASET_TIMEOUT_MS);
-  const t0 = Date.now();
   try {
     const res = await fetch(`${MB_BASE}/api/card/${BULK_CARD_ID}/query`, {
       method: "POST",
@@ -187,12 +191,11 @@ async function fetchOneDatasetApiChunk(
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      console.warn(
-        `[comms-bulk-fetch] dataset-api chunk HTTP ${res.status} (n=${entityIds.length}): ${text.slice(0, 200)}`,
-      );
-      // 403 = perms issue → transport unavailable → caller falls back to CSV.
-      // Any other status = retry-worthy single-chunk failure → return [].
-      return res.status === 403 ? null : [];
+      return {
+        ok: false,
+        status: res.status,
+        message: text.slice(0, 200) || `HTTP ${res.status}`,
+      };
     }
     const json = (await res.json()) as {
       data?: {
@@ -211,17 +214,65 @@ async function fetchOneDatasetApiChunk(
       out.push(obj);
     }
     const events = rowsToEvents(out);
-    console.log(
-      `[comms-bulk-fetch] dataset-api chunk: ${events.length} events for ${entityIds.length} entities in ${Date.now() - t0}ms`,
-    );
-    return events;
+    return { ok: true, events };
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    console.warn(`[comms-bulk-fetch] dataset-api chunk failed (n=${entityIds.length}): ${message}`);
-    return [];
+    return { ok: false, status: -1, message: message.slice(0, 200) };
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * Fire one Dataset API call for `entityIds` with retry-on-failure.
+ *
+ * Returns:
+ *   - events array on success (possibly after retries)
+ *   - null if the FIRST attempt returned 403 (auth issue — caller bails to CSV)
+ *   - [] if all retries failed for a non-auth reason; logs the entity_ids that
+ *     lost data so ops can see which customers are missing V2 coverage
+ *
+ * Retry policy: up to 3 attempts with 1s, 2s exponential backoff.
+ * 403 short-circuits (no retry — perms aren't going to fix themselves).
+ */
+async function fetchOneDatasetApiChunk(
+  entityIds: string[],
+  lookbackDays: number,
+): Promise<CommsEventRow[] | null> {
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [0, 1000, 2000];
+
+  const t0 = Date.now();
+  let lastError: { status: number; message: string } | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (BACKOFF_MS[attempt - 1] > 0) {
+      await new Promise((resolve) => setTimeout(resolve, BACKOFF_MS[attempt - 1]));
+    }
+    const result = await fetchOneDatasetApiChunkAttempt(entityIds, lookbackDays);
+    if (result.ok) {
+      console.log(
+        `[comms-bulk-fetch] dataset-api chunk OK: ${result.events.length} events for ${entityIds.length} entities in ${Date.now() - t0}ms (attempt ${attempt}/${MAX_ATTEMPTS})`,
+      );
+      return result.events;
+    }
+    lastError = { status: result.status, message: result.message };
+    console.warn(
+      `[comms-bulk-fetch] dataset-api chunk attempt ${attempt}/${MAX_ATTEMPTS} failed (n=${entityIds.length}): HTTP ${result.status}: ${result.message}`,
+    );
+    // 403 is a perms issue — retrying won't help, and caller needs to fall
+    // back to the CSV path. Return null to signal "transport unavailable".
+    if (result.status === 403) {
+      return null;
+    }
+  }
+
+  // All retries exhausted. Log the entity_ids that lost V2 coverage so the
+  // ops team can identify the impact and decide whether to manually re-fire.
+  console.error(
+    `[comms-bulk-fetch] CHUNK LOST after ${MAX_ATTEMPTS} attempts — ${entityIds.length} entities will have 0 V2 events. Last error: HTTP ${lastError?.status}: ${lastError?.message}. Entity IDs: ${entityIds.slice(0, 5).join(", ")}${entityIds.length > 5 ? `, ... +${entityIds.length - 5} more` : ""}`,
+  );
+  return [];
 }
 
 /**
