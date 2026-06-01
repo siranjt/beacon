@@ -133,9 +133,20 @@ async function loadContextForScope(
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const email = session?.user?.email;
-  if (!session || !email) {
+  // Phase E-17.3c — eval harness service-token bypass. The nightly eval
+  // cron hits this endpoint to score Beacon AI quality. It can't carry a
+  // user session (it's a server-to-server call), so we accept a shared
+  // service token via x-eval-runner-token header. The token is set as the
+  // EVAL_RUNNER_TOKEN env var. Bypassed user is identified as a synthetic
+  // "eval-runner@zoca.ai" with admin role for context loading.
+  const evalToken = req.headers.get("x-eval-runner-token");
+  const expectedEvalToken = process.env.EVAL_RUNNER_TOKEN;
+  const isEvalRunner =
+    !!evalToken && !!expectedEvalToken && evalToken === expectedEvalToken;
+
+  const session = isEvalRunner ? null : await getServerSession(authOptions);
+  const email = isEvalRunner ? "eval-runner@zoca.ai" : session?.user?.email;
+  if (!email) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -171,8 +182,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const role = getRoleForEmail(email);
-  const amName = session.user?.am_name ?? null;
+  const role = isEvalRunner ? "admin" : getRoleForEmail(email);
+  const amName = isEvalRunner ? null : (session?.user?.am_name ?? null);
 
   // Load scope-specific context.
   let ctx: LoadedContext;
