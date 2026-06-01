@@ -1,43 +1,27 @@
 /**
- * Phase E-18 — per-entity comms feed v2.
+ * Phase E-19 W2.5 — per-entity comms feed via Metabase Dataset API.
  *
- * Backed by the validated COMMS-2 Metabase public question which returns a
- * unified per-entity comms feed (chat + email + phone + video + sms) with
- * full message bodies and meeting transcripts in a single CSV.
+ * Previously this hit the public CSV endpoint of card fb775e8d. That worked
+ * but had three problems: (1) no auth, so anyone with the URL could pull
+ * arbitrary entity comms history, (2) CSV serialization added 2-4× the
+ * latency of the JSON dataset endpoint, (3) Metabase session-level row caps
+ * silently truncated high-volume customers.
  *
- * URL pattern (stable; the UUIDs are baked into the question definition —
- * not secrets, not env-ified):
+ * Post-cutover, we call the authenticated Dataset API directly
+ * (POST /api/card/:id/query with x-api-key) and override the row cap via
+ * `constraints.max-results`. Same parameter names (entity_id, lookback_days),
+ * same SQL underneath, same CommsFeedRow output shape — callers don't change.
  *
- *   https://metabase.zoca.ai/public/question/fb775e8d-f7be-49d5-b573-e89a45407f14.csv
- *     ?parameters=<URL-encoded JSON array>
- *
- * The JSON array uses Metabase's canonical parameter format. We pin BOTH
- * entity_id and lookback_days through it. `lookback_days = 0` returns
- * all-time; the perspective layer caps at 90 to keep token cost bounded.
- *
- * Soft-fail contract: any fetch / parse error logs a warning and returns
- * `[]`. Downstream callers (Haiku perspective builder + the per-entity 360
- * page) must never crash because the feed is slow or returning HTML.
- *
- * In-memory cache: repeated calls within one server request (e.g. the 360
- * page hits the feed twice — once for the timeline, once for the
- * perspective builder) skip the second network round trip. Five-minute TTL
- * is plenty for a server-render lifetime; we never want stale comms
- * showing up tomorrow.
- *
- * IMPORTANT: this helper lives alongside `lib/customer/comms-for-entity.ts`
- * — that older fetcher pulls 5 separate CSVs in parallel and is what
- * existing UI callers rely on. New code prefers comms-feed-v2 for the
- * unified shape; old callers will be migrated piecemeal.
+ * Soft-fail contract is preserved: any fetch/parse error logs a warning and
+ * returns []. In-memory 5-minute cache stays in place for the common case
+ * of one page hitting the feed twice (timeline + perspective).
  */
-import Papa from "papaparse";
 
-const COMMS_FEED_URL =
-  "https://metabase.zoca.ai/public/question/fb775e8d-f7be-49d5-b573-e89a45407f14.csv";
-
-// Stable Metabase parameter UUIDs — pinned in the public question.
-const ENTITY_ID_PARAM = "75994161-5d9f-44d3-b327-c8c4b512a659";
-const LOOKBACK_PARAM = "88c5b401-0b56-4953-9caa-5148ea16bcf2";
+const METABASE_BASE = process.env.METABASE_BASE || "https://metabase.zoca.ai";
+const PER_ENTITY_CARD_ID = Number(
+  process.env.METABASE_PER_ENTITY_COMMS_CARD_ID || "4051",
+);
+const PER_ENTITY_MAX_RESULTS = 25_000;
 
 export type CommsFeedChannel = "chat" | "email" | "phone" | "video" | "sms";
 export type CommsFeedDirection = "inbound" | "outbound" | "system";
@@ -63,24 +47,6 @@ interface CacheEntry {
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, CacheEntry>();
 
-function buildParams(entityId: string, lookbackDays: number): string {
-  const arr = [
-    {
-      id: ENTITY_ID_PARAM,
-      type: "category",
-      value: entityId,
-      target: ["variable", ["template-tag", "entity_id"]],
-    },
-    {
-      id: LOOKBACK_PARAM,
-      type: "category",
-      value: String(lookbackDays),
-      target: ["variable", ["template-tag", "lookback_days"]],
-    },
-  ];
-  return encodeURIComponent(JSON.stringify(arr));
-}
-
 function parseChannel(s: string): CommsFeedChannel | null {
   const v = (s || "").trim().toLowerCase();
   if (v === "chat" || v === "email" || v === "phone" || v === "video" || v === "sms") {
@@ -103,37 +69,19 @@ function parseTs(s: string): number {
   return Date.parse(withZone);
 }
 
-function parseRow(raw: Record<string, string>): CommsFeedRow | null {
-  const entity_id = (raw["entity_id"] ?? "").trim();
-  if (!entity_id) return null;
-  const channel = parseChannel(raw["channel"] ?? "");
-  if (!channel) return null;
-  const created_at = (raw["created_at"] ?? "").trim();
-  const ts = parseTs(created_at);
-  if (!Number.isFinite(ts)) return null;
-  const bodyAvailRaw = (raw["body_available"] ?? "").trim().toLowerCase();
-  const body_available = bodyAvailRaw === "true" || bodyAvailRaw === "t" || bodyAvailRaw === "1";
-  return {
-    entity_id,
-    channel,
-    subtype: (raw["subtype"] ?? "").trim(),
-    created_at,
-    ts,
-    direction: parseDirection(raw["direction"] ?? ""),
-    sender_name: (raw["sender_name"] ?? "").trim(),
-    message_body: raw["message_body"] ?? "",
-    body_available,
-    source_id: (raw["source_id"] ?? "").trim(),
-  };
+function readCol(row: Array<string | number | boolean | null>, idx: number | undefined): string {
+  if (idx === undefined) return "";
+  const v = row[idx];
+  if (v === null || v === undefined) return "";
+  return String(v);
 }
 
 /**
- * Fetch the unified per-entity comms feed.
+ * Fetch the unified per-entity comms feed via Metabase Dataset API.
  *
  * @param entityId      UUID. Empty/missing returns [].
  * @param lookbackDays  Days back from today. `0` requests all-time;
- *                      anything <0 is clamped to 0. The Metabase question
- *                      enforces a server-side cap too.
+ *                      anything <0 is clamped to 0.
  *
  * Returns rows sorted newest-first. Soft-fails to [] with a warning log.
  */
@@ -149,30 +97,81 @@ export async function fetchCommsFeed(
     return hit.rows;
   }
 
-  const url = `${COMMS_FEED_URL}?parameters=${buildParams(entityId, days)}`;
+  const apiKey = process.env.METABASE_API_KEY;
+  if (!apiKey || !PER_ENTITY_CARD_ID) {
+    console.warn(
+      `[comms-feed-v2] METABASE_API_KEY or METABASE_PER_ENTITY_COMMS_CARD_ID missing — returning [] for ${entityId}`,
+    );
+    return [];
+  }
+
+  const body = {
+    parameters: [
+      {
+        type: "category",
+        value: entityId,
+        target: ["variable", ["template-tag", "entity_id"]],
+      },
+      {
+        type: "category",
+        value: String(days),
+        target: ["variable", ["template-tag", "lookback_days"]],
+      },
+    ],
+    constraints: {
+      "max-results": PER_ENTITY_MAX_RESULTS,
+      "max-results-bare-rows": PER_ENTITY_MAX_RESULTS,
+    },
+  };
+
   try {
-    const res = await fetch(url, {
-      redirect: "follow",
+    const res = await fetch(`${METABASE_BASE}/api/card/${PER_ENTITY_CARD_ID}/query`, {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
       cache: "no-store",
-      headers: { Accept: "text/csv" },
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       console.warn(
-        `[comms-feed-v2] HTTP ${res.status} for ${entityId}: ${text.slice(0, 200)}`,
+        `[comms-feed-v2] dataset-api HTTP ${res.status} for ${entityId}: ${text.slice(0, 200)}`,
       );
       return [];
     }
-    const csv = await res.text();
-    const parsed = Papa.parse<Record<string, string>>(csv, {
-      header: true,
-      skipEmptyLines: true,
-    });
+    const json = (await res.json()) as {
+      data?: {
+        rows?: Array<Array<string | number | boolean | null>>;
+        cols?: Array<{ name: string }>;
+      };
+    };
+    const cols = json.data?.cols || [];
+    const rawRows = json.data?.rows || [];
+    const idx = new Map(cols.map((c, i) => [c.name, i] as const));
+
     const rows: CommsFeedRow[] = [];
-    for (const raw of parsed.data ?? []) {
-      if (!raw || typeof raw !== "object") continue;
-      const row = parseRow(raw);
-      if (row) rows.push(row);
+    for (const r of rawRows) {
+      const eid = readCol(r, idx.get("entity_id")).trim();
+      if (!eid) continue;
+      const channel = parseChannel(readCol(r, idx.get("channel")));
+      if (!channel) continue;
+      const created_at = readCol(r, idx.get("created_at")).trim();
+      const ts = parseTs(created_at);
+      if (!Number.isFinite(ts)) continue;
+      const bodyAvailRaw = readCol(r, idx.get("body_available")).trim().toLowerCase();
+      const body_available =
+        bodyAvailRaw === "true" || bodyAvailRaw === "t" || bodyAvailRaw === "1";
+      rows.push({
+        entity_id: eid,
+        channel,
+        subtype: readCol(r, idx.get("subtype")).trim(),
+        created_at,
+        ts,
+        direction: parseDirection(readCol(r, idx.get("direction"))),
+        sender_name: readCol(r, idx.get("sender_name")).trim(),
+        message_body: readCol(r, idx.get("message_body")),
+        body_available,
+        source_id: readCol(r, idx.get("source_id")).trim(),
+      });
     }
     rows.sort((a, b) => b.ts - a.ts);
     cache.set(cacheKey, { rows, ts: Date.now() });
