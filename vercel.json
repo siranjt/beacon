@@ -95,11 +95,11 @@
     },
     "app/(customer)/api/cron/refresh/compose/route.ts": {
       "memory": 2048,
-      "maxDuration": 60
+      "maxDuration": 180
     },
     "app/(customer)/api/cron/refresh/route.ts": {
       "memory": 2048,
-      "maxDuration": 60
+      "maxDuration": 180
     },
     "app/(customer)/api/cron/outcome-backfill/route.ts": {
       "memory": 1024,
