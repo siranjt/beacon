@@ -14,7 +14,7 @@
 import { NextResponse } from "next/server";
 import { readPipelineStage } from "@/lib/customer/pipeline-state";
 import { todaySnapshotDate } from "@/lib/customer/pipeline-state";
-import type { StageBData } from "@/lib/customer/refresh";
+import type { StageBData, StageB2Data } from "@/lib/customer/refresh";
 import type { CustomerMetrics } from "@/lib/customer/types";
 import { getApiUser, requireRole } from "@/lib/customer/api-auth";
 
@@ -58,25 +58,30 @@ export async function GET(req: Request) {
   const topN = Number(url.searchParams.get("top") || "30");
   const sampleEntity = url.searchParams.get("entity") || null;
 
-  const stage = await readPipelineStage<StageBData>("B", snapshotDate);
-  if (!stage || !stage.data) {
+  // Phase E-19 W1.8 — V1 lives in stage 'B', V2 lives in stage 'B2'
+  // (separate function instances to avoid OOMing on combined memory).
+  const [stageB, stageB2] = await Promise.all([
+    readPipelineStage<StageBData>("B", snapshotDate),
+    readPipelineStage<StageB2Data>("B2", snapshotDate),
+  ]);
+  if (!stageB || !stageB.data) {
     return NextResponse.json(
-      { ok: false, error: `no Stage B snapshot for date=${snapshotDate}` },
+      { ok: false, error: `no Stage B (V1) snapshot for date=${snapshotDate}` },
       { status: 404 },
     );
   }
-  const v1 = stage.data.commsMetricsByEntity || {};
-  const v2 = stage.data.commsMetricsByEntityV2 || {};
-  const diag = stage.data.v2Diagnostics;
+  const v1 = stageB.data.commsMetricsByEntity || {};
+  const v2 = stageB2?.data?.commsMetricsByEntityV2 || {};
+  const diag = stageB2?.data?.v2Diagnostics;
 
-  if (!diag || !diag.enabled) {
+  if (!stageB2 || !stageB2.data) {
     return NextResponse.json({
       ok: true,
       snapshot_date: snapshotDate,
       v2_enabled: false,
-      v2_diagnostics: diag,
+      v2_diagnostics: null,
       hint:
-        "V2 was not enabled for this Stage B run. Re-run Stage B (e.g., /api/cron/refresh) to populate V2 metrics.",
+        "No Stage B-v2 (V2) snapshot found. Fire /api/cron/refresh/stage-b-v2 to populate it, then re-check this endpoint.",
     });
   }
 
@@ -151,6 +156,8 @@ export async function GET(req: Request) {
     snapshot_date: snapshotDate,
     v2_enabled: true,
     v2_diagnostics: diag,
+    v2_generated_at: stageB2.generatedAt,
+    v1_generated_at: stageB.generatedAt,
     summary: {
       v1_entities: v1Entities.size,
       v2_entities: v2Entities.size,

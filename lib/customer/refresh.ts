@@ -126,20 +126,19 @@ export type StageBData = {
   perSourceEventCount: Record<string, number>;
   perDirectionCount: { in: number; out: number };
   channelCounts: { d30: Record<string, number>; d90: Record<string, number> };
+};
 
-  /**
-   * Phase E-19 Wave 1 — V2 comms metrics derived from the bulk-events
-   * Metabase question (card 4052) instead of the 5-CSV pipeline. Written
-   * alongside V1 during dual-source so the parity harness can diff them
-   * before UI is flipped over.
-   *
-   * Same shape as commsMetricsByEntity; populated only if the V2 fetch
-   * succeeded. v2Diagnostics carries the raw counters used to debug
-   * any divergence from V1 (row count, ingest time, soft-fail reason).
-   */
-  commsMetricsByEntityV2?: Record<string, CustomerMetrics>;
-  v2Diagnostics?: {
-    enabled: boolean;
+/**
+ * Phase E-19 Wave 1 W1.8 — V2 comms metrics, stored in a SEPARATE pipeline
+ * state slot (stage='B2') from V1's Stage B. V1 and V2 run in distinct
+ * Vercel function instances to keep their memory budgets independent —
+ * pre-split, running both in one function OOMed at 3GB.
+ *
+ * Owned by /api/cron/refresh/stage-b-v2 route, written by runStageBV2.
+ */
+export type StageB2Data = {
+  commsMetricsByEntityV2: Record<string, CustomerMetrics>;
+  v2Diagnostics: {
     eventCount: number;
     entitiesWithEventsV2: number;
     fetchDurationMs: number;
@@ -499,19 +498,7 @@ export async function runStageA(today: number = todayMs()): Promise<{
 // STAGE B — Comms (5 CSVs) → per-entity comms metrics
 // ===========================================================================
 
-export async function runStageB(
-  today: number = todayMs(),
-  /**
-   * Phase E-19 W1.5 — optional active-entity set for the V2 dual-source
-   * path. When provided AND METABASE_BULK_USE_DATASET_API=1 (or the
-   * public-CSV fallback is intentional), runStageB ALSO fetches the
-   * new bulk-events question, upserts into comms_events, and derives
-   * a parallel CustomerMetrics map. Soft-fails to V1-only on any error.
-   *
-   * When omitted, V2 path is skipped entirely (current default).
-   */
-  activeEntityIds?: string[],
-): Promise<{
+export async function runStageB(today: number = todayMs()): Promise<{
   data: StageBData;
   durationMs: number;
   errors: string[];
@@ -574,146 +561,6 @@ export async function runStageB(
   }
 
   memSnap("B end");
-
-  // ---------------------------------------------------------------------
-  // Phase E-19 Wave 1 — release V1 raw event buffers before V2 fetch.
-  //
-  // The V1 5-CSV pipeline can pull ~1.6M comms rows (all customers,
-  // all channels, all time). Once computeMetrics + perSourceEventCount
-  // + perDirectionCount are done above, the `events` array is only
-  // holding onto memory. Hanging onto it while V2 fetches another
-  // 60k+ events caused a function OOM during testing.
-  //
-  // We free the array contents (length = 0) — the reference variables
-  // stay in scope but the underlying storage is reclaimable by GC.
-  // ---------------------------------------------------------------------
-  if (commsResult.events.length > 0) {
-    const v1EventCount = commsResult.events.length;
-    commsResult.events.length = 0;
-    byEntity.clear();
-    if (global.gc) global.gc(); // honor --expose-gc flag if set
-    memSnap(`B after V1 release (${v1EventCount} events freed)`);
-  }
-
-  // ---------------------------------------------------------------------
-  // Phase E-19 Wave 1 — V2 dual-source path.
-  //
-  // If activeEntityIds was provided (called from runStageBAndStore with
-  // Stage A's universe), fetch the bulk-events Metabase question, upsert
-  // into comms_events, and derive a parallel CustomerMetrics map.
-  // Writes alongside the V1 metrics under separate snapshot keys so the
-  // parity harness can diff them before UI cuts over.
-  //
-  // Soft-fails: any failure here logs a warning + sets a softFailReason
-  // on v2Diagnostics. V1 keeps shipping unchanged.
-  // ---------------------------------------------------------------------
-  let commsMetricsByEntityV2: Record<string, CustomerMetrics> | undefined;
-  let v2Diagnostics: NonNullable<StageBData["v2Diagnostics"]> | undefined;
-
-  if (activeEntityIds && activeEntityIds.length > 0) {
-    const v2Started = Date.now();
-    let softFailReason: string | null = null;
-    let eventCount = 0;
-    let entitiesWithEventsV2 = 0;
-    let fetchDurationMs = 0;
-    let upsertDurationMs = 0;
-    let deriveDurationMs = 0;
-
-    try {
-      // Fetch
-      const tFetch = Date.now();
-      const events: CommsEventRow[] = await fetchBulkCommsEvents(activeEntityIds, 90);
-      fetchDurationMs = Date.now() - tFetch;
-      eventCount = events.length;
-
-      if (events.length === 0) {
-        softFailReason = "bulk fetch returned 0 events";
-      } else {
-        // Upsert to Postgres
-        const tUpsert = Date.now();
-        const { written, skipped } = await upsertCommsEvents(events);
-        upsertDurationMs = Date.now() - tUpsert;
-        if (skipped > 0) {
-          console.warn(`[stageB v2] upsert skipped ${skipped} events with missing required fields`);
-        }
-        console.log(`[stageB v2] upserted ${written} events in ${upsertDurationMs}ms`);
-
-        // Group events by entity for derivation + watermark
-        const byEntityV2 = new Map<string, CommsEventRow[]>();
-        for (const e of events) {
-          const arr = byEntityV2.get(e.entity_id) || [];
-          arr.push(e);
-          byEntityV2.set(e.entity_id, arr);
-        }
-        entitiesWithEventsV2 = byEntityV2.size;
-
-        // Derive metrics in-process from the events we just upserted
-        const tDerive = Date.now();
-        const now = new Date(today);
-        commsMetricsByEntityV2 = {};
-        for (const eid of activeEntityIds) {
-          const evs = byEntityV2.get(eid) || [];
-          commsMetricsByEntityV2[eid] = deriveCustomerMetricsFromEvents(evs, now);
-        }
-        deriveDurationMs = Date.now() - tDerive;
-
-        // Watermark: per-entity last_event_at + 90d count
-        const watermarks: Array<{
-          entity_id: string;
-          last_event_at: string | null;
-          event_count_90d: number;
-        }> = [];
-        for (const eid of activeEntityIds) {
-          const evs = byEntityV2.get(eid) || [];
-          const last = evs.length > 0
-            ? evs.reduce((acc, e) => (e.created_at > acc ? e.created_at : acc), evs[0].created_at)
-            : null;
-          watermarks.push({
-            entity_id: eid,
-            last_event_at: last,
-            event_count_90d: evs.length,
-          });
-        }
-        await writeWatermarks(watermarks).catch((e: Error) => {
-          console.warn(`[stageB v2] watermark write soft-failed: ${e.message}`);
-        });
-      }
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e);
-      softFailReason = `v2 ingest threw: ${message}`;
-      console.warn(`[stageB v2] ${softFailReason}`);
-      // Do NOT push to errors[] — V2 is dual-source, V1 must keep shipping.
-    }
-
-    v2Diagnostics = {
-      enabled: true,
-      eventCount,
-      entitiesWithEventsV2,
-      fetchDurationMs,
-      upsertDurationMs,
-      deriveDurationMs,
-      softFailReason,
-    };
-    console.log(
-      `[stageB v2] complete in ${Date.now() - v2Started}ms — ` +
-        `events=${eventCount}, entities_with_events=${entitiesWithEventsV2}, ` +
-        `fetch=${fetchDurationMs}ms upsert=${upsertDurationMs}ms derive=${deriveDurationMs}ms` +
-        (softFailReason ? ` SOFT-FAIL: ${softFailReason}` : ""),
-    );
-  } else {
-    // No activeEntityIds passed — V2 disabled for this call. This is the
-    // legacy path for any caller that doesn't go through runStageBAndStore.
-    v2Diagnostics = {
-      enabled: false,
-      eventCount: 0,
-      entitiesWithEventsV2: 0,
-      fetchDurationMs: 0,
-      upsertDurationMs: 0,
-      deriveDurationMs: 0,
-      softFailReason: "no activeEntityIds passed",
-    };
-  }
-
   const data: StageBData = {
     commsMetricsByEntity,
     channelCounts30dByEntity,
@@ -721,8 +568,6 @@ export async function runStageB(
     perSourceEventCount,
     perDirectionCount,
     channelCounts,
-    commsMetricsByEntityV2,
-    v2Diagnostics,
   };
   return { data, durationMs: Date.now() - started, errors };
 }
@@ -1829,17 +1674,176 @@ export async function runStageBAndStore(snapshotDate?: string): Promise<{
   const date = snapshotDate ?? todaySnapshotDate();
   const stageA = await readPipelineStage<StageAData>("A", date);
   const anchorToday = stageA?.data?.todayMs ?? todayMs();
-  // Phase E-19 W1.5 — pass Stage A's active universe so runStageB can also
-  // execute the V2 dual-source path (bulk-events → comms_events Postgres
-  // cache → derived metrics). Falls back to V1-only if stageA is missing.
-  const activeEntityIds = stageA?.data?.activeEntityIds;
-  const { data, durationMs, errors } = await runStageB(anchorToday, activeEntityIds);
+  const { data, durationMs, errors } = await runStageB(anchorToday);
   await writePipelineStage("B", date, data, {
     durationMs,
     errors,
     rowCount: Object.keys(data.commsMetricsByEntity).length,
   });
   return { durationMs, errors, rowCount: Object.keys(data.commsMetricsByEntity).length };
+}
+
+// ===========================================================================
+// STAGE B-V2 — bulk-events Metabase question → comms_events Postgres + derived
+//              CustomerMetrics. Runs in its OWN function instance to keep
+//              memory separated from V1.
+// ===========================================================================
+
+/**
+ * Phase E-19 W1.8 — V2 comms ingest. Pure replacement for Stage B's V1 5-CSV
+ * pipeline, just running in a separate function instance so the memory
+ * budgets don't compete. Reads activeEntityIds from Stage A, fetches the
+ * bulk-events Metabase question, upserts into comms_events, derives
+ * per-entity CustomerMetrics, and writes watermarks.
+ */
+export async function runStageBV2(
+  activeEntityIds: string[],
+  today: number = todayMs(),
+): Promise<{
+  data: StageB2Data;
+  durationMs: number;
+  errors: string[];
+}> {
+  const started = Date.now();
+  const errors: string[] = [];
+  memSnap("B-v2 start");
+
+  if (activeEntityIds.length === 0) {
+    return {
+      data: {
+        commsMetricsByEntityV2: {},
+        v2Diagnostics: {
+          eventCount: 0,
+          entitiesWithEventsV2: 0,
+          fetchDurationMs: 0,
+          upsertDurationMs: 0,
+          deriveDurationMs: 0,
+          softFailReason: "no activeEntityIds passed (Stage A may not have run)",
+        },
+      },
+      durationMs: Date.now() - started,
+      errors,
+    };
+  }
+
+  let softFailReason: string | null = null;
+  let eventCount = 0;
+  let entitiesWithEventsV2 = 0;
+  let fetchDurationMs = 0;
+  let upsertDurationMs = 0;
+  let deriveDurationMs = 0;
+  let commsMetricsByEntityV2: Record<string, CustomerMetrics> = {};
+
+  try {
+    // Fetch via Metabase Dataset API (chunked + parallel, see comms-bulk-fetch.ts)
+    const tFetch = Date.now();
+    const events: CommsEventRow[] = await fetchBulkCommsEvents(activeEntityIds, 90);
+    fetchDurationMs = Date.now() - tFetch;
+    eventCount = events.length;
+    memSnap(`B-v2 after fetch (${eventCount} events)`);
+
+    if (events.length === 0) {
+      softFailReason = "bulk fetch returned 0 events";
+    } else {
+      // Upsert to Postgres
+      const tUpsert = Date.now();
+      const { written, skipped } = await upsertCommsEvents(events);
+      upsertDurationMs = Date.now() - tUpsert;
+      if (skipped > 0) {
+        console.warn(`[stageB-v2] upsert skipped ${skipped} events with missing required fields`);
+      }
+      console.log(`[stageB-v2] upserted ${written} events in ${upsertDurationMs}ms`);
+      memSnap(`B-v2 after upsert`);
+
+      // Group events by entity for derivation + watermark
+      const byEntityV2 = new Map<string, CommsEventRow[]>();
+      for (const e of events) {
+        const arr = byEntityV2.get(e.entity_id) || [];
+        arr.push(e);
+        byEntityV2.set(e.entity_id, arr);
+      }
+      entitiesWithEventsV2 = byEntityV2.size;
+
+      // Derive metrics
+      const tDerive = Date.now();
+      const now = new Date(today);
+      for (const eid of activeEntityIds) {
+        const evs = byEntityV2.get(eid) || [];
+        commsMetricsByEntityV2[eid] = deriveCustomerMetricsFromEvents(evs, now);
+      }
+      deriveDurationMs = Date.now() - tDerive;
+
+      // Watermarks
+      const watermarks: Array<{
+        entity_id: string;
+        last_event_at: string | null;
+        event_count_90d: number;
+      }> = [];
+      for (const eid of activeEntityIds) {
+        const evs = byEntityV2.get(eid) || [];
+        const last = evs.length > 0
+          ? evs.reduce((acc, e) => (e.created_at > acc ? e.created_at : acc), evs[0].created_at)
+          : null;
+        watermarks.push({
+          entity_id: eid,
+          last_event_at: last,
+          event_count_90d: evs.length,
+        });
+      }
+      await writeWatermarks(watermarks).catch((e: Error) => {
+        console.warn(`[stageB-v2] watermark write soft-failed: ${e.message}`);
+      });
+      memSnap(`B-v2 end`);
+    }
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    softFailReason = `v2 ingest threw: ${message}`;
+    errors.push(softFailReason);
+    console.error(`[stageB-v2] ${softFailReason}`);
+  }
+
+  const data: StageB2Data = {
+    commsMetricsByEntityV2,
+    v2Diagnostics: {
+      eventCount,
+      entitiesWithEventsV2,
+      fetchDurationMs,
+      upsertDurationMs,
+      deriveDurationMs,
+      softFailReason,
+    },
+  };
+
+  console.log(
+    `[stageB-v2] complete in ${Date.now() - started}ms — ` +
+      `events=${eventCount}, entities_with_events=${entitiesWithEventsV2}, ` +
+      `fetch=${fetchDurationMs}ms upsert=${upsertDurationMs}ms derive=${deriveDurationMs}ms` +
+      (softFailReason ? ` SOFT-FAIL: ${softFailReason}` : ""),
+  );
+
+  return { data, durationMs: Date.now() - started, errors };
+}
+
+export async function runStageBV2AndStore(snapshotDate?: string): Promise<{
+  durationMs: number;
+  errors: string[];
+  rowCount: number;
+}> {
+  const date = snapshotDate ?? todaySnapshotDate();
+  const stageA = await readPipelineStage<StageAData>("A", date);
+  const anchorToday = stageA?.data?.todayMs ?? todayMs();
+  const activeEntityIds = stageA?.data?.activeEntityIds ?? [];
+  const { data, durationMs, errors } = await runStageBV2(activeEntityIds, anchorToday);
+  await writePipelineStage("B2", date, data, {
+    durationMs,
+    errors,
+    rowCount: Object.keys(data.commsMetricsByEntityV2).length,
+  });
+  return {
+    durationMs,
+    errors,
+    rowCount: Object.keys(data.commsMetricsByEntityV2).length,
+  };
 }
 
 export async function runStageCAndStore(snapshotDate?: string): Promise<{

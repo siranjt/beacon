@@ -20,6 +20,10 @@
       "schedule": "0 22 * * *"
     },
     {
+      "path": "/api/cron/refresh/stage-b-v2",
+      "schedule": "0 22 * * *"
+    },
+    {
       "path": "/api/cron/refresh/stage-c",
       "schedule": "0 22 * * *"
     },
@@ -78,6 +82,10 @@
       "maxDuration": 60
     },
     "app/(customer)/api/cron/refresh/stage-b/route.ts": {
+      "memory": 3008,
+      "maxDuration": 300
+    },
+    "app/(customer)/api/cron/refresh/stage-b-v2/route.ts": {
       "memory": 3008,
       "maxDuration": 300
     },

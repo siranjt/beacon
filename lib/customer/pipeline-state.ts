@@ -15,7 +15,7 @@ import { pgConfigured } from "./config";
  * Vercel Hobby's 60s timeout.
  */
 
-export type PipelineStage = "A" | "B" | "C" | "D";
+export type PipelineStage = "A" | "B" | "B2" | "C" | "D";
 
 let _sql: NeonQueryFunction<false, false> | null = null;
 function getSql(): NeonQueryFunction<false, false> | null {
@@ -27,18 +27,20 @@ function getSql(): NeonQueryFunction<false, false> | null {
 
 /**
  * Phase 13.1 — expand stage CHECK constraint to allow 'D' for HubSpot stage.
+ * Phase E-19 W1.7 — also allow 'B2' for the V2 comms ingest (runs in its own
+ * function instance to keep V1 + V2 memory budgets separated).
  * Idempotent: DROP IF EXISTS no-ops if not present, ADD re-asserts the rule.
  * Cached so we run the two ALTERs once per cold start, not on every write.
  */
-let _stageDConstraintReady = false;
-async function ensureStageDConstraint(): Promise<void> {
-  if (_stageDConstraintReady) return;
+let _stageConstraintReady = false;
+async function ensureStageConstraint(): Promise<void> {
+  if (_stageConstraintReady) return;
   const sql = getSql();
   if (!sql) return;
   try {
     await sql`ALTER TABLE pipeline_state DROP CONSTRAINT IF EXISTS pipeline_state_stage_check`;
-    await sql`ALTER TABLE pipeline_state ADD CONSTRAINT pipeline_state_stage_check CHECK (stage IN ('A', 'B', 'C', 'D'))`;
-    _stageDConstraintReady = true;
+    await sql`ALTER TABLE pipeline_state ADD CONSTRAINT pipeline_state_stage_check CHECK (stage IN ('A', 'B', 'B2', 'C', 'D'))`;
+    _stageConstraintReady = true;
   } catch (e) {
     console.warn("[pipeline-state] could not expand stage CHECK constraint:", e);
   }
@@ -63,7 +65,7 @@ export async function writePipelineStage(
   const sql = getSql();
   if (!sql) throw new Error("[pipeline-state] POSTGRES_URL not set");
 
-  await ensureStageDConstraint();
+  await ensureStageConstraint();
 
   const errors = opts.errors ?? [];
   const rowCount = opts.rowCount ?? null;
