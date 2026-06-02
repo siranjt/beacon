@@ -30,12 +30,25 @@ export async function GET(req: NextRequest) {
     ? `https://${process.env.VERCEL_URL}`
     : process.env.NEXTAUTH_URL || req.nextUrl.origin;
 
+  // Vercel Deployment Protection is in front of /miss-payment/* in production.
+  // Server-to-server cron calls bypass it via the project's "Protection
+  // Bypass for Automation" token. Without this header, the inner fetch lands
+  // on Vercel's auth wall and returns the 401 HTML page instead of our
+  // route's JSON. Same pattern as lib/ai/eval-harness.ts.
+  const headers: Record<string, string> = {};
+  if (secret) {
+    headers.authorization = `Bearer ${secret}`;
+  }
+  const protectionBypass = process.env.VERCEL_PROTECTION_BYPASS_TOKEN;
+  if (protectionBypass) {
+    headers["x-vercel-protection-bypass"] = protectionBypass;
+    headers["x-vercel-set-bypass-cookie"] = "false";
+  }
+
   const start = Date.now();
   try {
     const res = await fetch(`${origin}/miss-payment/api/invoices?refresh=1`, {
-      // Forward the cron secret so the route's session gate falls through
-      // to bearer auth on the dual-auth branch.
-      headers: secret ? { authorization: `Bearer ${secret}` } : undefined,
+      headers,
       cache: "no-store",
     });
     const ok = res.ok;
