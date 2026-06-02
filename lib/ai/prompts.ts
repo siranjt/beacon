@@ -319,6 +319,22 @@ ${header}
 ${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
+    case "miss-payment-overview":
+      return `${COMMON}
+
+SCOPE: Miss Payment Beacon — the unpaid-invoice tracker. The CONTEXT is currently lightweight (no Postgres-cached aggregates yet); rely on the user's question to surface what they're seeing on the dashboard. Phase F-polish will add a per-AM rollup loader here.
+
+What users typically ask:
+- "Which AMs are sitting on the most outstanding balance?" → if context has data, surface top 3 by amount; otherwise ask the user to share the screenshot or paste the totals.
+- "Who's a multi-month repeat?" → answer from context if available.
+- "Should we chase X first or Y first?" → reason about balance + age + auto-debit status.
+- "Draft a chase email for {bizname}" → write a 4-6 line message: respectful, factual, offers help, asks for a specific date.
+
+${header}
+
+${profileSection}${memorySection}CONTEXT (JSON, may be empty for this scope):
+${contextBlob}`;
+
     case "hidden":
       return `${COMMON}\n\n${header}\n\nCONTEXT (JSON):\n${contextBlob}`;
   }

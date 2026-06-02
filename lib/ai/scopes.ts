@@ -17,6 +17,7 @@ export type AiScope =
   | { kind: "escalation-overview" }
   | { kind: "post-payment-book" }
   | { kind: "post-payment-customer"; cbCustomerId: string }
+  | { kind: "miss-payment-overview" }
   | { kind: "hidden" };
 
 /** Stable string key for each scope (used for analytics + storage). */
@@ -85,6 +86,9 @@ export function pathToScope(pathname: string): AiScope {
   }
   if (pathname.startsWith("/post-payment")) return { kind: "post-payment-book" };
 
+  // Miss Payment Beacon
+  if (pathname.startsWith("/miss-payment")) return { kind: "miss-payment-overview" };
+
   // Umbrella launcher
   if (pathname === "/" || pathname === "") return { kind: "inbox" };
 
@@ -110,6 +114,8 @@ export function scopeLabel(s: AiScope): string {
       return "recent post-payment reviews";
     case "post-payment-customer":
       return "this post-payment review";
+    case "miss-payment-overview":
+      return "the missed-invoice book";
     case "hidden":
       return "";
   }
@@ -297,6 +303,29 @@ export function scopeQuickPrompts(
           label: "Draft a customer reply",
           prompt:
             "Draft a short message to this customer's owner that addresses the key concern surfaced in this verdict. Be honest and direct.",
+        },
+      ];
+    case "miss-payment-overview":
+      return [
+        {
+          label: "Who's hit the hardest right now?",
+          prompt:
+            "Looking at the missed-invoice book, which AMs have the largest outstanding balance? Top 3 with totals.",
+        },
+        {
+          label: "Multi-month repeat offenders",
+          prompt:
+            "List customers with unpaid invoices spanning two or more months. These are the priority chase list.",
+        },
+        {
+          label: "ACH already in flight vs not",
+          prompt:
+            "How many invoices have ACH 'In Progress' vs no ACH transaction recorded? What does that tell us about collection effort coverage?",
+        },
+        {
+          label: "Auto-debit Off but high balance",
+          prompt:
+            "Surface invoices where auto-debit is Off and the amount owed is significant. These need manual outreach today.",
         },
       ];
     case "hidden":

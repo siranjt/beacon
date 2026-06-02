@@ -173,6 +173,15 @@ Good suggestions:
 - DRAFT a reply to the customer's owner addressing the key concern
 - NAVIGATE to the docx report or the customer's 360 page (/360/...)`;
 
+    case "miss-payment-overview":
+      return `SCOPE: User is on the Miss Payment Beacon — the unpaid-invoice tracker. Rows pulled live from Chargebee, enriched with BaseSheet AM mapping + active Linear tickets.
+
+Good suggestions:
+- ASK which AMs have the highest outstanding balance or the most invoices
+- ASK to surface multi-month repeat offenders (entities with unpaid invoices spanning 2+ months)
+- ASK about auto-debit Off accounts with large balances
+- DRAFT a chase email or Slack message for a specific high-priority customer the user names`;
+
     case "hidden":
       return "";
   }
@@ -246,6 +255,13 @@ async function loadContextFor(
       return loadPostPaymentBookContext();
     case "post-payment-customer":
       return loadPostPaymentCustomerContext(scope.cbCustomerId);
+    case "miss-payment-overview":
+      // No bespoke loader yet — Beacon AI on /miss-payment relies on the
+      // page's NDJSON stream for live numbers. Returning null skips
+      // proactive suggestion generation; the panel still renders the
+      // quick-prompt buttons from scopeQuickPrompts. F-polish can add a
+      // real loader once we have stable Postgres-cached aggregates.
+      return null;
     case "hidden":
       return null;
   }

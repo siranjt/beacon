@@ -16,13 +16,14 @@
  *      hourly Slack rollup.
  */
 
-export type Agent = "customer" | "performance" | "escalation" | "post-payment" | "umbrella";
+export type Agent = "customer" | "performance" | "escalation" | "post-payment" | "miss-payment" | "umbrella";
 
 export const AGENTS: readonly Agent[] = [
   "customer",
   "performance",
   "escalation",
   "post-payment",
+  "miss-payment",
   "umbrella",
 ] as const;
 
@@ -94,6 +95,22 @@ export type PostPaymentSurface =
   | "post_payment_dashboard"
   | "post_payment_report";
 
+// --- Miss Payment Beacon -----------------------------------------------------
+// Phase F port — Finance-ops unpaid-invoice tracker. Click instrumentation
+// stays light at v1 (just page_view + the refresh + filter events that map
+// cleanly to existing names). Annotation saves intentionally NOT logged —
+// Finance reps edit dozens of cells per session and we don't want to flood
+// the activity log with low-signal events.
+export type MissPaymentEvent =
+  | "page_view"
+  | "refresh_clicked"
+  | "filter_changed"
+  | "excel_exported"
+  | "annotation_saved";
+
+export type MissPaymentSurface =
+  | "miss_payment_home";
+
 // --- Umbrella (cross-agent infra) -------------------------------------------
 // Auth, launcher, things that don't belong to one specific agent.
 export type UmbrellaEvent =
@@ -125,6 +142,7 @@ export type AnyEvent =
   | PerformanceEvent
   | EscalationEvent
   | PostPaymentEvent
+  | MissPaymentEvent
   | UmbrellaEvent;
 
 export type AnySurface =
@@ -132,6 +150,7 @@ export type AnySurface =
   | PerformanceSurface
   | EscalationSurface
   | PostPaymentSurface
+  | MissPaymentSurface
   | UmbrellaSurface;
 
 /** Validates an arbitrary string against the union of all known event names. */
@@ -148,6 +167,8 @@ export const ALL_EVENT_NAMES: readonly string[] = [
   "search_submitted", "tab_switched", "ticket_opened", "queue_filter_changed",
   // post-payment
   "verdict_filter_changed", "rerun_clicked", "docx_opened", "rerender_clicked",
+  // miss-payment
+  "excel_exported", "annotation_saved",
   // umbrella
   "sign_in", "sign_in_rejected", "launcher_card_clicked", "sign_out", "api_call",
   "command_palette_opened", "command_palette_select", "claude_asked",
@@ -166,6 +187,8 @@ export const ALL_SURFACES: readonly string[] = [
   "escalation_tickets", "escalation_customer",
   // post-payment
   "post_payment_dashboard", "post_payment_report",
+  // miss-payment
+  "miss_payment_home",
   // umbrella
   "auth", "launcher",
 ] as const;

@@ -35,7 +35,7 @@ export function isAllowedEmail(email: string | null | undefined): boolean {
  */
 export type AgentKind = "internal" | "external";
 export type Agent = {
-  id: "customer" | "performance" | "escalation" | "post-payment";
+  id: "customer" | "performance" | "escalation" | "post-payment" | "miss-payment";
   name: string;
   description: string;
   accent: string;       // Watchfire accent color for the card
@@ -74,6 +74,15 @@ export const AGENTS: Agent[] = [
     description: "Auto-gates new Discovery customers via Module 02 ICP at first pay.",
     accent: "#4A7C59", // Patina
     route: "/post-payment",
+    kind: "internal",
+  },
+  {
+    id: "miss-payment",
+    name: "Miss Payment Beacon",
+    description:
+      "Live unpaid invoices across the book — ACH status, AM ownership, Linear tickets, per-row notes.",
+    accent: "#2A4D5C", // Sea Lapis (Finance ops fits the lapis register)
+    route: "/miss-payment",
     kind: "internal",
   },
 ];

@@ -89,6 +89,7 @@ function isValidScope(s: unknown): s is AiScope {
     case "performance-landing":
     case "escalation-overview":
     case "post-payment-book":
+    case "miss-payment-overview":
       return true;
     case "customer-360":
     case "performance-report":
@@ -127,6 +128,19 @@ async function loadContextForScope(
       return loadPostPaymentBookContext();
     case "post-payment-customer":
       return loadPostPaymentCustomerContext(scope.cbCustomerId);
+    case "miss-payment-overview":
+      // No bespoke loader yet — return a stub context. Beacon AI on this
+      // scope relies on the user's question + general guidance rather
+      // than a pre-fetched data dump. F-polish will add a real loader
+      // that reads from a Postgres-cached per-AM rollup.
+      return {
+        audience: "the missed-invoice book",
+        blob: JSON.stringify({
+          scope: "miss-payment-overview",
+          note: "Live data lives in the user's browser dashboard via the NDJSON stream — no server-side cache to read from yet.",
+        }),
+        meta: { scope: "miss-payment-overview" },
+      };
     case "hidden":
       throw new Error("hidden scope cannot be asked");
   }

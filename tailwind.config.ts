@@ -116,6 +116,30 @@ const config: Config = {
         "accent-purple-bg": "#F5C9B6",
         "accent-pink": "#7C2D12",
         "accent-pink-bg": "#F5C9B6",
+
+        // ─────────────────────────────────────────────────────────────
+        // Miss Payment Beacon tokens — Phase F port.
+        // V1 Missed Invoice Tracker used these Tailwind tokens that
+        // didn't exist in the umbrella's Watchfire palette. Added as
+        // flat Watchfire-faithful colors so ported components render
+        // correctly without rewriting every class. Same pattern as the
+        // Escalation + Post-Payment remap blocks above. F-polish will
+        // consolidate when the design gets a deliberate re-skin pass.
+        // ─────────────────────────────────────────────────────────────
+        "zoca-textMuted": "#6E5F50",     // Smoke
+        "zoca-textDim": "#8B7A66",       // Faded Smoke
+        "zoca-stroke": "#D4C29B",        // Aged Brass
+        "zoca-strokeStrong": "#C2A975",  // Brass
+        "zoca-blueDeep": "#1F3B47",      // Deep Lapis
+        "zoca-pinkDeep": "#7C2D12",      // Deep Crimson (was hot-pink)
+        "zoca-indigo": "#2A4D5C",        // Sea Lapis (was indigo)
+        "zoca-purple": "#7C2D12",        // Deep Crimson (was purple)
+        "zoca-canvas": "#F0E4CC",        // Parchment
+        "zoca-surface": "#F8EFD7",       // Light Parchment
+        "zoca-surfaceMuted": "#EBE0C2",  // Buff
+        "zoca-success": "#4A7C59",       // Patina
+        "zoca-warning": "#D9A441",       // Brass
+        "zoca-danger": "#7C2D12",        // Deep Crimson
       },
       borderRadius: {
         zoca: "10px",

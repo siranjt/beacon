@@ -78,6 +78,10 @@
     {
       "path": "/api/cron/beacon-ai/daily-digest",
       "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/miss-payment-warm",
+      "schedule": "30 2 * * *"
     }
   ],
   "functions": {
@@ -156,6 +160,14 @@
     "app/(customer)/api/cron/beacon-ai/eval-nightly/route.ts": {
       "memory": 1024,
       "maxDuration": 300
+    },
+    "app/(miss-payment)/miss-payment/api/invoices/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
+    },
+    "app/(miss-payment)/api/cron/miss-payment-warm/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
     }
   }
 }
