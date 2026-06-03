@@ -174,6 +174,16 @@ export default async function LauncherPage() {
               >
                 Admin · Knowledge base
               </Link>
+              <Link
+                href="/admin/beacon-ai-gaps"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Beacon AI gaps
+              </Link>
             </>
           )}
         </div>

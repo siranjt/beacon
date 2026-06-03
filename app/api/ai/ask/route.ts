@@ -30,6 +30,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { authOptions } from "@/lib/auth";
 import { logUmbrellaActivity } from "@/lib/activity/log";
 import { getRoleForEmail } from "@/lib/customer/config";
+import { parseGaps, logGaps } from "@/lib/ai/gaps";
 import type { AiScope } from "@/lib/ai/scopes";
 import { scopeKey } from "@/lib/ai/scopes";
 import {
@@ -84,6 +85,31 @@ interface AskBody {
   scope?: AiScope;
   question?: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
+}
+
+/**
+ * F-polish-AI Tier 3 — pull the scope's identifying params (entity_id /
+ * cb_customer_id / am-filter context) into a plain JSON object so the
+ * failure-log row can be filtered by surface later. Whole-book scopes
+ * with no entity return null.
+ */
+function scopeMetaForLog(s: AiScope): Record<string, unknown> | null {
+  switch (s.kind) {
+    case "customer-360":
+    case "performance-report":
+      return { entity_id: s.entityId };
+    case "post-payment-customer":
+      return { cb_customer_id: s.cbCustomerId };
+    case "inbox":
+    case "customer-book":
+    case "performance-landing":
+    case "escalation-overview":
+    case "post-payment-book":
+    case "miss-payment-overview":
+      return null;
+    case "hidden":
+      return null;
+  }
 }
 
 function isValidScope(s: unknown): s is AiScope {
@@ -431,6 +457,33 @@ export async function POST(req: NextRequest) {
           // eslint-disable-next-line no-console
           console.warn(
             "[ai/ask] saveTurn failed:",
+            e instanceof Error ? e.message : String(e),
+          );
+        }
+
+        // F-polish-AI Tier 3 — failure inbox. Parse `<gap: ...>` markers
+        // out of the assistant turn and log one row per gap. Best-effort;
+        // never blocks stream completion. The markers themselves stay in
+        // assistantBuf (and thus in the saved turn) so admins can see
+        // exactly what the model said when triaging — the client renderer
+        // strips them from the visible bubble.
+        try {
+          const gaps = parseGaps(assistantBuf);
+          if (gaps.length > 0) {
+            void logGaps({
+              scope: scope.kind,
+              scope_meta: scopeMetaForLog(scope),
+              user_email: email,
+              user_role: role,
+              question,
+              full_response: assistantBuf,
+              conversation_id: assistantTurnId,
+              gaps,
+            });
+          }
+        } catch (e) {
+          console.warn(
+            "[ai/ask] gap logging failed:",
             e instanceof Error ? e.message : String(e),
           );
         }
