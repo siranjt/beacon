@@ -64,8 +64,12 @@ const IDEMPOTENT_WINDOW_SEC = 60;
 // Tools whose args do NOT include `customer_id`. The executor's
 // single-customer enforcement (args.customer_id must match top-level
 // customer_id) is bypassed for these — lookup_customer searches across the
-// whole book, so the top-level customer_id is a scope hint, not a target.
-const TOOLS_WITHOUT_CUSTOMER_ID_ARG = new Set(["lookup_customer"]);
+// whole book, query_customer_book aggregates across the whole book, so
+// the top-level customer_id is a scope hint, not a target.
+const TOOLS_WITHOUT_CUSTOMER_ID_ARG = new Set([
+  "lookup_customer",
+  "query_customer_book",
+]);
 
 interface ExecuteBody {
   tool_use_id?: string;

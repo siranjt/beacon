@@ -570,11 +570,14 @@ export default function AskPanel() {
                     ...last,
                     toolUses: [...(last.toolUses ?? []), newEntry],
                   };
-                  // Wave 2 — lookup_customer is read-only and auto-executes.
-                  // We schedule the approve a tick after setState lands so the
-                  // status flip from "pending" → "approving" → "approved" is
-                  // visible (matches the flow other tools follow on Approve).
-                  if (tu.name === "lookup_customer") {
+                  // Wave 2 + Tier 2 — read-only tools auto-execute. We schedule
+                  // the approve a tick after setState lands so the status flip
+                  // from "pending" → "approving" → "approved" is visible
+                  // (matches the flow other tools follow on Approve).
+                  if (
+                    tu.name === "lookup_customer" ||
+                    tu.name === "query_customer_book"
+                  ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
                     queueMicrotask(() => {

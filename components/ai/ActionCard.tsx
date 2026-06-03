@@ -92,7 +92,17 @@ const VERBS: Record<string, string> = {
   lookup_customer: "Look up",
   draft_email_to_contact: "Draft email to",
   draft_slack_message: "Draft Slack message about",
+  query_customer_book: "Query the book —",
 };
+
+/**
+ * Tools that act on the whole book (no specific customer). The card title
+ * suppresses the trailing `customerName` for these — saying "Query the
+ * book — this customer" reads wrong.
+ */
+function isBookLevelTool(toolName: string): boolean {
+  return toolName === "query_customer_book";
+}
 
 function verbFor(toolName: string, input: Record<string, unknown>): string {
   if (toolName === "pin_customer") {
@@ -177,6 +187,32 @@ function describeParams(toolName: string, input: Record<string, unknown>): React
         <>
           {channelHint && <Row label="Channel" value={channelHint} />}
           <Row label="Brief" value={bodyPreview} multiline />
+        </>
+      );
+    }
+    case "query_customer_book": {
+      const metric = typeof input.metric === "string" ? input.metric : "";
+      const groupBy = typeof input.group_by === "string" ? input.group_by : "";
+      const buckets = (input.buckets ?? {}) as Record<string, unknown>;
+      const bucketType = typeof buckets.type === "string" ? buckets.type : "";
+      let bucketDetail = bucketType;
+      if (bucketType === "threshold" && Array.isArray(buckets.threshold_values)) {
+        bucketDetail = `threshold at ${(buckets.threshold_values as number[]).join(", ")}`;
+      } else if (bucketType === "range" && Array.isArray(buckets.ranges)) {
+        bucketDetail = `range × ${(buckets.ranges as unknown[]).length} bands`;
+      }
+      const filter = input.filter as Record<string, unknown> | undefined;
+      const filterStr = filter
+        ? Object.entries(filter)
+            .map(([k, v]) => `${k}=${Array.isArray(v) ? v.join("|") : String(v)}`)
+            .join(", ")
+        : null;
+      return (
+        <>
+          <Row label="Metric" value={metric} />
+          <Row label="Group by" value={groupBy} />
+          <Row label="Buckets" value={bucketDetail} />
+          {filterStr && <Row label="Filter" value={filterStr} />}
         </>
       );
     }
@@ -358,7 +394,10 @@ export default function ActionCard({
             color: C.text,
           }}
         >
-          {verb} <em style={{ color: C.text2 }}>{data.customerName}</em>
+          {verb}{" "}
+          {!isBookLevelTool(data.toolName) && (
+            <em style={{ color: C.text2 }}>{data.customerName}</em>
+          )}
         </div>
         <span
           style={{
