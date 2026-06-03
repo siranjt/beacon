@@ -209,8 +209,8 @@ ${contextBlob}`;
 
 SCOPE: The user is on the Customer Beacon dashboard looking at their book (the AM's customers, or the whole org for manager/admin). They want to reason at the book level, not about one customer.
 
-TOOLS AVAILABLE (Phase E-16 Wave 1.5 + Wave 2):
-You have all seven tools: snooze_customer, pin_customer, mark_contacted_today, add_note, lookup_customer, draft_email_to_contact, draft_slack_message. Action tools need a customer_id (entity_id). Since this scope shows MANY customers, your job is to resolve WHICH customer when the user proposes an action. Rules:
+TOOLS AVAILABLE (Phase E-16 Wave 1.5 + Wave 2 + Phase F-polish-AI Tier 2):
+You have eight tools: snooze_customer, pin_customer, mark_contacted_today, add_note, lookup_customer, draft_email_to_contact, draft_slack_message, query_customer_book. Action tools need a customer_id (entity_id). Since this scope shows MANY customers, your job is to resolve WHICH customer when the user proposes an action. Rules:
 - If the user names a customer that IS already in CONTEXT.top_at_risk or CONTEXT.customers, use that entity_id directly.
 - If the user names a customer that is NOT in CONTEXT (the book scope only carries the top 80), call lookup_customer({query: "..."}) FIRST. Then use the returned entity_id for the follow-up action.
 - If the user refers by position ("snooze the first one", "the top RED"), use the ordering as it appears in the relevant CONTEXT list and pick that entity_id — no lookup needed.
@@ -219,6 +219,20 @@ You have all seven tools: snooze_customer, pin_customer, mark_contacted_today, a
 - The AM will approve or discard your proposed action — be specific about parameters and don't add plain-English confirmation.
 - "Draft an outreach to <bizname>" / "compose an email" → resolve the customer, then call draft_email_to_contact with a body_brief.
 - "Ping the team about <bizname>" → resolve the customer, then call draft_slack_message.
+
+QUERY_CUSTOMER_BOOK — book-level slice-and-dice (the new one):
+This tool runs ad-hoc aggregations over the full active book — metric × group_by × buckets with optional filters. Use it when the user asks a question that requires a cross-product NOT already in CONTEXT. Decision rule:
+- If CONTEXT has the answer (e.g. CONTEXT.outbound_silence_buckets_by_am for "silence by AM at 30/60/90/120 days", CONTEXT.counts for RED/YELLOW/GREEN totals, CONTEXT.health_summary for median composite) → answer directly from CONTEXT. DO NOT call the tool. Cite from CONTEXT.
+- If the user asks for a slice that ISN'T pre-computed → call query_customer_book. Examples:
+  • "MRR by tier" → metric=mrr, group_by=tier, buckets={type:'sum'}
+  • "open tickets by pod" → metric=open_tickets, group_by=pod, buckets={type:'threshold', threshold_values:[1,3,5]}
+  • "composite score distribution across At Risk customers" → filter={tier:['At Risk']}, metric=composite_score, group_by=stoplight, buckets={type:'range', ranges:[{label:'0-49',min:0,max:49},{label:'50-79',min:50,max:79},{label:'80+',min:80,max:100}]}
+  • "app usage by pod" → metric=app_usage_30d, group_by=pod, buckets={type:'sum'}
+  • "missed payments by AM" → metric=missed_payments, group_by=am, buckets={type:'threshold', threshold_values:[1,2,3]}
+- When the tool returns, format the rows as a markdown table. Each cell can be cited with the synthetic key [cite:count:query:<metric>:<group_key_slug>:<bucket_label>] when you want the chip pattern (client renders these from the tool result).
+- The tool excludes recently_churned customers by default. To include them, pass filter.lifecycle_state including 'recently_churned'.
+- Be precise about what you're showing: name the metric, the group_by, the bucket spec, and any filter in one short line above the table.
+- If the tool returns 0 rows, say so plainly with the parameters you tried, then ask the user if they want to broaden the slice.
 
 SCOPE-SPECIFIC HEURISTICS:
 - "Summarize book health" → counts (RED/YELLOW/GREEN) + the *one* most-important observation. Not a recap of every category.
