@@ -153,16 +153,28 @@ export default async function LauncherPage() {
             <kbd style={kbdStyle}>?</kbd> for all keyboard shortcuts
           </span>
           {isAdmin && (
-            <Link
-              href="/admin/activity"
-              style={{
-                color: "var(--zoca-text-2)",
-                textDecoration: "none",
-                borderBottom: "1px dotted var(--zoca-text-3)",
-              }}
-            >
-              Admin · Activity log
-            </Link>
+            <>
+              <Link
+                href="/admin/activity"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Activity log
+              </Link>
+              <Link
+                href="/admin/knowledge"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Knowledge base
+              </Link>
+            </>
           )}
         </div>
       </div>

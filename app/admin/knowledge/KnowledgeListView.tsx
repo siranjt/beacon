@@ -9,8 +9,9 @@
  * (or /admin/knowledge/new) — separate pages keep the list view simple.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { KnowledgeDoc } from "@/lib/ai/knowledge";
 
 interface Props {
@@ -46,9 +47,42 @@ function fmtDate(iso: string): string {
 }
 
 export default function KnowledgeListView({ initialDocs }: Props) {
+  const router = useRouter();
   const [docs] = useState<KnowledgeDoc[]>(initialDocs);
   const [query, setQuery] = useState("");
   const [scopeFilter, setScopeFilter] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/knowledge/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.doc) {
+        setUploadError(data.detail || data.error || `HTTP ${res.status}`);
+        return;
+      }
+      // Hand the user to the editor so they can review the auto-parsed
+      // body + narrow the scope_tags before publishing.
+      router.push(`/admin/knowledge/${data.doc.id}`);
+      router.refresh();
+    } catch (err: any) {
+      setUploadError(String(err?.message || err));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -84,22 +118,69 @@ export default function KnowledgeListView({ initialDocs }: Props) {
             Markdown docs that Beacon AI cites on every question. {docs.length} total.
           </p>
         </div>
-        <Link
-          href="/admin/knowledge/new"
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx,.png,.jpg,.jpeg,.gif,.webp,image/*,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={onFilePicked}
+            style={{ display: "none" }}
+            disabled={uploading}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            style={{
+              background: "white",
+              color: "var(--zoca-text)",
+              padding: "9px 18px",
+              borderRadius: 10,
+              border: "1px solid #D4C29B",
+              fontWeight: 500,
+              fontSize: 13,
+              cursor: uploading ? "not-allowed" : "pointer",
+              opacity: uploading ? 0.5 : 1,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+            title="Upload a .docx file or a screenshot. Mammoth parses Word docs into markdown; screenshots get OCR'd via Claude Vision."
+          >
+            {uploading ? "⏳ Uploading…" : "↑ Add file"}
+          </button>
+          <Link
+            href="/admin/knowledge/new"
+            style={{
+              background: "linear-gradient(135deg, #C8431D, #7C2D12)",
+              color: "white",
+              padding: "9px 18px",
+              borderRadius: 10,
+              fontWeight: 600,
+              fontSize: 13,
+              textDecoration: "none",
+              boxShadow: "0 4px 12px rgba(200, 67, 29, 0.25)",
+            }}
+          >
+            + New doc
+          </Link>
+        </div>
+      </div>
+
+      {uploadError && (
+        <div
           style={{
-            background: "linear-gradient(135deg, #C8431D, #7C2D12)",
-            color: "white",
-            padding: "9px 18px",
-            borderRadius: 10,
-            fontWeight: 600,
+            background: "#F5C9B6",
+            color: "#7C2D12",
+            padding: "10px 14px",
+            borderRadius: 8,
+            marginBottom: 12,
             fontSize: 13,
-            textDecoration: "none",
-            boxShadow: "0 4px 12px rgba(200, 67, 29, 0.25)",
           }}
         >
-          + New doc
-        </Link>
-      </div>
+          Upload failed: {uploadError}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <input
