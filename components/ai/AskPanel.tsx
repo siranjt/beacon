@@ -767,9 +767,13 @@ export default function AskPanel() {
         // FIX E-16.B — fire-and-forget. The card's "approved" state is
         // already committed by writeResult above; the follow-up ask is for
         // Claude's narration only and must not block the UI.
+        // FIX T2.B — for query_customer_book, the structured rows are in
+        // json.data and the model needs them to format the table. Other
+        // tools ignore the data field (their value is the action itself).
         void askWithToolResult(data, {
           ok: true,
           summary: json.summary ?? "Action completed.",
+          data: json.data ?? null,
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -796,7 +800,9 @@ export default function AskPanel() {
   const askWithToolResult = useCallback(
     async (
       action: ActionCardData,
-      outcome: { ok: true; summary: string } | { ok: false; error: string },
+      outcome:
+        | { ok: true; summary: string; data?: Record<string, unknown> | null }
+        | { ok: false; error: string },
     ) => {
       const verb =
         ({
@@ -807,10 +813,58 @@ export default function AskPanel() {
           lookup_customer: "lookup",
           draft_email_to_contact: "draft-email",
           draft_slack_message: "draft-slack",
+          query_customer_book: "query",
         } as Record<string, string>)[action.toolName] ?? action.toolName;
-      const followUp = outcome.ok
-        ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
-        : `[Beacon's ${verb} proposal was not run — ${outcome.error}.]`;
+
+      // F-polish-AI hotfix B — query_customer_book is book-level AND its
+      // value is in the structured rows, not the one-line summary. Inline
+      // the rows into the follow-up so the model has something to format
+      // into a markdown table. Other tools keep the lean summary-only
+      // path (their value is in the action itself, not the data).
+      let followUp: string;
+      if (action.toolName === "query_customer_book" && outcome.ok) {
+        const summary = outcome.summary;
+        const rich = (outcome.data ?? null) as
+          | {
+              metric?: string;
+              group_by?: string;
+              buckets?: Record<string, unknown>;
+              filter?: Record<string, unknown> | null;
+              total_customers_in_scope?: number;
+              rows?: Array<Record<string, unknown>>;
+            }
+          | null;
+        const lines: string[] = [];
+        lines.push(`[Beacon ran query_customer_book → ${summary}`);
+        if (rich) {
+          lines.push(`metric: ${rich.metric}`);
+          lines.push(`group_by: ${rich.group_by}`);
+          if (rich.buckets) {
+            lines.push(`buckets: ${JSON.stringify(rich.buckets)}`);
+          }
+          if (rich.filter && Object.keys(rich.filter).length > 0) {
+            lines.push(`filter: ${JSON.stringify(rich.filter)}`);
+          }
+          if (typeof rich.total_customers_in_scope === "number") {
+            lines.push(`total_customers_in_scope: ${rich.total_customers_in_scope}`);
+          }
+          if (Array.isArray(rich.rows)) {
+            lines.push(`rows (${rich.rows.length}):`);
+            lines.push(JSON.stringify(rich.rows, null, 2));
+          }
+        }
+        lines.push("");
+        lines.push(
+          "Now format these rows as a clean markdown table. Cite each cell with [cite:count:query:<metric>:<group_key_slug>:<bucket_label>]. Don't restate the parameters — just give me the table.",
+        );
+        followUp = lines.join("\n") + "]";
+      } else if (action.toolName === "query_customer_book" && !outcome.ok) {
+        followUp = `[Beacon's query_customer_book proposal was not run — ${outcome.error}.]`;
+      } else {
+        followUp = outcome.ok
+          ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
+          : `[Beacon's ${verb} proposal was not run — ${outcome.error}.]`;
+      }
       // Reuse the regular ask path so memory + facts + everything stays
       // consistent. The bracketed prefix signals to Claude this is a
       // system trace, not a fresh AM question.
