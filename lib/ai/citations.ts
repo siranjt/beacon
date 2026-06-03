@@ -508,6 +508,14 @@ function buildCustomerBookLookup(args: {
     outbound_silence_14d: number;
     outbound_silence_30d: number;
   };
+  silenceByAm?: Array<{
+    am_name: string;
+    total_customers: number;
+    silent_30d_plus: number;
+    silent_60d_plus: number;
+    silent_90d_plus: number;
+    silent_120d_plus: number;
+  }>;
   topAtRisk: Array<{
     entity_id: string;
     company: string | null;
@@ -518,7 +526,7 @@ function buildCustomerBookLookup(args: {
     days_since_out: number | null;
   }>;
 }): CitationLookup {
-  const { counts, trajectory, health, topAtRisk } = args;
+  const { counts, trajectory, health, silenceByAm, topAtRisk } = args;
   const out: CitationLookup = {};
 
   // Book-level counts.
@@ -565,6 +573,44 @@ function buildCustomerBookLookup(args: {
     label: "Silent ≥30 days (outbound)",
     value: String(health.outbound_silence_30d),
   };
+
+  // F-polish-AI-T1 — per-AM silence rows. One citation entry per AM, per
+  // threshold. Slug the am_name into a lookup key (spaces → underscores,
+  // lowercased) so `[cite:count:silence_by_am:30d:sakshi_mamgain]` is the
+  // canonical chip id.
+  if (silenceByAm && silenceByAm.length > 0) {
+    for (const row of silenceByAm) {
+      const slug = row.am_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+      const thresholdRows = [
+        { threshold: 30 as const, count: row.silent_30d_plus, label: "≥30d" },
+        { threshold: 60 as const, count: row.silent_60d_plus, label: "≥60d" },
+        { threshold: 90 as const, count: row.silent_90d_plus, label: "≥90d" },
+        { threshold: 120 as const, count: row.silent_120d_plus, label: "≥120d" },
+      ];
+      for (const r of thresholdRows) {
+        out[makeCitationKey("count", `silence_by_am:${r.threshold}d:${slug}`)] = {
+          category: "count",
+          label: `${row.am_name} — silent ${r.label} (outbound)`,
+          value: String(r.count),
+          raw: {
+            am_name: row.am_name,
+            threshold_days: r.threshold,
+            total_customers: row.total_customers,
+          },
+        };
+      }
+      out[makeCitationKey("count", `silence_by_am:total:${slug}`)] = {
+        category: "count",
+        label: `${row.am_name} — total customers`,
+        value: String(row.total_customers),
+        raw: { am_name: row.am_name },
+      };
+    }
+  }
+
   if (health.median_composite !== null) {
     out[makeCitationKey("metric", "median_composite_book")] = {
       category: "metric",
@@ -1202,6 +1248,17 @@ export interface CustomerBookCitationInput {
     outbound_silence_14d: number;
     outbound_silence_30d: number;
   };
+  // F-polish-AI-T1 — per-AM outbound silence at 30/60/90/120d. Optional so
+  // existing callers that don't pass it stay valid; the loader always
+  // populates it today.
+  silenceByAm?: Array<{
+    am_name: string;
+    total_customers: number;
+    silent_30d_plus: number;
+    silent_60d_plus: number;
+    silent_90d_plus: number;
+    silent_120d_plus: number;
+  }>;
   topAtRisk: Array<{
     entity_id: string;
     company: string | null;
@@ -1337,6 +1394,7 @@ export function buildCitationLookup(input: CitationLookupInput): CitationLookup 
         counts: input.counts,
         trajectory: input.trajectory,
         health: input.health,
+        silenceByAm: input.silenceByAm,
         topAtRisk: input.topAtRisk,
       });
     case "inbox":

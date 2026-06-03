@@ -664,6 +664,51 @@ export async function loadCustomerBookContext(opts: {
     (c) => (c.metrics?.days_since_out ?? 0) >= 30,
   ).length;
 
+  // F-polish-AI-T1 — outbound silence bucketed by AM at the standard
+  // retention thresholds. Lets Beacon AI answer "how many customers haven't
+  // we touched in 30/60/90/120 days, by AM" without falling back to "I
+  // don't have that breakdown." Computed in-memory from the snapshot — no
+  // extra fetch. Note: `days_since_out` is null for customers with no
+  // outbound history ever; we treat those as ≥120 (worst bucket) because
+  // that's the operationally correct read.
+  const SILENCE_THRESHOLDS = [30, 60, 90, 120] as const;
+  type SilenceBucket = (typeof SILENCE_THRESHOLDS)[number];
+  const silenceByAmMap = new Map<
+    string,
+    { total: number; buckets: Record<SilenceBucket, number> }
+  >();
+  for (const c of scoped) {
+    const amKey = c.am_name && c.am_name.trim() ? c.am_name.trim() : "(Unassigned)";
+    const dso = c.metrics?.days_since_out;
+    // Treat null/undefined as 9999 (effectively forever) so a customer
+    // who has never been contacted hits every threshold.
+    const days = typeof dso === "number" ? dso : 9999;
+    let entry = silenceByAmMap.get(amKey);
+    if (!entry) {
+      entry = {
+        total: 0,
+        buckets: { 30: 0, 60: 0, 90: 0, 120: 0 },
+      };
+      silenceByAmMap.set(amKey, entry);
+    }
+    entry.total += 1;
+    for (const t of SILENCE_THRESHOLDS) {
+      if (days >= t) entry.buckets[t] += 1;
+    }
+  }
+  const outbound_silence_buckets_by_am = Array.from(silenceByAmMap.entries())
+    .map(([am_name, v]) => ({
+      am_name,
+      total_customers: v.total,
+      silent_30d_plus: v.buckets[30],
+      silent_60d_plus: v.buckets[60],
+      silent_90d_plus: v.buckets[90],
+      silent_120d_plus: v.buckets[120],
+    }))
+    // Sort by 30d-silent desc so the most-silent AMs surface first — Beacon
+    // AI can take the top N for a tight answer without listing every AM.
+    .sort((a, b) => b.silent_30d_plus - a.silent_30d_plus);
+
   // Phase E-18 — bulk cache read for the top-at-risk customers. Cache-only;
   // never triggers Haiku from the AI ask path.
   const perspectiveMap = await readPerspectivesForEntities(
@@ -681,6 +726,7 @@ export async function loadCustomerBookContext(opts: {
       outbound_silence_14d: silent_14d_count,
       outbound_silence_30d: silent_30d_count,
     },
+    silenceByAm: outbound_silence_buckets_by_am,
     topAtRisk: top.map((c) => ({
       entity_id: c.entity_id,
       company: c.company ?? null,
@@ -718,6 +764,10 @@ export async function loadCustomerBookContext(opts: {
         outbound_silence_14d: silent_14d_count,
         outbound_silence_30d: silent_30d_count,
       },
+      // F-polish-AI-T1 — per-AM outbound silence at 30/60/90/120-day
+      // thresholds. Sorted by 30d-silent desc. Use this for any "haven't
+      // contacted in X days by AM" question.
+      outbound_silence_buckets_by_am,
       top_at_risk: top.map((c) => {
         const persp = perspectiveMap.get(c.entity_id);
         return {

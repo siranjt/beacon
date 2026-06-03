@@ -225,6 +225,7 @@ SCOPE-SPECIFIC HEURISTICS:
 - "Who's regressing?" → 3-6 customers with worst 7-day trajectory, each with the specific reason. Cite trajectory_7d explicitly.
 - "Common patterns across RED" → identify shared signals (e.g. "5 of 8 RED customers are failing on we_silent — outbound isn't happening"). Suggest a single intervention that could help multiple.
 - "Who haven't I contacted?" → look at days_since_out, sort by composite-risk × days-silent product. Surface the worst 5.
+- "Outbound silence by AM" / "how many customers haven't we touched in 30/60/90/120 days, grouped by AM" → use CONTEXT.outbound_silence_buckets_by_am directly. Render as a table: AM Name | 30d+ | 60d+ | 90d+ | 120d+ | Total. Rows are pre-sorted by 30d-silent desc. Cite each cell with [cite:count:silence_by_am:<threshold>d:<am_slug>] — the AM slug is am_name lowercased with non-alphanumerics → underscores. The thresholds 30/60/90/120 are the only ones supported here; if the user asks for a non-standard threshold (e.g. 45d), say you only have the four standard buckets and offer the closest.
 - Don't list 20 customers — keep lists short (5-8 max) and ranked.
 
 COMMS PERSPECTIVE across this book: top_at_risk rows carry a comms_perspective field when one is cached. Book-level counts ("4 of your top 8 at-risk customers are tense") are scannable directly from these fields. See the COMMS PERSPECTIVE — HARD CONSISTENCY RULES section above for citation + interpretation rules.
