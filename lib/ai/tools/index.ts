@@ -45,6 +45,7 @@ import { addNoteTool } from "./add-note";
 import { lookupCustomerTool } from "./lookup-customer";
 import { draftEmailToContactTool } from "./draft-email";
 import { draftSlackMessageTool } from "./draft-slack";
+import { queryCustomerBookTool } from "./query-customer-book";
 
 /**
  * The execution context passed to every tool's `execute()` handler. Filled
@@ -119,6 +120,11 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   lookupCustomerTool,
   draftEmailToContactTool,
   draftSlackMessageTool,
+  // Phase F-polish-AI Tier 2 — generalized slice-and-dice over the active
+  // book. Read-only, returns structured rows; the model uses the result to
+  // compose tabular answers without needing every cross-product
+  // pre-computed in CONTEXT.
+  queryCustomerBookTool,
 ];
 
 /** Alias for callers that prefer the umbrella naming. */
@@ -160,4 +166,5 @@ export {
   lookupCustomerTool,
   draftEmailToContactTool,
   draftSlackMessageTool,
+  queryCustomerBookTool,
 };
