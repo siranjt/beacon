@@ -62,9 +62,10 @@ import type { Tier, Stoplight } from "./config";
 
 import { getHealthCardMap } from "@/lib/customer/health-card";
 // Phase E-19 Wave 1 — dual-source comms ingest (V2 path).
-import { fetchBulkCommsEvents } from "./comms-bulk-fetch";
+import { fetchBulkCommsEvents, fetchBulkCommsEventsStreaming } from "./comms-bulk-fetch";
 import {
   upsertCommsEvents,
+  getEventsForEntities,
   deriveCustomerMetricsFromEvents,
   writeWatermarks,
   type CommsEventRow,
@@ -551,28 +552,54 @@ export async function runStageB(
     };
   }
 
-  // Fetch via Metabase Dataset API (chunked + parallel).
-  const events = await fetchBulkCommsEvents(activeEntityIds, 90).catch((e: Error) => {
-    errors.push(`Comms (V2 bulk): ${e.message}`);
-    return [] as CommsEventRow[];
-  });
-  memSnap(`B after fetch (${events.length} events)`);
-
-  // Upsert to comms_events Postgres cache (idempotent on (entity,channel,source_id)).
-  if (events.length > 0) {
-    await upsertCommsEvents(events).catch((e: Error) => {
-      errors.push(`Comms (V2 upsert): ${e.message}`);
-    });
-    memSnap("B after upsert");
+  // Phase E-19 follow-up (#336) — stream fetch + upsert chunk-by-chunk
+  // so peak memory stays bounded to one chunk at a time instead of
+  // holding the union of all chunks in RAM. Per-source + per-direction
+  // counters tally inline during the stream (cheap O(1) per row) so we
+  // don't need a flat array later. After streaming completes, re-read
+  // the upserted rows from Postgres for the per-entity derivation —
+  // one extra DB query, but means the heaviest in-memory state is the
+  // final byEntity Map, not the chunked fetch overhead on top.
+  let totalEventsFetched = 0;
+  const perSourceEventCount = { chat: 0, email: 0, phone: 0, video: 0, sms: 0 } as Record<string, number>;
+  const perDirectionCount = { in: 0, out: 0 };
+  try {
+    const result = await fetchBulkCommsEventsStreaming(
+      activeEntityIds,
+      90,
+      async (chunkEvents: CommsEventRow[]) => {
+        // Tally diagnostic counters on the way through — saves an extra
+        // pass over the final 60k-row array later.
+        for (const e of chunkEvents) {
+          perSourceEventCount[e.channel] = (perSourceEventCount[e.channel] || 0) + 1;
+          if (e.direction === "inbound") perDirectionCount.in++;
+          else if (e.direction === "outbound") perDirectionCount.out++;
+        }
+        // Upsert this chunk immediately. If Postgres backpressures,
+        // the fetcher pauses naturally (the worker awaits this).
+        try {
+          await upsertCommsEvents(chunkEvents);
+        } catch (e: any) {
+          errors.push(`Comms (V2 upsert chunk): ${e.message}`);
+        }
+      },
+    );
+    totalEventsFetched = result.totalEvents;
+  } catch (e: any) {
+    errors.push(`Comms (V2 bulk stream): ${e.message}`);
   }
+  memSnap(`B after streamed fetch+upsert (${totalEventsFetched} events)`);
 
-  // Group events by entity for derivation + watermark
-  const byEntity = new Map<string, CommsEventRow[]>();
-  for (const e of events) {
-    const arr = byEntity.get(e.entity_id) || [];
-    arr.push(e);
-    byEntity.set(e.entity_id, arr);
-  }
+  // Re-read from Postgres for the per-entity derivation. The streamed
+  // upsert wrote the canonical rows; this read gives us the same data
+  // already deduped + bounded by the 90d window via SQL.
+  const byEntity = await getEventsForEntities(activeEntityIds, 90).catch(
+    (e: Error) => {
+      errors.push(`Comms (V2 readback): ${e.message}`);
+      return new Map<string, CommsEventRow[]>();
+    },
+  );
+  memSnap(`B after readback (${byEntity.size} entities)`);
 
   // Derive per-entity metrics
   const commsMetricsByEntity: Record<string, CustomerMetrics> = {};
@@ -594,15 +621,9 @@ export async function runStageB(
   }
   memSnap("B after metrics");
 
-  // Diagnostic aggregates from raw events
-  const perSourceEventCount = { chat: 0, email: 0, phone: 0, video: 0, sms: 0 } as Record<string, number>;
-  const perDirectionCount = { in: 0, out: 0 };
-  for (const e of events) {
-    perSourceEventCount[e.channel] = (perSourceEventCount[e.channel] || 0) + 1;
-    // V2 returns "inbound"/"outbound"/"system"; map to V1's "in"/"out" shape.
-    if (e.direction === "inbound") perDirectionCount.in++;
-    else if (e.direction === "outbound") perDirectionCount.out++;
-  }
+  // perSourceEventCount + perDirectionCount were tallied inline during
+  // the streamed fetch above (search "Phase E-19 follow-up (#336)").
+  // No second pass over a flat array needed.
 
   // Channel counts across active book (d30/d90 distinct customers per channel)
   const channelCounts = { d30: {} as Record<string, number>, d90: {} as Record<string, number> };
@@ -653,7 +674,7 @@ export async function runStageB(
 
   console.log(
     `[stageB] V2 ingest complete in ${Date.now() - started}ms — ` +
-      `events=${events.length}, entities_with_events=${byEntity.size}/${activeEntityIds.length}`,
+      `events=${totalEventsFetched}, entities_with_events=${byEntity.size}/${activeEntityIds.length}`,
   );
   return { data, durationMs: Date.now() - started, errors };
 }

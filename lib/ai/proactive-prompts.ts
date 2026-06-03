@@ -211,6 +211,12 @@ export function buildDailyDigestPrompt(
   changes: DailyChange[],
   summary: DailyDigestSummary,
   factsBlock: string | null,
+  // Phase F-polish-AI-5b — optional book-level miss-payment snapshot.
+  // The change-detection already surfaces per-customer new_missed_payment
+  // deltas inside `changes`; this gives the model a TOTALS context so the
+  // opener can frame the day in dollars ("3 score drops, 1 new ticket +
+  // $4,200 still outstanding across 12 invoices").
+  missPayment?: MissPaymentAmSummary | null,
 ): PromptPair {
   const styleSection = factsBlock
     ? `THE AM'S WORKING STYLE (apply naturally — don't recite):\n${factsBlock}\n\n`
@@ -252,9 +258,24 @@ ${styleSection}HARD RULES:
     2,
   );
 
+  // Phase F-polish-AI-5b — optional book-level miss-payment context.
+  // Renders only when this AM has any open unpaid invoices. The opener
+  // line in the digest may reference the dollar total when material.
+  const missPaymentBlock =
+    missPayment && missPayment.open_invoice_count > 0
+      ? `\nMISS PAYMENT BOOK SNAPSHOT (totals, not deltas):
+- Open invoices in your book: ${missPayment.open_invoice_count}
+- Total outstanding: $${missPayment.total_outstanding_usd.toLocaleString()}
+- Multi-month repeat customers: ${missPayment.multi_month_customer_count}
+- Auto-debit Off + balance >= $500: ${missPayment.auto_debit_off_high_balance_count}
+
+When the total is material (>= $500, or any multi-month repeats), you MAY weave a brief reference into the opener — e.g. "3 score drops, $2,140 still outstanding across 4 invoices — here's the cut." Otherwise omit; the per-customer new_missed_payment changes below already cover overnight movement.
+`
+      : "";
+
   const user = `SUMMARY of changes for ${amName} (today vs yesterday):
 ${JSON.stringify(summary, null, 2)}
-
+${missPaymentBlock}
 CHANGES (already filtered to "material" — score drops > 10, tier flips, new tickets in last 24h, new missed payments):
 ${changesJson}
 

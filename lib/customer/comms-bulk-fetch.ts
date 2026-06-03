@@ -441,20 +441,161 @@ async function fetchViaPublicCsv(
 /**
  * Fetch the bulk comms-events question for the given entity_ids.
  * Tries Dataset API first if METABASE_BULK_USE_DATASET_API=1; falls back
- * to chunked public CSV. Returns CommsEventRow[].
+ * to chunked public CSV. Returns the full accumulated CommsEventRow[].
+ *
+ * Use this when you genuinely need the full array in memory (e.g. AI
+ * context loaders that aggregate across the response). For Stage B's
+ * refresh path, prefer fetchBulkCommsEventsStreaming below to keep peak
+ * memory bounded to one chunk at a time.
  */
 export async function fetchBulkCommsEvents(
   entityIds: string[],
   lookbackDays = 90,
 ): Promise<CommsEventRow[]> {
   if (entityIds.length === 0) return [];
+  // Thin wrapper over the streaming variant — accumulate every chunk into
+  // a single array. Same shape as the pre-#336 contract for back-compat.
+  const out: CommsEventRow[] = [];
+  await fetchBulkCommsEventsStreaming(entityIds, lookbackDays, async (chunk) => {
+    out.push(...chunk);
+  });
+  return out;
+}
+
+/**
+ * Phase E-19 follow-up (#336) — streaming variant. Calls `onChunk` once
+ * per Metabase chunk as it arrives, so the caller can drain to Postgres
+ * (or any other sink) and free the chunk array before the next request
+ * lands. Peak memory ≈ concurrency × chunk_size events instead of the
+ * full union of all chunks.
+ *
+ * The `onChunk` callback is awaited — if upserting backpressures, the
+ * fetcher pauses naturally. Returns the total event count fetched.
+ *
+ * onChunk MAY be called with an empty array (e.g. when a chunk's
+ * Dataset API call returns no rows). Callers should handle that as a
+ * no-op rather than failing.
+ */
+export async function fetchBulkCommsEventsStreaming(
+  entityIds: string[],
+  lookbackDays: number,
+  onChunk: (events: CommsEventRow[]) => Promise<void>,
+): Promise<{ totalEvents: number; transport: "dataset-api" | "csv" }> {
+  if (entityIds.length === 0) return { totalEvents: 0, transport: "csv" };
 
   if (process.env.METABASE_BULK_USE_DATASET_API === "1") {
-    const events = await fetchViaDatasetApi(entityIds, lookbackDays);
-    if (events !== null) return events;
+    const result = await fetchViaDatasetApiStreaming(entityIds, lookbackDays, onChunk);
+    if (result !== null) {
+      return { totalEvents: result, transport: "dataset-api" };
+    }
     console.warn("[comms-bulk-fetch] dataset-api unavailable, falling back to public CSV");
   }
-  return fetchViaPublicCsv(entityIds, lookbackDays);
+  const total = await fetchViaPublicCsvStreaming(entityIds, lookbackDays, onChunk);
+  return { totalEvents: total, transport: "csv" };
+}
+
+/**
+ * Streaming variant of fetchViaDatasetApi — same chunking + concurrency
+ * but each chunk's events are handed to onChunk and freed before the
+ * worker pulls the next chunk. Returns total event count, or null when
+ * the probe chunk returned 403 (caller falls back to CSV).
+ */
+async function fetchViaDatasetApiStreaming(
+  entityIds: string[],
+  lookbackDays: number,
+  onChunk: (events: CommsEventRow[]) => Promise<void>,
+): Promise<number | null> {
+  if (entityIds.length === 0) return 0;
+  const apiKey = process.env.METABASE_API_KEY;
+  if (!apiKey || !BULK_CARD_ID) return null;
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < entityIds.length; i += BULK_DATASET_CHUNK_SIZE) {
+    chunks.push(entityIds.slice(i, i + BULK_DATASET_CHUNK_SIZE));
+  }
+
+  const t0 = Date.now();
+  // Probe with the first chunk — bails out before parallel fan-out on
+  // 403 (permissions issue). On success, the probe's events are still
+  // delivered to onChunk before any other chunk fires.
+  const probe = await fetchOneDatasetApiChunk(chunks[0], lookbackDays);
+  if (probe === null) {
+    console.warn(
+      `[comms-bulk-fetch] dataset-api probe returned null (perms issue) — caller falls back to CSV`,
+    );
+    return null;
+  }
+  let total = probe.length;
+  await onChunk(probe);
+
+  if (chunks.length > 1) {
+    let cursor = 1;
+    const worker = async (): Promise<void> => {
+      while (cursor < chunks.length) {
+        const i = cursor++;
+        const events = await fetchOneDatasetApiChunk(chunks[i], lookbackDays);
+        if (events && events.length > 0) {
+          total += events.length;
+          // Await the upsert (or whatever onChunk does) before pulling
+          // the next chunk. This is the backpressure point — if the DB
+          // is slow, fetcher concurrency naturally throttles.
+          await onChunk(events);
+        }
+      }
+    };
+    const workers = Array.from(
+      { length: Math.min(BULK_DATASET_CONCURRENCY, chunks.length - 1) },
+      () => worker(),
+    );
+    await Promise.all(workers);
+  }
+
+  console.log(
+    `[comms-bulk-fetch] dataset-api STREAMED: ${total} events for ${entityIds.length} entities across ${chunks.length} chunks in ${Date.now() - t0}ms`,
+  );
+  return total;
+}
+
+/**
+ * Streaming variant of fetchViaPublicCsv — same pattern as the Dataset
+ * API streaming variant. Each CSV chunk's parsed rows are handed to
+ * onChunk and freed before the next request fires.
+ */
+async function fetchViaPublicCsvStreaming(
+  entityIds: string[],
+  lookbackDays: number,
+  onChunk: (events: CommsEventRow[]) => Promise<void>,
+): Promise<number> {
+  if (entityIds.length === 0) return 0;
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < entityIds.length; i += PUBLIC_CSV_CHUNK_SIZE) {
+    chunks.push(entityIds.slice(i, i + PUBLIC_CSV_CHUNK_SIZE));
+  }
+
+  const t0 = Date.now();
+  let total = 0;
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < chunks.length) {
+      const i = cursor++;
+      const events = await fetchOneCsvChunk(chunks[i], lookbackDays);
+      if (events.length > 0) {
+        total += events.length;
+        await onChunk(events);
+      }
+    }
+  };
+  const workers = Array.from(
+    { length: Math.min(PUBLIC_CSV_CONCURRENCY, chunks.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+
+  console.log(
+    `[comms-bulk-fetch] csv STREAMED: ${total} events for ${entityIds.length} entities across ${chunks.length} chunks in ${Date.now() - t0}ms`,
+  );
+  return total;
 }
 
 /**

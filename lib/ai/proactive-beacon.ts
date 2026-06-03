@@ -755,7 +755,11 @@ export async function runDailyDigestForAm(
   amEmail: string,
   todaySnapshot: SnapshotV2,
   yesterdaySnapshot: SnapshotV2 | null,
-  opts: { dryRun?: boolean } = {},
+  opts: {
+    dryRun?: boolean;
+    /** Phase F-polish-AI-5b — per-AM miss-payment book snapshot. */
+    missPaymentByAm?: Map<string, MissPaymentAmSummary> | null;
+  } = {},
 ): Promise<ProactiveResult<DailyDigestMeta>> {
   const amName = await resolveAmNameForEmail(amEmail).catch(() => null);
   if (!amName) {
@@ -849,11 +853,16 @@ export async function runDailyDigestForAm(
 
   const facts = await listFactsForUser(amEmail, {}).catch(() => []);
   const factsBlock = renderFactsForPrompt(facts);
+  // Phase F-polish-AI-5b — per-AM miss-payment slice for the opener. Same
+  // shape used by the Monday briefing; null when no map was passed OR the
+  // AM has zero unpaid invoices.
+  const amMissPayment = opts.missPaymentByAm?.get(amName) ?? null;
   const { system, user } = buildDailyDigestPrompt(
     amName,
     changes,
     summary,
     factsBlock,
+    amMissPayment,
   );
   const llm = await callHaiku(system, user, DAILY_DIGEST_PROMPT_MAX_TOKENS);
   if ("error" in llm) {
@@ -960,9 +969,17 @@ export async function runDailyDigestForAllAms(opts: {
     .slice(0, 10);
   const yesterday = await readSnapshotByDate(yesterdayDate);
 
+  // Phase F-polish-AI-5b — single Chargebee pull, slice per AM. Same
+  // helper used by the Monday briefing fan-out. Failure here is non-
+  // fatal — digest renders without the book-level miss-payment line.
+  const missPaymentByAm = await pullMissPaymentByAm();
+
   const results: ProactiveResult<DailyDigestMeta>[] = [];
   for (const email of AM_EMAILS) {
-    const r = await runDailyDigestForAm(email, today, yesterday, { dryRun });
+    const r = await runDailyDigestForAm(email, today, yesterday, {
+      dryRun,
+      missPaymentByAm,
+    });
     results.push(r);
 
     void logUmbrellaActivity({
