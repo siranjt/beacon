@@ -14,6 +14,7 @@ import { buildSnapshotV2 } from "@/lib/customer/refresh";
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { getLocationRecordIdMap } from "@/lib/customer/hubspot-locations";
 import { getHealthCardMap } from "@/lib/customer/health-card";
+import { getActiveCallOutcomes, applyOutcomeOverride } from "@/lib/customer/call-outcomes";
 import { getApiUser, requireRole } from "@/lib/customer/api-auth";
 
 export const runtime = "nodejs";
@@ -71,6 +72,24 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       console.warn(
         "[snapshot] Health card enrichment skipped:",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+
+    // F-call-outcome — overlay active call outcomes. 'connected' also
+    // demotes the customer's tier for the 7-day window so the "needs a
+    // call" filter naturally drops them. Must run AFTER metabase_health
+    // enrichment so the override has the raw tier to demote from.
+    try {
+      const outcomes = await getActiveCallOutcomes();
+      if (outcomes.size > 0 && Array.isArray(snap.customers)) {
+        snap.customers = snap.customers.map((c) =>
+          applyOutcomeOverride(c, outcomes.get(c.entity_id)),
+        );
+      }
+    } catch (e) {
+      console.warn(
+        "[snapshot] Call-outcome enrichment skipped:",
         e instanceof Error ? e.message : String(e),
       );
     }

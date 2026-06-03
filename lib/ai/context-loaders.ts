@@ -11,6 +11,7 @@
  */
 
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
+import { enrichWithCallOutcomes } from "@/lib/customer/call-outcomes";
 import { fetchEntityReportData } from "@/lib/report/fetchers";
 import {
   fetchAllTickets,
@@ -117,7 +118,9 @@ export async function loadInboxContext(opts: {
 }): Promise<LoadedContext> {
   const snap = await readLatestSnapshotV2().catch(() => null);
   // F-purge-churned — snapshot already excludes recently-churned rows.
-  const all = snap?.customers ?? [];
+  // F-call-outcome — enrich + apply tier overrides for 'connected' marks.
+  const raw = snap?.customers ?? [];
+  const all = await enrichWithCallOutcomes(raw);
   const scoped = opts.amFilter
     ? all.filter((c) => (c.am_name ?? "") === opts.amFilter)
     : all;
@@ -576,7 +579,9 @@ export async function loadCustomerBookContext(opts: {
 }): Promise<LoadedContext> {
   const snap = await readLatestSnapshotV2().catch(() => null);
   // F-purge-churned — snapshot already excludes recently-churned rows.
-  const all = snap?.customers ?? [];
+  // F-call-outcome — enrich + apply tier overrides for 'connected' marks.
+  const raw = snap?.customers ?? [];
+  const all = await enrichWithCallOutcomes(raw);
   const scoped = opts.amFilter
     ? all.filter((c) => (c.am_name ?? "") === opts.amFilter)
     : all;
@@ -819,7 +824,9 @@ export async function loadPerformanceLandingContext(): Promise<LoadedContext> {
   // we skip it here.
   const snap = await readLatestSnapshotV2().catch(() => null);
   // F-purge-churned — snapshot already excludes recently-churned rows.
-  const all = snap?.customers ?? [];
+  // F-call-outcome — enrich + apply tier overrides for 'connected' marks.
+  const raw = snap?.customers ?? [];
+  const all = await enrichWithCallOutcomes(raw);
   const composites = all
     .map((c) => c.signals_v2?.composite)
     .filter((n): n is number => typeof n === "number")

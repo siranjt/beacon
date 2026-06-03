@@ -25,6 +25,7 @@ import { normalizeHealthTier, HEALTH_TIER_COLORS, HEALTH_TIER_LABELS } from "@/l
 import { useCompareSelection } from "@/lib/customer/hooks/use-compare-selection";
 // Phase E-15.4 — pin / snooze chrome extracted for file-size hygiene.
 import { PinButton, SnoozeMenu, SnoozedBanner } from "./V2CardChrome";
+import CallOutcomeControls from "./CallOutcomeControls";
 // Phase E-15.4b — chip pile extracted.
 import {
   FlagChip,
@@ -1171,6 +1172,19 @@ function V2CustomerCardInner({
               {onSnooze && (
                 <SnoozeMenu onPick={(days) => handleSnoozeWithAnimation(days)} />
               )}
+              {/* F-call-outcome — 3-button outcome marker, or active pill if already marked */}
+              <CallOutcomeControls
+                entityId={customer.entity_id}
+                outcome={customer.call_outcome ?? null}
+                onChange={() => {
+                  // Triggers a soft refresh — the parent dashboard refetches
+                  // the snapshot on the next tick so the demoted tier flows
+                  // through the per-AM KPI tiles + lane filters.
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("beacon:snapshot:invalidate"));
+                  }
+                }}
+              />
             </div>
           )}
           {actionState.kind === "error" && (

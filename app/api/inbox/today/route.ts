@@ -26,6 +26,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
+import { enrichWithCallOutcomes } from "@/lib/customer/call-outcomes";
 import { listCustomersSinceFloor } from "@/lib/post-payment/db/queries";
 import { fetchAllTickets } from "@/lib/escalation/tickets";
 import { getRoleForEmail } from "@/lib/customer/config";
@@ -122,7 +123,10 @@ export async function GET() {
   if (snapshotR.status === "fulfilled" && snapshotR.value) {
     const snap = snapshotR.value;
     // F-purge-churned — snapshot excludes recently-churned rows.
-    const all = (snap.customers ?? []).filter((c) => c.signals_v2?.stoplight === "RED");
+    // F-call-outcome — apply tier overrides so 'connected' customers drop
+    // out of RED before we surface them in today's inbox.
+    const enriched = await enrichWithCallOutcomes(snap.customers ?? []);
+    const all = enriched.filter((c) => c.signals_v2?.stoplight === "RED");
     const scoped = amFiltered
       ? all.filter((c) => (c.am_name || "") === sessionAmName)
       : all;

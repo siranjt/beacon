@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readLatestSnapshotV2, readSnapshotByDate, readPendingFollowUps } from "@/lib/customer/postgres";
 import type { ScoredCustomerV2 } from "@/lib/customer/types";
 import { getApiUser, requireAmScope } from "@/lib/customer/api-auth";
+import { enrichWithCallOutcomes } from "@/lib/customer/call-outcomes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,8 +33,10 @@ export async function GET(
       return NextResponse.json({ error: "no snapshot available" }, { status: 404 });
     }
 
-    // Filter to this AM's book
-    const book = latest.customers.filter((c) => c.am_name === am);
+    // F-call-outcome — overlay tier overrides for 'connected' marks before
+    // slicing the AM's book. Customers the AM just called drop out of topRed.
+    const enriched = await enrichWithCallOutcomes(latest.customers);
+    const book = enriched.filter((c) => c.am_name === am);
 
     // Top 5 customers needing call (Critical + At-risk), sorted by composite desc, exclude pre-launch
     const topRed = book

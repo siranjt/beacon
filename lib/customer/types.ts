@@ -378,6 +378,21 @@ export type ScoredCustomerV2 = ScoredCustomer & {
    */
   signal_state?: "fresh" | "warming" | "ready" | "stale_signals";
   /**
+   * F-call-outcome — latest active call outcome (read-time decoration, not
+   * compose-time). Present only when an active row exists in
+   * `customer_call_outcomes` for this entity (expires_at > NOW). The
+   * `connected` variant ALSO mutates `signals_v2.stoplight` / `tier` and
+   * `metabase_health.health_tier` so downstream "needs a call" filters
+   * naturally drop the customer for the 7-day window.
+   */
+  call_outcome?: {
+    outcome: "connected" | "vm" | "not_connected";
+    marked_at: string;
+    marked_by_email: string;
+    marked_by_name: string | null;
+    expires_at: string;
+  };
+  /**
    * Phase E-18 — Haiku-derived comms perspective summary. Lightweight
    * subset of `beacon_ai_comms_perspective` — just the fields the
    * V2CustomerCard / list rows render (sentiment chip + topic glyphs +

@@ -24,6 +24,7 @@
 
 import type { ScoredCustomerV2 } from "./types";
 import { readLatestSnapshotV2 } from "./postgres";
+import { enrichWithCallOutcomes } from "./call-outcomes";
 import { postSlack, slackConfigured, type SlackBlock } from "./slack";
 
 /**
@@ -239,6 +240,10 @@ export async function runDigestForAllAms(opts?: {
   const dryRun = !!opts?.dryRun;
   const snapshot = await readLatestSnapshotV2();
   if (!snapshot) return [];
+
+  // F-call-outcome — overlay active outcomes so 'connected' customers drop
+  // out of needs-a-call before we group/score for the digest.
+  snapshot.customers = await enrichWithCallOutcomes(snapshot.customers);
 
   // Group active customers by AM.
   const byAm = new Map<string, ScoredCustomerV2[]>();
