@@ -855,7 +855,7 @@ export default function AskPanel() {
         }
         lines.push("");
         lines.push(
-          "Now format these rows as a clean markdown table. Cite each cell with [cite:count:query:<metric>:<group_key_slug>:<bucket_label>]. Don't restate the parameters — just give me the table.",
+          "Now format these rows as a clean markdown table. Don't emit `[cite:...]` chips inside the table — the rows above are the citation. Don't restate the parameters either. Just give me the table, then one short line below it naming the most-silent / highest-value group_key as a takeaway.",
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_customer_book" && !outcome.ok) {
