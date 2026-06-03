@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { runQuery } from "./query-customer-book";
+import { runQuery, buildQueryCitations } from "./query-customer-book";
 import type { ScoredCustomerV2 } from "@/lib/customer/types";
 
 // ─────────────────── Test fixtures ───────────────────────
@@ -408,5 +408,108 @@ describe("runQuery — edge cases", () => {
     });
     expect(result.rows).toEqual([]);
     expect(result.total_customers_in_scope).toBe(0);
+  });
+});
+
+// ────────────────────────── Tier 4 — synthetic citations ────────────────
+
+describe("buildQueryCitations — threshold mode", () => {
+  it("emits one citation per (group, bucket) plus a :total entry", () => {
+    const result = runQuery(sampleBook(), {
+      metric: "outbound_silence",
+      group_by: "am",
+      buckets: { type: "threshold", values: [30, 60, 90, 120] },
+    });
+    const citations = result.citations;
+    // Kanak sharma: 4 bucket entries + 1 total = 5
+    // Hubern C: 4 + 1 = 5
+    // (Unassigned): 4 + 1 = 5
+    expect(Object.keys(citations).length).toBe(15);
+
+    // Kanak's 30d+ entry — 2 customers (35-day, 95-day)
+    const kanak30 = citations["count:query:outbound_silence:kanak_sharma:30d+"];
+    expect(kanak30).toBeDefined();
+    expect(kanak30.value).toBe("2");
+    expect(kanak30.label).toContain("Kanak sharma");
+    expect(kanak30.label).toContain("30d+");
+
+    // Kanak's 90d+ — just the 95-day customer
+    const kanak90 = citations["count:query:outbound_silence:kanak_sharma:90d+"];
+    expect(kanak90.value).toBe("1");
+
+    // Kanak's :total
+    const kanakTotal = citations["count:query:outbound_silence:kanak_sharma:total"];
+    expect(kanakTotal.value).toBe("3");
+  });
+
+  it("slugs group keys with non-alphanumerics → underscores", () => {
+    const result = runQuery(sampleBook(), {
+      metric: "outbound_silence",
+      group_by: "am",
+      buckets: { type: "threshold", values: [30] },
+    });
+    // "(Unassigned)" should slug to "unassigned"
+    const unassignedKey = "count:query:outbound_silence:unassigned:30d+";
+    expect(result.citations[unassignedKey]).toBeDefined();
+  });
+
+  it("raw payload includes group_key + bucket + total_customers", () => {
+    const result = runQuery(sampleBook(), {
+      metric: "outbound_silence",
+      group_by: "am",
+      buckets: { type: "threshold", values: [30] },
+    });
+    const entry = result.citations["count:query:outbound_silence:hubern_c:30d+"];
+    expect(entry.raw).toMatchObject({
+      group_key: "Hubern C",
+      metric: "outbound_silence",
+      bucket: "30d+",
+      total_customers: 2,
+    });
+  });
+});
+
+describe("buildQueryCitations — sum mode", () => {
+  it("emits :sum, :avg, and :total per group (no bucket entries)", () => {
+    const result = runQuery(sampleBook(), {
+      metric: "mrr",
+      group_by: "tier",
+      buckets: { type: "sum" },
+    });
+    const citations = result.citations;
+
+    // At Risk has 2 customers: 249 + 149 = 398, avg 199
+    const atRiskSum = citations["count:query:mrr:at_risk:sum"];
+    expect(atRiskSum).toBeDefined();
+    expect(atRiskSum.value).toBe("398");
+
+    const atRiskAvg = citations["count:query:mrr:at_risk:avg"];
+    expect(atRiskAvg.value).toBe("199");
+
+    const atRiskTotal = citations["count:query:mrr:at_risk:total"];
+    expect(atRiskTotal.value).toBe("2");
+
+    // No bucket entries for sum mode
+    expect(citations["count:query:mrr:at_risk:30d+"]).toBeUndefined();
+  });
+});
+
+describe("buildQueryCitations — direct call", () => {
+  it("works without going through runQuery", () => {
+    const citations = buildQueryCitations({
+      metric: "outbound_silence",
+      rows: [
+        {
+          group_key: "Test AM",
+          total_customers: 5,
+          bucket_counts: { "30d+": 3, "60d+": 1 },
+        },
+      ],
+      labels: ["30d+", "60d+"],
+      isSum: false,
+    });
+    expect(citations["count:query:outbound_silence:test_am:30d+"].value).toBe("3");
+    expect(citations["count:query:outbound_silence:test_am:60d+"].value).toBe("1");
+    expect(citations["count:query:outbound_silence:test_am:total"].value).toBe("5");
   });
 });

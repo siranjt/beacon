@@ -85,6 +85,15 @@ interface AskBody {
   scope?: AiScope;
   question?: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
+  /**
+   * F-polish-AI Tier 4 — extra citation entries to merge into this turn's
+   * citationLookup. Used by the client-orchestrated continuation after a
+   * `query_customer_book` tool execution: the tool builds synthetic
+   * citations for each (group_key, bucket) cell, the client passes them
+   * here, and the server merges them into the SSE citations frame so the
+   * model's `[cite:count:query:...]` chips render with real popovers.
+   */
+  extra_citations?: Record<string, unknown>;
 }
 
 /**
@@ -366,8 +375,22 @@ export async function POST(req: NextRequest) {
       // client can render `[cite:KEY]` chips in deltas as they arrive. Empty
       // lookups (scopes without v1 support) still send the frame so the
       // client always knows the start of the stream is reached.
-      if (ctx.citationLookup && Object.keys(ctx.citationLookup).length > 0) {
-        send({ citations: ctx.citationLookup });
+      //
+      // F-polish-AI Tier 4 — merge any extra_citations from the request body.
+      // The continuation after a query_customer_book execute passes the
+      // tool's synthetic citations here so the model's table cells get real
+      // popovers, not "(unverified)" fallback chips. Body-supplied keys win
+      // over scope-supplied keys on collision (the tool result is the more
+      // recent source of truth).
+      const extraCitationsIn = body.extra_citations;
+      const mergedCitationLookup = {
+        ...(ctx.citationLookup ?? {}),
+        ...(extraCitationsIn && typeof extraCitationsIn === "object"
+          ? (extraCitationsIn as Record<string, unknown>)
+          : {}),
+      };
+      if (Object.keys(mergedCitationLookup).length > 0) {
+        send({ citations: mergedCitationLookup });
       }
 
       try {

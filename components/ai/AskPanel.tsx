@@ -384,7 +384,10 @@ export default function AskPanel() {
   }, [open, streaming]);
 
   const ask = useCallback(
-    async (question: string) => {
+    async (
+      question: string,
+      opts?: { extraCitations?: Record<string, unknown> },
+    ) => {
       const trimmed = question.trim();
       if (!trimmed || streaming) return;
       setErrorMsg(null);
@@ -440,7 +443,14 @@ export default function AskPanel() {
         const res = await fetch("/api/ai/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scope, question: trimmed, history }),
+          body: JSON.stringify({
+            scope,
+            question: trimmed,
+            history,
+            ...(opts?.extraCitations
+              ? { extra_citations: opts.extraCitations }
+              : {}),
+          }),
           signal: controller.signal,
         });
         if (!res.ok || !res.body) {
@@ -855,7 +865,7 @@ export default function AskPanel() {
         }
         lines.push("");
         lines.push(
-          "Now format these rows as a clean markdown table. Don't emit `[cite:...]` chips inside the table — the rows above are the citation. Don't restate the parameters either. Just give me the table, then one short line below it naming the most-silent / highest-value group_key as a takeaway.",
+          "Now format these rows as a clean markdown table. Cite each non-header cell with a chip in this exact pattern: `[cite:count:query:<metric>:<group_slug>:<bucket_label>]` — `group_slug` is the row's group_key lowercased with non-alphanumerics → underscores. For sum/avg cells use `<group_slug>:sum` or `<group_slug>:avg`. For the total-customers column use `<group_slug>:total`. Don't restate the parameters above the table. End with one short line naming the most-silent / highest-value group_key as a takeaway.",
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_customer_book" && !outcome.ok) {
@@ -865,10 +875,30 @@ export default function AskPanel() {
           ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
           : `[Beacon's ${verb} proposal was not run — ${outcome.error}.]`;
       }
+      // F-polish-AI Tier 4 — for query_customer_book, lift the synthetic
+      // citations out of the tool result and pass them through to the
+      // continuation request. The server merges them into the SSE
+      // citationLookup frame so the model's table cells render with real
+      // popovers.
+      let extraCitations: Record<string, unknown> | undefined;
+      if (
+        action.toolName === "query_customer_book" &&
+        outcome.ok &&
+        outcome.data &&
+        typeof outcome.data === "object" &&
+        outcome.data !== null &&
+        "citations" in outcome.data
+      ) {
+        const c = (outcome.data as { citations?: Record<string, unknown> }).citations;
+        if (c && typeof c === "object") {
+          extraCitations = c;
+        }
+      }
+
       // Reuse the regular ask path so memory + facts + everything stays
       // consistent. The bracketed prefix signals to Claude this is a
       // system trace, not a fresh AM question.
-      await ask(followUp);
+      await ask(followUp, extraCitations ? { extraCitations } : undefined);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],

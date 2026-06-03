@@ -53,6 +53,7 @@ import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { logUmbrellaActivity } from "@/lib/activity/log";
 import type { ScoredCustomerV2 } from "@/lib/customer/types";
 import type { BeaconTool, ToolExecutionContext, ToolResult } from "./index";
+import { makeCitationKey, type CitationLookup } from "@/lib/ai/citations";
 
 // ───────────────────────────── Types ─────────────────────────────────────
 
@@ -115,6 +116,14 @@ export interface QueryResult {
   limit: number;
   total_customers_in_scope: number;
   rows: QueryRow[];
+  /**
+   * F-polish-AI Tier 4 — synthetic citation entries keyed by
+   * `count:query:<metric>:<group_slug>:<bucket_label_or_sum>`. The client
+   * merges these into the assistant turn's CitationLookup so cells the
+   * model labels with `[cite:...]` chips render with proper popovers
+   * instead of muted "(unverified)" fallback chips.
+   */
+  citations: CitationLookup;
 }
 
 // ────────────────────────── Metric extractors ───────────────────────────
@@ -350,6 +359,18 @@ export function runQuery(
   // Limit.
   if (rows.length > limit) rows = rows.slice(0, limit);
 
+  // F-polish-AI Tier 4 — synthetic citations. One entry per (group, bucket)
+  // for threshold/range, one per group for sum. The model can cite each
+  // table cell with [cite:count:query:<metric>:<group_slug>:<label>] and
+  // the client renders a real popover instead of a muted "(unverified)"
+  // fallback chip.
+  const citations = buildQueryCitations({
+    metric: input.metric,
+    rows,
+    labels,
+    isSum,
+  });
+
   return {
     metric: input.metric,
     group_by: input.group_by,
@@ -359,7 +380,103 @@ export function runQuery(
     limit,
     total_customers_in_scope: scoped.length,
     rows,
+    citations,
   };
+}
+
+/**
+ * Slug an arbitrary group_key (AM name, pod, tier, etc.) into a citation-safe
+ * identifier. Lowercase, non-alphanumerics → underscores, trim, capped at 60
+ * chars. Same shape as the customer-book outbound_silence_buckets_by_am
+ * citation keys so they read consistently in the chip popover.
+ */
+function slugGroupKey(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60) || "unknown";
+}
+
+/**
+ * Build one citation entry per cell in the query result.
+ *   - threshold / range mode: `count:query:<metric>:<group_slug>:<bucket_label>`
+ *     emitted for every (group, bucket) pair, plus a `:total:<group_slug>` row.
+ *   - sum mode: `count:query:<metric>:<group_slug>:sum` and `:avg:<group_slug>`,
+ *     plus `:total:<group_slug>`.
+ *
+ * Exported separately so the test suite can assert citation keys without
+ * touching Postgres.
+ */
+export function buildQueryCitations(args: {
+  metric: MetricKey;
+  rows: QueryRow[];
+  labels: string[];
+  isSum: boolean;
+}): CitationLookup {
+  const { metric, rows, labels, isSum } = args;
+  const out: CitationLookup = {};
+
+  for (const row of rows) {
+    const slug = slugGroupKey(row.group_key);
+
+    if (isSum) {
+      if (typeof row.sum === "number") {
+        out[makeCitationKey("count", `query:${metric}:${slug}:sum`)] = {
+          category: "count",
+          label: `${row.group_key} — ${metric} sum`,
+          value: String(row.sum),
+          raw: {
+            group_key: row.group_key,
+            metric,
+            mode: "sum",
+            total_customers: row.total_customers,
+          },
+        };
+      }
+      if (typeof row.avg === "number") {
+        out[makeCitationKey("count", `query:${metric}:${slug}:avg`)] = {
+          category: "count",
+          label: `${row.group_key} — ${metric} avg`,
+          value: String(row.avg),
+          raw: {
+            group_key: row.group_key,
+            metric,
+            mode: "avg",
+            total_customers: row.total_customers,
+          },
+        };
+      }
+    } else if (row.bucket_counts) {
+      for (const label of labels) {
+        const count = row.bucket_counts[label] ?? 0;
+        out[
+          makeCitationKey("count", `query:${metric}:${slug}:${label}`)
+        ] = {
+          category: "count",
+          label: `${row.group_key} — ${metric} ${label}`,
+          value: String(count),
+          raw: {
+            group_key: row.group_key,
+            metric,
+            bucket: label,
+            total_customers: row.total_customers,
+          },
+        };
+      }
+    }
+
+    // Per-group total — handy when the model cites the "total customers"
+    // column of the table.
+    out[makeCitationKey("count", `query:${metric}:${slug}:total`)] = {
+      category: "count",
+      label: `${row.group_key} — total customers in scope`,
+      value: String(row.total_customers),
+      raw: { group_key: row.group_key, metric },
+    };
+  }
+
+  return out;
 }
 
 function sortRows(
