@@ -32,6 +32,7 @@ import {
   loadCustomerBookContext,
   loadEscalationOverviewContext,
   loadInboxContext,
+  loadMissPaymentOverviewContext,
   loadPerformanceLandingContext,
   loadPerformanceReportContext,
   loadPostPaymentBookContext,
@@ -256,12 +257,9 @@ async function loadContextFor(
     case "post-payment-customer":
       return loadPostPaymentCustomerContext(scope.cbCustomerId);
     case "miss-payment-overview":
-      // No bespoke loader yet — Beacon AI on /miss-payment relies on the
-      // page's NDJSON stream for live numbers. Returning null skips
-      // proactive suggestion generation; the panel still renders the
-      // quick-prompt buttons from scopeQuickPrompts. F-polish can add a
-      // real loader once we have stable Postgres-cached aggregates.
-      return null;
+      // Phase F-polish-AI — real loader; proactive suggestions now fire
+      // from live unpaid-invoice aggregates instead of a generic blob.
+      return loadMissPaymentOverviewContext();
     case "hidden":
       return null;
   }

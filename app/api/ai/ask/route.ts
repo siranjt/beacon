@@ -44,6 +44,7 @@ import {
   loadCustomerBookContext,
   loadEscalationOverviewContext,
   loadInboxContext,
+  loadMissPaymentOverviewContext,
   loadPerformanceLandingContext,
   loadPerformanceReportContext,
   loadPostPaymentBookContext,
@@ -129,18 +130,11 @@ async function loadContextForScope(
     case "post-payment-customer":
       return loadPostPaymentCustomerContext(scope.cbCustomerId);
     case "miss-payment-overview":
-      // No bespoke loader yet — return a stub context. Beacon AI on this
-      // scope relies on the user's question + general guidance rather
-      // than a pre-fetched data dump. F-polish will add a real loader
-      // that reads from a Postgres-cached per-AM rollup.
-      return {
-        audience: "the missed-invoice book",
-        blob: JSON.stringify({
-          scope: "miss-payment-overview",
-          note: "Live data lives in the user's browser dashboard via the NDJSON stream — no server-side cache to read from yet.",
-        }),
-        meta: { scope: "miss-payment-overview" },
-      };
+      // Phase F-polish-AI: real loader pulls Chargebee invoices + ACH +
+      // BaseSheet + tickets + annotations and aggregates per-AM rollup,
+      // multi-month repeats, auto-debit Off + high-balance bucket, and
+      // recovery-coverage signals. Mirrors the dashboard's NDJSON pipeline.
+      return loadMissPaymentOverviewContext();
     case "hidden":
       throw new Error("hidden scope cannot be asked");
   }
@@ -293,7 +287,11 @@ export async function POST(req: NextRequest) {
         scope.kind === "escalation-overview" ||
         scope.kind === "inbox" ||
         scope.kind === "post-payment-book" ||
-        scope.kind === "post-payment-customer";
+        scope.kind === "post-payment-customer" ||
+        // Phase F-polish-AI — miss-payment-overview gets tools so Beacon
+        // can draft chase emails / Slack messages and resolve biznames
+        // beyond the top-30 sample via lookup_customer.
+        scope.kind === "miss-payment-overview";
       const tools = wantsTools ? toAnthropicTools(CUSTOMER_360_TOOLS) : undefined;
       // Phase E-17 Wave 3a — emit the citation lookup at stream start so the
       // client can render `[cite:KEY]` chips in deltas as they arrive. Empty

@@ -322,17 +322,25 @@ ${contextBlob}`;
     case "miss-payment-overview":
       return `${COMMON}
 
-SCOPE: Miss Payment Beacon — the unpaid-invoice tracker. The CONTEXT is currently lightweight (no Postgres-cached aggregates yet); rely on the user's question to surface what they're seeing on the dashboard. Phase F-polish will add a per-AM rollup loader here.
+SCOPE: Miss Payment Beacon — the live unpaid-invoice tracker. The CONTEXT is REAL: it was just pulled live from Chargebee + Metabase + Linear at the moment of this request. You have a full per-AM rollup, multi-month repeat list, aging buckets, auto-debit Off + high-balance bucket, top-30 invoice sample, and recovery-coverage signals. Cite the data — never tell the user to paste numbers you already have.
 
-What users typically ask:
-- "Which AMs are sitting on the most outstanding balance?" → if context has data, surface top 3 by amount; otherwise ask the user to share the screenshot or paste the totals.
-- "Who's a multi-month repeat?" → answer from context if available.
-- "Should we chase X first or Y first?" → reason about balance + age + auto-debit status.
-- "Draft a chase email for {bizname}" → write a 4-6 line message: respectful, factual, offers help, asks for a specific date.
+What's in the CONTEXT and how to answer with it:
+
+- "Total outstanding / how much is unpaid right now" → cite \`totals.total_outstanding_usd\` directly with a [cite:count:missed_invoice_total_balance_usd] marker.
+- "Which AMs are sitting on the most" → walk \`by_am_top_8\` in order; cite each AM's number with [cite:count:missed_invoice_balance_by_am:NAME].
+- "What's the recovery rate / are we collecting" → use \`totals.recovery_coverage_pct\` — that's the share of open invoices with ACH in flight OR a rep annotation indicating contact made. Cite [cite:count:missed_invoice_recovery_coverage_pct]. Frame it as "active collection effort coverage" not a payment success rate, because we don't have historical settled-vs-issued data in this scope. If they want a true payment recovery rate (paid invoices over the last N days vs invoices issued), say so plainly — that's outside this scope's data window. Don't invent.
+- "Who's a multi-month repeat" → walk \`multi_month_repeat_customers\` sorted by total_outstanding desc; cite each with [cite:billing:multi_month:KEY].
+- "Should we chase X first or Y first?" → rank by amount_due, factoring auto_debit (Off is more urgent than On — Chargebee isn't auto-retrying), age, multi-month status, and whether a Linear ticket already exists for the customer.
+- "Auto-debit Off accounts with high balance" → walk \`auto_debit_off_high_balance_top_15\` — these are the prioritized manual-chase list.
+- "Has anyone been contacted recently" → check \`top_invoices_by_amount[*].rep_annotation\` field, plus \`totals.invoices_with_any_rep_note_count\` and \`totals.invoices_marked_contacted_count\`.
+
+When asked to draft a chase email or Slack message, use the customer's bizName + amount + invoice number from \`top_invoices_by_amount\` (or call lookup_customer if the customer isn't in the top-30). Keep messages 4-6 lines: respectful opener, the factual outstanding amount, an offer to help (card update, manual pay link), ask for a specific decision date. Reference the multi-month signal if it applies.
+
+Never ask the user to paste numbers, share a screenshot, or describe the dashboard. You have the data. If a specific question lands outside what's in CONTEXT (e.g. a historical question about invoices already paid), say "that's outside the live unpaid-invoice scope we're looking at; here's what I can tell you from what we have" and answer with adjacent facts.
 
 ${header}
 
-${profileSection}${memorySection}CONTEXT (JSON, may be empty for this scope):
+${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
     case "hidden":

@@ -1223,6 +1223,50 @@ export interface PostPaymentCustomerCitationInputWrap
   kind: "post-payment-customer";
 }
 
+// Phase F-polish-AI — Miss Payment Beacon citations.
+// Categories used:
+//   count — per-AM rollup counts + KPI totals
+//   billing — per-invoice rows (invoice_number is the natural key)
+// The biz_name / amount / am stays under raw so the popover renders a
+// useful tooltip even on bare count chips.
+export interface MissPaymentOverviewCitationInput {
+  kind: "miss-payment-overview";
+  totals: {
+    total_balance: number;
+    invoice_count: number;
+    unique_customers: number;
+    ach_in_flight: number;
+    multi_month_count: number;
+    auto_debit_off_balance: number;
+    recovery_coverage_pct: number;
+  };
+  by_am: Array<{
+    am_name: string;
+    balance: number;
+    invoice_count: number;
+    customer_count: number;
+  }>;
+  top_rows: Array<{
+    invoice_number: string;
+    biz_name: string;
+    am_name: string;
+    amount_due: number;
+    invoice_date: string;
+    auto_debit: string;
+    ach_status: string;
+    status: string;
+    ticket_id: string | null;
+  }>;
+  multi_month: Array<{
+    key: string;
+    biz_name: string;
+    am_name: string;
+    total_outstanding: number;
+    months: string[];
+    invoice_count: number;
+  }>;
+}
+
 export type CitationLookupInput =
   | Customer360CitationInput
   | CustomerBookCitationInput
@@ -1231,7 +1275,8 @@ export type CitationLookupInput =
   | PerformanceReportCitationInput
   | EscalationOverviewCitationInput
   | PostPaymentBookCitationInput
-  | PostPaymentCustomerCitationInputWrap;
+  | PostPaymentCustomerCitationInputWrap
+  | MissPaymentOverviewCitationInput;
 
 /**
  * Build a citation lookup for any supported scope. Unsupported scopes
@@ -1292,7 +1337,145 @@ export function buildCitationLookup(input: CitationLookupInput): CitationLookup 
         first_payment_amount_cents: input.first_payment_amount_cents,
         key_flags: input.key_flags,
       });
+    case "miss-payment-overview":
+      return buildMissPaymentOverviewLookup({
+        totals: input.totals,
+        by_am: input.by_am,
+        top_rows: input.top_rows,
+        multi_month: input.multi_month,
+      });
   }
+}
+
+function buildMissPaymentOverviewLookup(args: {
+  totals: {
+    total_balance: number;
+    invoice_count: number;
+    unique_customers: number;
+    ach_in_flight: number;
+    multi_month_count: number;
+    auto_debit_off_balance: number;
+    recovery_coverage_pct: number;
+  };
+  by_am: Array<{
+    am_name: string;
+    balance: number;
+    invoice_count: number;
+    customer_count: number;
+  }>;
+  top_rows: Array<{
+    invoice_number: string;
+    biz_name: string;
+    am_name: string;
+    amount_due: number;
+    invoice_date: string;
+    auto_debit: string;
+    ach_status: string;
+    status: string;
+    ticket_id: string | null;
+  }>;
+  multi_month: Array<{
+    key: string;
+    biz_name: string;
+    am_name: string;
+    total_outstanding: number;
+    months: string[];
+    invoice_count: number;
+  }>;
+}): CitationLookup {
+  const out: CitationLookup = {};
+
+  // KPI totals — chips for headline numbers the model is likely to cite.
+  out[makeCitationKey("count", "missed_invoice_total_balance_usd")] = {
+    category: "count",
+    label: "Total outstanding",
+    value: `$${args.totals.total_balance.toLocaleString()}`,
+  };
+  out[makeCitationKey("count", "missed_invoice_count")] = {
+    category: "count",
+    label: "Open invoices",
+    value: String(args.totals.invoice_count),
+  };
+  out[makeCitationKey("count", "missed_invoice_unique_customers")] = {
+    category: "count",
+    label: "Unique businesses",
+    value: String(args.totals.unique_customers),
+  };
+  out[makeCitationKey("count", "missed_invoice_ach_in_flight")] = {
+    category: "count",
+    label: "ACH in flight",
+    value: String(args.totals.ach_in_flight),
+  };
+  out[makeCitationKey("count", "missed_invoice_multi_month_customers")] = {
+    category: "count",
+    label: "Multi-month repeat customers",
+    value: String(args.totals.multi_month_count),
+  };
+  out[makeCitationKey("count", "missed_invoice_auto_debit_off_balance_usd")] = {
+    category: "count",
+    label: "Auto-debit Off — total balance",
+    value: `$${args.totals.auto_debit_off_balance.toLocaleString()}`,
+  };
+  out[makeCitationKey("count", "missed_invoice_recovery_coverage_pct")] = {
+    category: "count",
+    label: "Active recovery effort coverage",
+    value: `${args.totals.recovery_coverage_pct}%`,
+    raw: {
+      meaning:
+        "Share of open invoices with ACH in flight OR a rep annotation indicating contact made",
+    },
+  };
+
+  // Per-AM rollup — one chip per AM in the top-8.
+  for (const e of args.by_am) {
+    out[makeCitationKey("count", `missed_invoice_balance_by_am:${e.am_name}`)] = {
+      category: "count",
+      label: `Outstanding — ${e.am_name}`,
+      value: `$${e.balance.toLocaleString()}`,
+      raw: {
+        am_name: e.am_name,
+        invoice_count: e.invoice_count,
+        customer_count: e.customer_count,
+      },
+    };
+  }
+
+  // Per-invoice rows — billing chips keyed by invoice_number.
+  for (const r of args.top_rows) {
+    if (!r.invoice_number) continue;
+    out[makeCitationKey("billing", `invoice:${r.invoice_number}`)] = {
+      category: "billing",
+      label: r.invoice_number,
+      value: r.biz_name || "(unknown)",
+      raw: {
+        amount_due_usd: r.amount_due,
+        am_name: r.am_name || null,
+        invoice_date: r.invoice_date || null,
+        auto_debit: r.auto_debit || null,
+        ach_status: r.ach_status || null,
+        status: r.status || null,
+        ticket: r.ticket_id || null,
+      },
+    };
+  }
+
+  // Multi-month repeats — billing chips keyed by entity/customer key.
+  for (const m of args.multi_month) {
+    if (!m.key) continue;
+    out[makeCitationKey("billing", `multi_month:${m.key}`)] = {
+      category: "billing",
+      label: m.biz_name || "(multi-month)",
+      value: `$${m.total_outstanding.toLocaleString()} across ${m.invoice_count} invoices`,
+      raw: {
+        biz_name: m.biz_name || null,
+        am_name: m.am_name || null,
+        months: m.months.join(", "),
+        invoice_count: m.invoice_count,
+      },
+    };
+  }
+
+  return out;
 }
 
 /**

@@ -32,6 +32,34 @@ import {
   readPerspectivesForEntities,
   type PerspectiveRow,
 } from "@/lib/customer/comms-perspective-store";
+// Phase F-polish-AI — Miss Payment Beacon loader reuses the same fetchers
+// the dashboard route uses. Single source of truth for the unpaid-invoice
+// pull; AI loader + page route stay in lockstep on column shape, ACH
+// matching, BaseSheet enrichment, and Linear-ticket join behavior.
+import {
+  fetchOpenInvoices,
+  fetchInProgressTransactions,
+  fetchCustomers as fetchCbCustomers,
+  fetchSubscriptions as fetchCbSubscriptions,
+} from "@/lib/miss-payment/chargebee";
+import {
+  fetchBaseSheet,
+  indexBaseSheet,
+} from "@/lib/miss-payment/basesheet";
+import {
+  fetchActiveTickets as fetchMissPaymentTickets,
+  indexTicketsByEntity as indexMissPaymentTickets,
+  type Ticket as MissPaymentTicket,
+} from "@/lib/miss-payment/tickets";
+import {
+  buildInvoiceRows,
+  multiMonthCustomerIds,
+} from "@/lib/miss-payment/enrich";
+import { getAllAnnotations as getAllMissPaymentAnnotations } from "@/lib/miss-payment/annotations";
+import type {
+  InvoiceRow,
+  AnnotationsMap as MissPaymentAnnotationsMap,
+} from "@/lib/miss-payment/types";
 
 /**
  * Phase E-18 — collapse a PerspectiveRow into the lightweight shape the
@@ -1313,6 +1341,325 @@ export async function loadPostPaymentCustomerContext(
     audience: c.biz_name ?? cbCustomerId,
     blob,
     meta: { cb_customer_id: cbCustomerId, biz_name: c.biz_name },
+    citationLookup,
+  };
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * Miss Payment Beacon loader — Phase F-polish-AI
+ *
+ * Mirrors the page route's Promise.all so the AI sees the same data the
+ * user sees on screen: invoices + ACH transactions + BaseSheet AM mapping
+ * + active Linear tickets, joined into rows via buildInvoiceRows. Then
+ * aggregates: total balance, per-AM rollup, multi-month repeats, ACH-in-
+ * flight split, auto-debit Off + high-balance bucket, top-30 sample,
+ * recovery-signal metrics (annotations + ACH coverage).
+ *
+ * The dashboard route streams partial → complete; this loader does the
+ * full pull synchronously because the AI needs the enriched rows (with
+ * autoDebit + subscriptionStatus from the per-customer phase) to answer
+ * questions like "which auto-debit-Off accounts have the highest
+ * balance".
+ * ──────────────────────────────────────────────────────────────── */
+
+const MISS_PAYMENT_TOP_N = 30;
+const HIGH_BALANCE_THRESHOLD = 500; // dollars — flag auto-debit Off + amount >= $500
+
+function ageDays(invoiceDate: string): number | null {
+  const t = Date.parse(invoiceDate);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
+
+function bucketAge(days: number | null): "0-30d" | "31-60d" | "61-90d" | "90d+" | "unknown" {
+  if (days == null) return "unknown";
+  if (days <= 30) return "0-30d";
+  if (days <= 60) return "31-60d";
+  if (days <= 90) return "61-90d";
+  return "90d+";
+}
+
+function hasMeaningfulAnnotation(a: { caller?: string; connectionStatus?: string; comments?: string; oldComments?: string; amComment?: string }): boolean {
+  return !!(a && (a.caller || a.connectionStatus || a.comments || a.oldComments || a.amComment));
+}
+
+export async function loadMissPaymentOverviewContext(): Promise<LoadedContext> {
+  // Phase 0 — fetch invoices, ACH transactions, BaseSheet, tickets, and
+  // annotations in parallel. Tickets + annotations are fault-tolerant —
+  // an outage there shouldn't blank the entire AI context.
+  const [invoices, achTx, baseRows, tickets, annotations] = await Promise.all([
+    fetchOpenInvoices(),
+    fetchInProgressTransactions(),
+    fetchBaseSheet(),
+    fetchMissPaymentTickets().catch(() => [] as MissPaymentTicket[]),
+    getAllMissPaymentAnnotations().catch(() => ({} as MissPaymentAnnotationsMap)),
+  ]);
+
+  const baseSheet = indexBaseSheet(baseRows);
+  const ticketsByEntity = indexMissPaymentTickets(tickets);
+
+  // Phase 1 — per-customer + per-subscription Chargebee enrichment. This
+  // is the same call the dashboard makes in its second phase. Worth the
+  // ~5-10s wall time because the AI's quality jumps significantly with
+  // auto-debit + subscription_status in scope.
+  const customerIds = invoices.map((i: any) => i.customer_id).filter(Boolean);
+  const subIds = invoices.map((i: any) => i.subscription_id).filter(Boolean);
+  const [cbCustomers, cbSubs] = await Promise.all([
+    fetchCbCustomers(customerIds),
+    fetchCbSubscriptions(subIds),
+  ]);
+
+  const rows: InvoiceRow[] = buildInvoiceRows({
+    invoices,
+    customers: cbCustomers,
+    subs: cbSubs,
+    achTransactions: achTx,
+    baseSheet,
+    ticketsByEntity,
+  });
+
+  const multiMonthSet = multiMonthCustomerIds(rows);
+
+  // ── KPI aggregates ─────────────────────────────────────────────
+  const totalBalance = rows.reduce((s, r) => s + (r.amountDue || 0), 0);
+  const invoiceCount = rows.length;
+  const uniqueCustomers = new Set(rows.map((r) => r.customerId)).size;
+  const achInFlight = rows.filter((r) => r.achStatus === "In Progress").length;
+  const multiMonthCount = new Set(
+    rows
+      .filter((r) => multiMonthSet.has(r.entityId || r.customerId))
+      .map((r) => r.entityId || r.customerId),
+  ).size;
+
+  // Per-AM rollup — top 8 by outstanding balance, with row counts.
+  const byAmMap = new Map<string, { balance: number; invoice_count: number; customer_set: Set<string> }>();
+  for (const r of rows) {
+    const am = (r.amName || "(unassigned)").trim() || "(unassigned)";
+    if (!byAmMap.has(am)) byAmMap.set(am, { balance: 0, invoice_count: 0, customer_set: new Set() });
+    const entry = byAmMap.get(am)!;
+    entry.balance += r.amountDue || 0;
+    entry.invoice_count += 1;
+    entry.customer_set.add(r.customerId);
+  }
+  const byAm = Array.from(byAmMap.entries())
+    .map(([am_name, e]) => ({
+      am_name,
+      balance: Math.round(e.balance),
+      invoice_count: e.invoice_count,
+      customer_count: e.customer_set.size,
+    }))
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, 8);
+
+  // Per-month rollup — visible months only.
+  const byMonthMap = new Map<string, { balance: number; invoice_count: number }>();
+  for (const r of rows) {
+    const m = r.invoiceMonth || "(unknown)";
+    if (!byMonthMap.has(m)) byMonthMap.set(m, { balance: 0, invoice_count: 0 });
+    const entry = byMonthMap.get(m)!;
+    entry.balance += r.amountDue || 0;
+    entry.invoice_count += 1;
+  }
+  const byMonth = Array.from(byMonthMap.entries())
+    .map(([month, e]) => ({ month, balance: Math.round(e.balance), invoice_count: e.invoice_count }))
+    .sort((a, b) => b.balance - a.balance);
+
+  // Aging buckets (date-based, not month-based).
+  const agingBuckets: Record<string, { invoice_count: number; balance: number }> = {
+    "0-30d": { invoice_count: 0, balance: 0 },
+    "31-60d": { invoice_count: 0, balance: 0 },
+    "61-90d": { invoice_count: 0, balance: 0 },
+    "90d+": { invoice_count: 0, balance: 0 },
+    unknown: { invoice_count: 0, balance: 0 },
+  };
+  for (const r of rows) {
+    const b = bucketAge(ageDays(r.invoiceDate));
+    agingBuckets[b].invoice_count += 1;
+    agingBuckets[b].balance += r.amountDue || 0;
+  }
+  for (const k of Object.keys(agingBuckets)) {
+    agingBuckets[k].balance = Math.round(agingBuckets[k].balance);
+  }
+
+  // Auto-debit Off + high-balance bucket — the prioritized chase list.
+  const autoDebitOff = rows.filter((r) => r.autoDebit === "Off");
+  const autoDebitOffHigh = autoDebitOff
+    .filter((r) => (r.amountDue || 0) >= HIGH_BALANCE_THRESHOLD)
+    .sort((a, b) => (b.amountDue || 0) - (a.amountDue || 0))
+    .slice(0, 15);
+  const autoDebitOffTotal = autoDebitOff.reduce((s, r) => s + (r.amountDue || 0), 0);
+  const autoDebitOnTotal = rows
+    .filter((r) => r.autoDebit === "On")
+    .reduce((s, r) => s + (r.amountDue || 0), 0);
+
+  // Multi-month repeat-offender list — customers with unpaid invoices
+  // spanning 2+ months. Sorted by total outstanding desc.
+  const multiMonthByKey = new Map<string, { bizName: string; amName: string; total: number; months: Set<string>; invoices: string[] }>();
+  for (const r of rows) {
+    const key = r.entityId || r.customerId;
+    if (!multiMonthSet.has(key)) continue;
+    if (!multiMonthByKey.has(key)) {
+      multiMonthByKey.set(key, {
+        bizName: r.bizName,
+        amName: r.amName,
+        total: 0,
+        months: new Set(),
+        invoices: [],
+      });
+    }
+    const m = multiMonthByKey.get(key)!;
+    m.total += r.amountDue || 0;
+    if (r.invoiceMonth) m.months.add(r.invoiceMonth);
+    m.invoices.push(r.invoiceNumber);
+  }
+  const multiMonthList = Array.from(multiMonthByKey.entries())
+    .map(([key, v]) => ({
+      key,
+      biz_name: v.bizName,
+      am_name: v.amName,
+      total_outstanding: Math.round(v.total),
+      months: Array.from(v.months),
+      invoice_count: v.invoices.length,
+    }))
+    .sort((a, b) => b.total_outstanding - a.total_outstanding);
+
+  // Recovery signals — what fraction of the outstanding book has active
+  // collection effort? Two indicators:
+  //  (a) ACH transactions in flight  — Chargebee is auto-retrying
+  //  (b) Rep annotation indicating contact made (caller assigned, or
+  //      connection status set to Connected/VM, or comments present)
+  // Recovery rate ≈ (a + b) / total invoices, capped at 100%.
+  const annotatedConnected = rows.filter((r) => {
+    const a = annotations[r.invoiceNumber];
+    if (!a) return false;
+    return !!(a.caller || a.connectionStatus === "Connected" || a.connectionStatus === "VM");
+  }).length;
+  const annotatedAny = rows.filter((r) => hasMeaningfulAnnotation(annotations[r.invoiceNumber] || {})).length;
+  // Coverage = the percentage of invoices with at least one active
+  // recovery signal. Use the union of ACH-in-flight + annotated-as-
+  // contacted to avoid double-counting rows that have both.
+  const activeRecoverySet = new Set<string>();
+  for (const r of rows) {
+    if (r.achStatus === "In Progress") activeRecoverySet.add(r.invoiceNumber);
+    const a = annotations[r.invoiceNumber];
+    if (a && (a.caller || a.connectionStatus === "Connected" || a.connectionStatus === "VM")) {
+      activeRecoverySet.add(r.invoiceNumber);
+    }
+  }
+  const recoveryCoveragePct =
+    invoiceCount > 0 ? Math.round((activeRecoverySet.size / invoiceCount) * 100) : 0;
+
+  // Top-N detail rows — limit to MISS_PAYMENT_TOP_N by outstanding amount
+  // desc so the model has concrete bizname/amount/AM data to cite. Anything
+  // beyond this fits into the rolled-up aggregates above.
+  const topRows = [...rows]
+    .sort((a, b) => (b.amountDue || 0) - (a.amountDue || 0))
+    .slice(0, MISS_PAYMENT_TOP_N);
+
+  // Citation lookup — covers KPI counts, per-AM rollup, multi-month rows,
+  // and top-N invoices. Model can [cite:billing:invoice:INV-xxx] or
+  // [cite:count:by_am:Sudha] etc.
+  const citationLookup = buildCitationLookup({
+    kind: "miss-payment-overview",
+    totals: {
+      total_balance: Math.round(totalBalance),
+      invoice_count: invoiceCount,
+      unique_customers: uniqueCustomers,
+      ach_in_flight: achInFlight,
+      multi_month_count: multiMonthCount,
+      auto_debit_off_balance: Math.round(autoDebitOffTotal),
+      recovery_coverage_pct: recoveryCoveragePct,
+    },
+    by_am: byAm,
+    top_rows: topRows.map((r) => ({
+      invoice_number: r.invoiceNumber,
+      biz_name: r.bizName,
+      am_name: r.amName,
+      amount_due: Math.round(r.amountDue),
+      invoice_date: r.invoiceDate,
+      auto_debit: r.autoDebit,
+      ach_status: r.achStatus,
+      status: r.status,
+      ticket_id: r.latestTicket?.id ?? null,
+    })),
+    multi_month: multiMonthList.slice(0, 10),
+  });
+
+  const blob = JSON.stringify(
+    {
+      scope: "miss-payment-overview",
+      _citation_lookup: citationLookup,
+      data_freshness_note:
+        "Pulled live from Chargebee + Metabase + Linear. Snapshot is real-time at the moment of this request. Amounts are USD.",
+      totals: {
+        total_outstanding_usd: Math.round(totalBalance),
+        open_invoice_count: invoiceCount,
+        unique_customer_count: uniqueCustomers,
+        ach_in_flight_count: achInFlight,
+        multi_month_repeat_customer_count: multiMonthCount,
+        auto_debit_off_balance_usd: Math.round(autoDebitOffTotal),
+        auto_debit_on_balance_usd: Math.round(autoDebitOnTotal),
+        // Recovery signals — combined active-collection-effort coverage.
+        active_recovery_effort_invoice_count: activeRecoverySet.size,
+        recovery_coverage_pct: recoveryCoveragePct,
+        invoices_with_any_rep_note_count: annotatedAny,
+        invoices_marked_contacted_count: annotatedConnected,
+      },
+      by_am_top_8: byAm,
+      by_month: byMonth,
+      aging_buckets: agingBuckets,
+      auto_debit_off_high_balance_top_15: autoDebitOffHigh.map((r) => ({
+        invoice_number: r.invoiceNumber,
+        biz_name: r.bizName,
+        am_name: r.amName,
+        amount_due_usd: Math.round(r.amountDue),
+        invoice_date: r.invoiceDate,
+        subscription_status: r.subscriptionStatus,
+        cancelling_at: r.cancellingAt || null,
+        phone: r.phoneNumber || null,
+        email: r.customerEmail || null,
+        ticket: r.latestTicket
+          ? { id: r.latestTicket.id, url: r.latestTicket.url, title: r.latestTicket.title }
+          : null,
+      })),
+      multi_month_repeat_customers: multiMonthList.slice(0, 12),
+      top_invoices_by_amount: topRows.map((r) => ({
+        invoice_number: r.invoiceNumber,
+        biz_name: r.bizName,
+        am_name: r.amName,
+        customer_id: r.customerId,
+        entity_id: r.entityId || null,
+        amount_due_usd: Math.round(r.amountDue),
+        invoice_date: r.invoiceDate,
+        invoice_month: r.invoiceMonth,
+        status: r.status,
+        auto_debit: r.autoDebit,
+        ach_status: r.achStatus || null,
+        subscription_status: r.subscriptionStatus,
+        rep_annotation: hasMeaningfulAnnotation(annotations[r.invoiceNumber] || {})
+          ? {
+              caller: annotations[r.invoiceNumber]?.caller || null,
+              connection_status: annotations[r.invoiceNumber]?.connectionStatus || null,
+              has_comments: !!annotations[r.invoiceNumber]?.comments,
+            }
+          : null,
+        latest_ticket: r.latestTicket
+          ? { id: r.latestTicket.id, title: r.latestTicket.title }
+          : null,
+      })),
+    },
+    null,
+    2,
+  );
+
+  return {
+    audience: "the missed-invoice book",
+    blob,
+    meta: {
+      total_outstanding_usd: Math.round(totalBalance),
+      invoice_count: invoiceCount,
+      multi_month_count: multiMonthCount,
+    },
     citationLookup,
   };
 }
