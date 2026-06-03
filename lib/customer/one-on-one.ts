@@ -289,10 +289,7 @@ function bookSummaryFor(customers: ScoredCustomerV2[]): OneOnOneBookSummary {
   let mrrTotal = 0;
   let mrrAtRisk = 0;
   for (const c of customers) {
-    // Phase 33.scope-fix6 — recently_churned customers stay visible in scope
-    // for 30 days but should NOT pollute book-level RED/YELLOW/GREEN/MRR
-    // tallies. Their MRR is already gone; their tier is forced HEALTHY.
-    if ((c as any).lifecycle_state === "recently_churned") continue;
+    // F-purge-churned — snapshot excludes recently-churned rows.
     const planCents = Math.round((c.plan_amount || 0) * 100);
     mrrTotal += planCents;
     // Phase 33.H.7 — read metabase_health.tier (MONITOR fallback for missing data)

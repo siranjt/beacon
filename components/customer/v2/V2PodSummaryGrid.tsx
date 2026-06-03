@@ -114,8 +114,7 @@ export default function V2PodSummaryGrid({
     const compareCountsByPod = new Map<string, { red: number; needsCall: number }>();
     if (comparison) {
       for (const c of comparison.customers) {
-        // Phase 33.scope followup — exclude recently_churned from compareCountsByPod.
-        if ((c as any).lifecycle_state === "recently_churned") continue;
+        // F-purge-churned — snapshot excludes recently-churned rows.
         const pod = POD_MAP[c.am_name] || "Floating";
         const entry = compareCountsByPod.get(pod) || { red: 0, needsCall: 0 };
         if (c.signals_v2.stoplight === "RED") entry.red += 1;
@@ -134,10 +133,7 @@ export default function V2PodSummaryGrid({
     // Phase 33.H.3a — per-AM needsCall tally (replaces former red-based tally)
     const amsByPod = new Map<string, Map<string, number>>();
     for (const c of snapshot.customers) {
-      // Phase 33.scope followup — exclude recently_churned from byPod groupby.
-      // They render on the resurrection/churn surfaces separately, not in the
-      // pod-card RED/YELLOW/GREEN/MRR tallies.
-      if ((c as any).lifecycle_state === "recently_churned") continue;
+      // F-purge-churned — snapshot excludes recently-churned rows.
       const pod = POD_MAP[c.am_name] || "Floating";
       if (!byPod.has(pod)) byPod.set(pod, []);
       if (!amsByPod.has(pod)) amsByPod.set(pod, new Map());

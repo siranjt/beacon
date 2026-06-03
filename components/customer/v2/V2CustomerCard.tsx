@@ -566,24 +566,23 @@ function V2CustomerCardInner({
               {customer.signal_state === "fresh" ? "🔥 Fresh — signals warming up" : "✨ Warming — signals settling"}
             </span>
           )}
-          {/* Phase 33.scope — lifecycle pill (recently_churned | newly_onboarded | resurrected) */}
+          {/* F-purge-churned — lifecycle pill (newly_onboarded | resurrected).
+              Recently-churned customers are dropped from the book entirely;
+              resurrected customers (new sub after a cancel) keep their prior
+              churned_on for "rejoined N days after churning" context. */}
           {customer.lifecycle_state && customer.lifecycle_state !== "active" && (() => {
             const lc = customer.lifecycle_state;
             const dayMs = 24 * 60 * 60 * 1000;
-            const sourceIso = lc === "recently_churned" ? customer.churned_on : customer.onboarded_on;
+            const sourceIso = customer.onboarded_on;
             const daysAgo = sourceIso ? Math.max(0, Math.floor((Date.now() - Date.parse(sourceIso)) / dayMs)) : null;
             const cls =
-              lc === "recently_churned"
-                ? "bg-zoca-pink/18 text-zoca-pink-bright"
-                : lc === "newly_onboarded"
-                  ? "bg-emerald-500/18 text-emerald-700"
-                  : "bg-sky-500/18 text-sky-700";
+              lc === "newly_onboarded"
+                ? "bg-emerald-500/18 text-emerald-700"
+                : "bg-sky-500/18 text-sky-700";
             const label =
-              lc === "recently_churned"
-                ? `Churned ${daysAgo ?? "?"} day${daysAgo === 1 ? "" : "s"} ago`
-                : lc === "newly_onboarded"
-                  ? `New customer · ${daysAgo ?? "?"} day${daysAgo === 1 ? "" : "s"}`
-                  : `Resurrected · ${daysAgo ?? "?"} day${daysAgo === 1 ? "" : "s"}`;
+              lc === "newly_onboarded"
+                ? `New customer · ${daysAgo ?? "?"} day${daysAgo === 1 ? "" : "s"}`
+                : `Resurrected · ${daysAgo ?? "?"} day${daysAgo === 1 ? "" : "s"}`;
             return (
               <span
                 className={`rounded-zoca-pill px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cls}`}

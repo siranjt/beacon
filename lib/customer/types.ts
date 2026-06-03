@@ -350,9 +350,19 @@ export type ScoredCustomerV2 = ScoredCustomer & {
   tickets: TicketsMetrics | null;
   signals_v2: CustomerSignalsV2;
   hubspot?: HubspotJoinFields | null;
-  /** Phase 33.scope — recently_churned | newly_onboarded | resurrected | active. */
-  lifecycle_state?: "active" | "recently_churned" | "newly_onboarded" | "resurrected";
-  /** Phase 33.scope — ISO string when cancelled_at landed (for recently_churned). */
+  /**
+   * Phase 33.scope (revised F-purge-churned) — lifecycle bucket.
+   * "recently_churned" is intentionally NOT a member: customers without a
+   * live subscription that have a recent cancellation are dropped from the
+   * snapshot at compose time. Resurrected (rejoined after a cancel) is
+   * still surfaced as a distinct state for AM context.
+   */
+  lifecycle_state?: "active" | "newly_onboarded" | "resurrected";
+  /**
+   * Phase 33.scope (revised F-purge-churned) — ISO string of cancelled_at
+   * for resurrected customers ONLY (carries the prior churn date so AMs
+   * can see "rejoined N days after churning"). null for everyone else.
+   */
   churned_on?: string | null;
   /** Phase 33.scope — ISO string of first activated_at across customer's subs. */
   onboarded_on?: string | null;

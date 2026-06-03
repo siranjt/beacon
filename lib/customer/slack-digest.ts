@@ -267,12 +267,9 @@ export async function runDigestForAllAms(opts?: {
     }
 
     const snoozed = await loadSnoozedEntityIds(amName);
-    // Phase 33.scope followup — exclude recently_churned from slack digest.
-    // A cancelled sub showing up in tomorrow's "needs a call" list is the
-    // failure mode we're guarding against; lifecycle pill handles them.
-    const visible = customers
-      .filter((c) => !snoozed.has(c.entity_id))
-      .filter((c) => (c as any).lifecycle_state !== "recently_churned");
+    // F-purge-churned — snapshot excludes recently-churned rows; the only
+    // remaining hide-from-digest filter is the per-AM snooze list.
+    const visible = customers.filter((c) => !snoozed.has(c.entity_id));
 
     const red = visible.filter((c) => { const _ht = String(((c as any).metabase_health?.health_tier) || ""); return _ht === "CRITICAL - DEAL BREAKER" || _ht === "CRITICAL" || _ht === "AT-RISK"; });
     const yellow = visible.filter((c) => { const _ht = String(((c as any).metabase_health?.health_tier) || ""); return _ht === "MONITOR" || _ht === ""; });

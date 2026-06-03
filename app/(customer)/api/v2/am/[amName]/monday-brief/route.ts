@@ -77,11 +77,7 @@ export async function GET(
     // Aggregate book-level stats
     const totals = book.reduce(
       (acc, c) => {
-        // Phase 33.scope followup — exclude recently_churned from tier tallies.
-        // (Spec leaves room to add them to a separate MRR bucket later, but the
-        // current reducer only tracks mrrAtRisk, which they cannot contribute
-        // to once their tier is no longer CRITICAL/AT-RISK.)
-        if ((c as any).lifecycle_state === "recently_churned") return acc;
+        // F-purge-churned — snapshot excludes recently-churned rows.
         // Phase 33.H.5 — repurpose totals.RED/YELLOW/GREEN to count tiers (MONITOR fallback)
         const _htRaw = ((c as any).metabase_health?.health_tier as string | null | undefined) || "";
         const _ht =

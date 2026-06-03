@@ -84,7 +84,7 @@ export interface QueryFilter {
   am_name?: string[];
   tier?: string[];
   pod?: string[];
-  lifecycle_state?: Array<"active" | "newly_onboarded" | "resurrected" | "recently_churned">;
+  lifecycle_state?: Array<"active" | "newly_onboarded" | "resurrected">;
   stoplight?: Array<"RED" | "YELLOW" | "GREEN">;
 }
 
@@ -589,7 +589,7 @@ function parseInput(args: Record<string, unknown>): QueryInput | { error: string
     }
     if (f.lifecycle_state !== undefined) {
       const v = f.lifecycle_state;
-      const allowed = ["active", "newly_onboarded", "resurrected", "recently_churned"] as const;
+      const allowed = ["active", "newly_onboarded", "resurrected"] as const;
       if (!Array.isArray(v) || !v.every((x) => typeof x === "string" && (allowed as readonly string[]).includes(x))) {
         return { error: `filter.lifecycle_state must be subset of: ${allowed.join(", ")}` };
       }
@@ -662,7 +662,7 @@ export const queryCustomerBookTool: BeaconTool = {
         type: "string",
         enum: ["am", "pod", "tier", "lifecycle_state", "stoplight", "none"],
         description:
-          "How to slice the population. 'am' groups by am_name (unassigned customers fall into '(Unassigned)'). 'pod' groups by Pod 1-5 / Floating. 'tier' groups by signals tier (Critical/At Risk/Watch/Healthy or similar). 'lifecycle_state' groups by active/newly_onboarded/resurrected/recently_churned. 'stoplight' groups by RED/YELLOW/GREEN. 'none' returns a single row with totals across the whole book.",
+          "How to slice the population. 'am' groups by am_name (unassigned customers fall into '(Unassigned)'). 'pod' groups by Pod 1-5 / Floating. 'tier' groups by signals tier (Critical/At Risk/Watch/Healthy or similar). 'lifecycle_state' groups by active/newly_onboarded/resurrected (recently-churned customers are dropped from the book, never appear). 'stoplight' groups by RED/YELLOW/GREEN. 'none' returns a single row with totals across the whole book.",
       },
       buckets: {
         type: "object",
@@ -710,7 +710,7 @@ export const queryCustomerBookTool: BeaconTool = {
             type: "array",
             items: {
               type: "string",
-              enum: ["active", "newly_onboarded", "resurrected", "recently_churned"],
+              enum: ["active", "newly_onboarded", "resurrected"],
             },
           },
           stoplight: {
@@ -742,12 +742,8 @@ export const queryCustomerBookTool: BeaconTool = {
 
     try {
       const snap = await readLatestSnapshotV2();
-      const all = snap?.customers ?? [];
-      // Operationally we exclude recently_churned by default (it's not the
-      // active book). Callers can re-include them via filter.lifecycle_state.
-      const activeBook = parsed.filter?.lifecycle_state
-        ? all
-        : all.filter((c) => c.lifecycle_state !== "recently_churned");
+      // F-purge-churned — snapshot already excludes recently-churned rows.
+      const activeBook = snap?.customers ?? [];
 
       const result = runQuery(activeBook, parsed);
 

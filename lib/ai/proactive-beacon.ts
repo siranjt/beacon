@@ -183,7 +183,8 @@ function toBriefingTopCustomer(c: ScoredCustomerV2): BriefingTopCustomer {
 
 /**
  * Filter snapshot.customers to a single AM's book, dropping snoozed +
- * pinned + recently_churned. Returns the AM-visible book.
+ * pinned. Recently-churned customers are already excluded by the snapshot
+ * compose step (F-purge-churned). Returns the AM-visible book.
  */
 async function loadVisibleBookForAm(
   snapshot: SnapshotV2,
@@ -200,11 +201,8 @@ async function loadVisibleBookForAm(
     ...snoozed.map((s) => s.entity_id),
     ...pinned.map((p) => p.entity_id),
   ]);
-  return ownBook.filter(
-    (c) =>
-      !skipIds.has(c.entity_id) &&
-      (c.lifecycle_state ?? "active") !== "recently_churned",
-  );
+  // F-purge-churned — snapshot already excludes recently-churned rows.
+  return ownBook.filter((c) => !skipIds.has(c.entity_id));
 }
 
 // ---------------------------------------------------------------------------

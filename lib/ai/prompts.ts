@@ -245,7 +245,7 @@ This tool runs ad-hoc aggregations over the full active book — metric × group
   • "app usage by pod" → metric=app_usage_30d, group_by=pod, buckets={type:'sum'}
   • "missed payments by AM" → metric=missed_payments, group_by=am, buckets={type:'threshold', threshold_values:[1,2,3]}
 - When the tool returns, format the rows as a markdown table. Each cell can be cited with the synthetic key [cite:count:query:<metric>:<group_key_slug>:<bucket_label>] when you want the chip pattern (client renders these from the tool result).
-- The tool excludes recently_churned customers by default. To include them, pass filter.lifecycle_state including 'recently_churned'.
+- Recently-churned customers are dropped from the book entirely (no retention window). Only active, newly_onboarded, and resurrected customers appear here. A customer who churns and later creates a new subscription comes back as 'resurrected'.
 - Be precise about what you're showing: name the metric, the group_by, the bucket spec, and any filter in one short line above the table.
 - If the tool returns 0 rows, say so plainly with the parameters you tried, then ask the user if they want to broaden the slice.
 

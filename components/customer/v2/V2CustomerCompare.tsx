@@ -703,12 +703,12 @@ function TrajectoryChip({
 
 function LifecycleChip({ lifecycle }: { lifecycle: string }) {
   if (lifecycle === "active") return <span style={{ color: C.text3 }}>active</span>;
+  // F-purge-churned — recently-churned customers are dropped from the snapshot,
+  // so this chip only renders for newly_onboarded / resurrected.
   const tone =
-    lifecycle === "recently_churned"
-      ? { bg: C.emberBg, color: C.ember }
-      : lifecycle === "newly_onboarded"
-        ? { bg: C.patinaBg, color: C.patina }
-        : { bg: C.brassBg, color: C.brass };
+    lifecycle === "newly_onboarded"
+      ? { bg: C.patinaBg, color: C.patina }
+      : { bg: C.brassBg, color: C.brass };
   return (
     <span
       style={{

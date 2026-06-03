@@ -46,16 +46,12 @@ export default function ScopeStrip({ scope }: { scope?: SnapshotV2["scope"] }) {
           multi-location
         </>
       )}
-      {" · Active subs + 30-day churn retention ("}
+      {" · Active subs ("}
       {statusLabel}
       {")"}
-      {/* Phase 33.scope — recently_churned / newly_onboarded / resurrected sibling counts */}
-      {scope.recently_churned_count !== undefined && scope.recently_churned_count > 0 && (
-        <>
-          {" · "}
-          <span className="font-semibold text-zoca-text">+{scope.recently_churned_count}</span>{" recently churned"}
-        </>
-      )}
+      {/* F-purge-churned — "+N recently churned" segment removed; churned customers
+          are dropped from the book on the day they cancel. newly_onboarded /
+          resurrected sibling counts remain. */}
       {scope.newly_onboarded_count !== undefined && scope.newly_onboarded_count > 0 && (
         <>
           {" · "}

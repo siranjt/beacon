@@ -530,9 +530,7 @@ function V2DashboardInner() {
     let critical = 0, atRisk = 0, monitor = 0, healthy = 0, mrr = 0;
     for (const c of ready.customers) {
       if (c.am_name !== selectedAm) continue;
-      // Phase 33.scope followup — exclude recently_churned from per-AM KPI tiles.
-      // Their plan_amount is no longer billing; counting them inflates MRR-at-risk.
-      if ((c as any).lifecycle_state === "recently_churned") continue;
+      // F-purge-churned — snapshot excludes recently-churned rows.
       const tier = normalizeHealthTier((c as any).metabase_health?.health_tier);
       const amt = Number(c.plan_amount);
       const validAmt = Number.isFinite(amt) && amt > 0 ? amt : 0;

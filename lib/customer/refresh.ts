@@ -1052,10 +1052,26 @@ export async function composeSnapshot(
     );
   }
 
+  let _droppedChurned = 0;
   for (const entityId of stageA.activeEntityIds) {
     const meta = stageA.entityMeta[entityId];
     const bs = stageA.baseSheetByEntityId[entityId];
     const billing = stageA.billingMetrics[entityId] || null;
+
+    // Day-to-day churn purge — customers without a live subscription that
+    // have a recent cancellation should NOT enter the snapshot. They appear
+    // again only when resurrected (new live sub after the cancel), at which
+    // point lifecycle_state below will tag them "resurrected".
+    {
+      const _cid = meta?.customer_id || "";
+      const _churn = _cid ? stageA.recentlyChurnedByCustomer?.[_cid] : null;
+      const _subStatus = meta?.sub_status || "";
+      const _hasLiveSub = !!meta?.subscription_id && _subStatus !== "cancelled";
+      if (_churn && !_hasLiveSub) {
+        _droppedChurned++;
+        continue;
+      }
+    }
 
     // Comms — if not in B's map (zero-comms entity), build empty metrics
     const cMetrics: CustomerMetrics =
@@ -1148,18 +1164,10 @@ export async function composeSnapshot(
       perspective: perspectivesByEntity.get(entityId) ?? null,
     });
 
-    // Phase 33.scope — recently churned customers are already gone;
-    // don't let them clog the at-risk stack. Override stoplight to GREEN
-    // (neutral) so existing math is preserved while UI uses lifecycle_state.
-    {
-      const _cidNeutral = meta?.customer_id || "";
-      const _churn = stageA.recentlyChurnedByCustomer?.[_cidNeutral];
-      const _hasLive = !!meta?.subscription_id;
-      if (!_hasLive && _churn) {
-        (signalsV2 as any).stoplight = "GREEN";
-        (signalsV2 as any).tier = "HEALTHY";
-      }
-    }
+    // (Phase F-purge-churned — recently churned customers are skipped at the
+    // top of this loop, so the prior stoplight-override block is no longer
+    // reachable here. Resurrected customers proceed normally.)
+
     // Pod from AM
     const amName = bs?.am_name || "";
     const pod = POD_MAP[amName] || "";
@@ -1233,12 +1241,12 @@ export async function composeSnapshot(
       }
     }
 
-    // Phase 33.scope — derive lifecycle_state for this customer.
+    // Phase 33.scope (revised F-purge-churned) — derive lifecycle_state.
+    // Recently-churned (no live sub + recent cancel) customers were skipped
+    // at the top of this loop, so the only states we can land in here are
+    // active | newly_onboarded | resurrected.
     const _cidForLifecycle = meta?.customer_id || "";
     const _recentlyChurned = stageA.recentlyChurnedByCustomer?.[_cidForLifecycle] || null;
-    // Phase 33.scope-fix1 — pure-churn customers have subscription_id set
-    // (subsByCustomer stores any sub if no live sub overrode it), so we must
-    // also require sub_status !== "cancelled" to call them a live sub.
     const _subStatus = meta?.sub_status || "";
     const _hasLiveSub = !!meta?.subscription_id && _subStatus !== "cancelled";
     const _activatedIso = meta?.activated_at || null;
@@ -1246,12 +1254,12 @@ export async function composeSnapshot(
     const _thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     const _isNewlyOnboarded = _hasLiveSub && Number.isFinite(_activatedMs) && (stageA.todayMs - _activatedMs) <= _thirtyDaysMs && !_recentlyChurned;
     const _isResurrected = _hasLiveSub && !!_recentlyChurned;
-    const _isRecentlyChurned = !_hasLiveSub && !!_recentlyChurned;
-    let _lifecycle_state: "active" | "recently_churned" | "newly_onboarded" | "resurrected" = "active";
-    if (_isRecentlyChurned) _lifecycle_state = "recently_churned";
-    else if (_isResurrected) _lifecycle_state = "resurrected";
+    let _lifecycle_state: "active" | "newly_onboarded" | "resurrected" = "active";
+    if (_isResurrected) _lifecycle_state = "resurrected";
     else if (_isNewlyOnboarded) _lifecycle_state = "newly_onboarded";
-    const _churnedOn = _recentlyChurned?.cancelled_at || null;
+    // Resurrected customers retain their prior cancelled_at for AM context
+    // ("rejoined after churning N days ago"); everyone else carries null.
+    const _churnedOn = _isResurrected ? (_recentlyChurned?.cancelled_at || null) : null;
     const _onboardedOn = _activatedIso;
 
     // Phase E-11 — per-customer signal freshness. Independent of lifecycle_state
@@ -1358,8 +1366,6 @@ export async function composeSnapshot(
   const tierCounts: Record<Tier, number> = { HIGH: 0, MEDIUM: 0, LOW: 0, HEALTHY: 0 };
   const stoplightCounts: Record<Stoplight, number> = { RED: 0, YELLOW: 0, GREEN: 0 };
   for (const c of scored) {
-    // Phase 33.scope optionB — exclude recently_churned from tier/stoplight totals.
-    if (c.lifecycle_state === "recently_churned") continue;
     tierCounts[c.signals_v2.tier]++;
     stoplightCounts[c.signals_v2.stoplight]++;
   }
@@ -1385,8 +1391,6 @@ export async function composeSnapshot(
   const amMap = new Map<string, { high: number; total: number }>();
   const amBreakdownMap = new Map<string, AmTierRow>();
   for (const c of scored) {
-    // Phase 33.scope optionB — exclude recently_churned from AM breakdown.
-    if (c.lifecycle_state === "recently_churned") continue;
     const am = c.am_name || "(unassigned)";
     const cur = amMap.get(am) || { high: 0, total: 0 };
     cur.total++;
@@ -1405,8 +1409,6 @@ export async function composeSnapshot(
   // Pod breakdown
   const podMap = new Map<string, PodTierRow>();
   for (const c of scored) {
-    // Phase 33.scope optionB — exclude recently_churned from pod breakdown.
-    if (c.lifecycle_state === "recently_churned") continue;
     const pod = c.pod || "(unassigned)";
     const row = podMap.get(pod) || { pod, HIGH: 0, MEDIUM: 0, LOW: 0, HEALTHY: 0, total: 0, ams: [] };
     row[c.signals_v2.tier]++;
@@ -1597,10 +1599,10 @@ export async function composeSnapshot(
   // -------------------------------------------------------------------------
   {
     const allowedStatuses = new Set(["active", "non_renewing", "in_trial", "future"]);
-    // Phase 33.scope-fix4 — recently_churned customers intentionally have
-    // cb_status="cancelled" (30-day retention window). Allow them through
-    // the guard; still block any other unexpected status.
-    const invalid = scored.filter((c) => !allowedStatuses.has(c.cb_status) && c.lifecycle_state !== "recently_churned");
+    // F-purge-churned — recently_churned customers were dropped at compose
+    // time, so every surviving row must carry a live-sub status. Any other
+    // value is an integrity failure.
+    const invalid = scored.filter((c) => !allowedStatuses.has(c.cb_status));
     if (invalid.length > 0) {
       const examples = invalid
         .slice(0, 3)
@@ -1625,7 +1627,9 @@ export async function composeSnapshot(
       customer_count: scored.length,
       customer_id_count: byCid.size,
       multi_location_count: multiLocCount,
-      recently_churned_count: scored.filter((c) => c.lifecycle_state === "recently_churned").length,
+      // F-purge-churned — always 0 (churned customers no longer enter the snapshot);
+      // kept in the shape for back-compat with older snapshot readers.
+      recently_churned_count: 0,
       newly_onboarded_count: scored.filter((c) => c.lifecycle_state === "newly_onboarded").length,
       resurrected_count: scored.filter((c) => c.lifecycle_state === "resurrected").length,
     };
@@ -1676,12 +1680,10 @@ export async function composeSnapshot(
       errors.push(`Postgres write: ${msg}`);
     }
     try {
-      // Phase 33.scope-optionZ — exclude recently_churned from the
-      // historical trend. They're forced GREEN by compose and would
-      // pad the trend's healthy count over time as the universe shifts.
-      const trendRows = snapshot.customers
-        .filter((c) => c.lifecycle_state !== "recently_churned")
-        .map((c) => ({
+      // F-purge-churned — snapshot.customers no longer contains
+      // recently-churned rows, so the trend write can iterate the full
+      // list directly. (Resurrected customers stay in the trend.)
+      const trendRows = snapshot.customers.map((c) => ({
         entity_id: c.entity_id,
         am_name: c.am_name || "",
         pod: c.pod || "",
@@ -1702,6 +1704,7 @@ export async function composeSnapshot(
 
   console.log(
     "[compose] active:", scored.length,
+    "dropped_churned:", _droppedChurned,
     "tiers:", tierCounts,
     "stoplight:", stoplightCounts,
     "duration:", health.refreshDurationMs + "ms",

@@ -257,11 +257,10 @@ export default function V2AMTriage({ amName, pod, customers, generatedAt, pinned
     // Pre-Phase-32.1 buckets — kept for URL/saved-view backward compat. No
     // longer have primary chips on the bar. "improving" is the top-15 lowest-
     // composite GREEN; "quiet" is comms-gap (≥30d since inbound), capped at 20.
-    // Phase 33.scope optionB triage improving exclude recently_churned
+    // F-purge-churned: snapshot no longer contains recently-churned rows.
     const improving = customers
       .filter(
         (c) =>
-          c.lifecycle_state !== "recently_churned" &&
           c.signals_v2.stoplight === "GREEN" &&
           c.signals_v2.composite < 20 &&
           !isSnoozed(c.entity_id),
@@ -269,11 +268,9 @@ export default function V2AMTriage({ amName, pod, customers, generatedAt, pinned
       .sort((a, b) => a.signals_v2.composite - b.signals_v2.composite)
       .slice(0, 15);
 
-    // Phase 33.scope optionB triage quiet30 exclude recently_churned
     const quiet30 = customers
       .filter(
         (c) =>
-          c.lifecycle_state !== "recently_churned" &&
           (c.metrics.days_since_in >= 30 ||
             (c.metrics.last_any_iso === null &&
               c.signals_v2.tier !== "HEALTHY")) &&

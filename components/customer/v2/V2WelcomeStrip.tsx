@@ -10,12 +10,9 @@ type Props = {
 };
 
 export default function V2WelcomeStrip({ amName, customers, onDismiss }: Props) {
-  // Phase 33.scope followup — exclude recently_churned from welcome-strip tallies.
-  // The lifecycle pill on the card already surfaces them separately;
-  // counting them here doubles them into the "needs a call" stack.
-  const _activeCustomers = customers.filter(
-    (c) => (c as any).lifecycle_state !== "recently_churned",
-  );
+  // F-purge-churned — snapshot excludes recently-churned rows; the local
+  // `customers` is the AM's whole book and is safe to count directly.
+  const _activeCustomers = customers;
   const redCount = _activeCustomers.filter((c) => c.signals_v2.stoplight === "RED").length;
   const yellowCount = _activeCustomers.filter((c) => c.signals_v2.stoplight === "YELLOW").length;
   // Phase 33.H.2 — tier-based counts (MONITOR fallback for missing metabase_health)

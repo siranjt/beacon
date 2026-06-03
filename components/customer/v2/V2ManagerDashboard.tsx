@@ -408,9 +408,7 @@ function V2ManagerDashboardInner() {
     let flagged = 0;
     let preLaunch = 0;
     for (const c of snapshot.snapshot.customers) {
-      // Phase 33.scope followup — exclude recently_churned from main kpis tally.
-      // They already surface in ScopeStrip via the +N recently churned suffix.
-      if ((c as any).lifecycle_state === "recently_churned") continue;
+      // F-purge-churned — snapshot excludes recently-churned rows.
       total += 1;
       const sl = c.signals_v2.stoplight;
       if (sl === "RED") RED += 1;
@@ -475,8 +473,7 @@ function V2ManagerDashboardInner() {
     let mrrAtRisk = 0;
     const actionAmsSet = new Set<string>();
     for (const c of compareSnapshot.customers) {
-      // Phase 33.scope optionB manager compareKpis exclude recently_churned
-      if (c.lifecycle_state === "recently_churned") continue;
+      // F-purge-churned — snapshot excludes recently-churned rows.
       total += 1;
       const sl = c.signals_v2.stoplight;
       if (sl === "RED") RED += 1;
@@ -506,10 +503,7 @@ function V2ManagerDashboardInner() {
     if (!compareSnapshot) return new Map<string, { red: number; needsCall: number }>();
     const m = new Map<string, { red: number; needsCall: number }>();
     for (const c of compareSnapshot.customers) {
-      // Phase 33.scope followup — exclude recently_churned from compareCountsByAm.
-      // compareRedByAm reads off this map, so without this, the "RED Δ" arrows
-      // on the per-AM rollup compare against a churn-contaminated baseline.
-      if ((c as any).lifecycle_state === "recently_churned") continue;
+      // F-purge-churned — snapshot excludes recently-churned rows.
       if (!c.am_name) continue;
       const entry = m.get(c.am_name) || { red: 0, needsCall: 0 };
       if (c.signals_v2.stoplight === "RED") entry.red += 1;
@@ -543,8 +537,7 @@ function V2ManagerDashboardInner() {
     if (snapshot.status !== "ready") return [];
     const byAm = new Map<string, { red: number; yellow: number; green: number }>();
     for (const c of snapshot.snapshot.customers) {
-      // Phase 33.scope optionB manager amStoplightRows exclude recently_churned
-      if (c.lifecycle_state === "recently_churned") continue;
+      // F-purge-churned — snapshot excludes recently-churned rows.
       if (!c.am_name) continue;
       const entry =
         byAm.get(c.am_name) || { red: 0, yellow: 0, green: 0 };
@@ -568,9 +561,7 @@ function V2ManagerDashboardInner() {
     if (snapshot.status !== "ready") return [];
     const byAm = new Map<string, ScoredCustomerV2[]>();
     for (const c of snapshot.snapshot.customers) {
-      // Phase 33.scope optionB manager topMovers exclude recently_churned
-      // so the per-AM RED tally below doesn't pick them up.
-      if (c.lifecycle_state === "recently_churned") continue;
+      // F-purge-churned — snapshot excludes recently-churned rows.
       if (!c.am_name) continue;
       if (!byAm.has(c.am_name)) byAm.set(c.am_name, []);
       byAm.get(c.am_name)!.push(c);

@@ -116,9 +116,8 @@ export async function loadInboxContext(opts: {
   amFilter: string | null;
 }): Promise<LoadedContext> {
   const snap = await readLatestSnapshotV2().catch(() => null);
-  const all = (snap?.customers ?? []).filter(
-    (c) => c.lifecycle_state !== "recently_churned",
-  );
+  // F-purge-churned — snapshot already excludes recently-churned rows.
+  const all = snap?.customers ?? [];
   const scoped = opts.amFilter
     ? all.filter((c) => (c.am_name ?? "") === opts.amFilter)
     : all;
@@ -576,9 +575,8 @@ export async function loadCustomerBookContext(opts: {
   amFilter: string | null;
 }): Promise<LoadedContext> {
   const snap = await readLatestSnapshotV2().catch(() => null);
-  const all = (snap?.customers ?? []).filter(
-    (c) => c.lifecycle_state !== "recently_churned",
-  );
+  // F-purge-churned — snapshot already excludes recently-churned rows.
+  const all = snap?.customers ?? [];
   const scoped = opts.amFilter
     ? all.filter((c) => (c.am_name ?? "") === opts.amFilter)
     : all;
@@ -820,9 +818,8 @@ export async function loadPerformanceLandingContext(): Promise<LoadedContext> {
   // light-touch comparisons in; recent-reports is client-side only so
   // we skip it here.
   const snap = await readLatestSnapshotV2().catch(() => null);
-  const all = (snap?.customers ?? []).filter(
-    (c) => c.lifecycle_state !== "recently_churned",
-  );
+  // F-purge-churned — snapshot already excludes recently-churned rows.
+  const all = snap?.customers ?? [];
   const composites = all
     .map((c) => c.signals_v2?.composite)
     .filter((n): n is number => typeof n === "number")

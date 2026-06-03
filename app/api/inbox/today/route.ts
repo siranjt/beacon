@@ -121,13 +121,8 @@ export async function GET() {
   let critical: InboxResponse["critical_customers"] = null;
   if (snapshotR.status === "fulfilled" && snapshotR.value) {
     const snap = snapshotR.value;
-    const all = (snap.customers ?? []).filter((c) => {
-      // Skip recently-churned customers — they're in retention mode, not
-      // an active engagement signal.
-      if (c.lifecycle_state === "recently_churned") return false;
-      const stoplight = c.signals_v2?.stoplight;
-      return stoplight === "RED";
-    });
+    // F-purge-churned — snapshot excludes recently-churned rows.
+    const all = (snap.customers ?? []).filter((c) => c.signals_v2?.stoplight === "RED");
     const scoped = amFiltered
       ? all.filter((c) => (c.am_name || "") === sessionAmName)
       : all;
