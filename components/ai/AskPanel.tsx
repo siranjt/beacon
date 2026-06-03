@@ -189,6 +189,12 @@ interface ParsedAssistantContent {
   confidence: ConfidenceData | null;
 }
 
+// F-ai-context L1 — gap-marker pattern. Mirror of lib/ai/gaps.ts GAP_PATTERN;
+// duplicated here so the client doesn't need to import a server-only module.
+// Gap markers are logged server-side for /admin/beacon-ai-gaps but must never
+// reach the user's screen — they're telemetry, not content.
+const GAP_PATTERN_CLIENT = /<gap:\s*([a-z_]+)\s*[—:\-]\s*([^>]+?)\s*>/gi;
+
 function parseAssistantContent(raw: string): ParsedAssistantContent {
   const re = new RegExp(CONFIDENCE_PATTERN_SOURCE, "g");
   let firstMatch: ConfidenceData | null = null;
@@ -209,10 +215,13 @@ function parseAssistantContent(raw: string): ParsedAssistantContent {
     }
     return "";
   });
-  // Collapse the extra whitespace the marker leaves behind.
-  const cleaned = stripped
+  // Strip gap markers (telemetry, not content).
+  const gapStripped = stripped.replace(GAP_PATTERN_CLIENT, "");
+  // Collapse the extra whitespace the markers leave behind.
+  const cleaned = gapStripped
     .replace(/[ \t]+([.,;:!?])/g, "$1")
-    .replace(/[ \t]{2,}/g, " ");
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
   return { text: cleaned, confidence: firstMatch };
 }
 
@@ -586,7 +595,8 @@ export default function AskPanel() {
                   // (matches the flow other tools follow on Approve).
                   if (
                     tu.name === "lookup_customer" ||
-                    tu.name === "query_customer_book"
+                    tu.name === "query_customer_book" ||
+                    tu.name === "read_customer_notes"
                   ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
@@ -821,6 +831,7 @@ export default function AskPanel() {
           mark_contacted_today: "mark-contacted",
           add_note: "add-note",
           lookup_customer: "lookup",
+          read_customer_notes: "read notes",
           draft_email_to_contact: "draft-email",
           draft_slack_message: "draft-slack",
           query_customer_book: "query",
@@ -870,6 +881,42 @@ export default function AskPanel() {
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_customer_book" && !outcome.ok) {
         followUp = `[Beacon's query_customer_book proposal was not run — ${outcome.error}.]`;
+      } else if (action.toolName === "read_customer_notes" && outcome.ok) {
+        // F-ai-context — inline the actual note content into the follow-up
+        // so the model can quote/summarize. The one-line summary alone tells
+        // it how many notes exist but not what's in them.
+        const rich = (outcome.data ?? null) as
+          | {
+              entity_id?: string;
+              scope?: "own-am" | "all-ams";
+              note?: { note: string; updated_at: string } | null;
+              notes?: Array<{
+                am_name: string;
+                bizname: string | null;
+                note: string;
+                updated_at: string;
+              }>;
+            }
+          | null;
+        const lines: string[] = [`[Beacon ran read_customer_notes → ${outcome.summary}`];
+        if (rich?.scope === "own-am" && rich.note) {
+          lines.push(`Your saved note (updated ${rich.note.updated_at}):`);
+          lines.push(rich.note.note);
+        } else if (rich?.scope === "all-ams" && Array.isArray(rich.notes)) {
+          lines.push("");
+          for (const n of rich.notes) {
+            lines.push(`— ${n.am_name} (updated ${n.updated_at}):`);
+            lines.push(n.note);
+            lines.push("");
+          }
+        }
+        lines.push("");
+        lines.push(
+          "Now answer the user's question using these notes. Quote relevant lines directly when helpful. If the notes are empty / missing, say so plainly — don't apologize or hedge with 'I don't have access'; the tool ran and this is the result.",
+        );
+        followUp = lines.join("\n") + "]";
+      } else if (action.toolName === "read_customer_notes" && !outcome.ok) {
+        followUp = `[Beacon's read_customer_notes proposal was not run — ${outcome.error}.]`;
       } else {
         followUp = outcome.ok
           ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
