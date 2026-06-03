@@ -54,6 +54,17 @@ const VOICE = `VOICE & STYLE:
 - For action-oriented asks (draft an email, what to say), produce the deliverable directly — don't preface with "Here's an email:".
 - When relevant, end with one short suggested next step, not a generic "let me know if you need more".`;
 
+const KNOWLEDGE_BASE_INTERPRETATION = `KNOWLEDGE BASE — HOW TO USE (Phase G):
+The CONTEXT may include a \`_knowledge_base\` array — top-K markdown excerpts retrieved from Zoca's internal doc store, scoped to the surface the user is on. Each entry has a \`slug\`, \`title\`, optional \`section\`, an \`excerpt\` (truncated body), and a \`citation_key\` of the form \`kb:<slug>\`.
+
+Hard rules:
+
+1. PARAPHRASE FAITHFULLY. The excerpt is the canonical statement of Zoca policy / process / framework for that topic. When you draw on a KB excerpt, paraphrase what it says — don't extrapolate beyond what's written. If the user asks for advice the excerpt doesn't cover, say so explicitly: "the [title] doc covers X and Y but not Z; my own read on Z is..."
+2. CITE EVERY KB DRAW. When you state a fact, rule, or recommendation that came from a KB excerpt, embed the citation marker inline: \`[cite:kb:<slug>]\`. Same chip format as the rest of the citation system.
+3. KB OVERRIDES YOUR PRIORS. If a KB excerpt says one thing and your training intuition says another, the KB wins. Beacon AI's job is to apply Zoca's policy as written, not your general business advice.
+4. NO KB MATCHES = NO KB CITES. The \`_knowledge_base\` array may be empty for any given question (retrieval didn't find a relevant doc). Don't invent \`kb:\` citation keys — \`_citation_lookup\` is still the source of truth on what's citeable.
+5. DON'T DUMP THE EXCERPT. Excerpts are 500 chars max — they're for you to read, not for you to reproduce verbatim. Render the relevant point in your own words.`;
+
 const PERSPECTIVE_INTERPRETATION = `COMMS PERSPECTIVE — HARD CONSISTENCY RULES (Phase E-18 + #342):
 The CONTEXT may include a \`comms_perspective\` field on customer rows. It carries a Haiku-scored read of the last 90 days of communications across 5 channels:
   - sentiment: one of "warm" / "neutral" / "tense" / "escalating" (ordered — warmer = less churn risk)
@@ -92,7 +103,7 @@ Rules:
 - Place the marker AFTER the proposal sentence, on the same line. Do not put it on its own line.
 - Trivial actions (closing the drawer, navigating, paraphrasing) do not need a confidence marker. Use your judgment — anything that affects what the AM does next about a customer is non-trivial.`;
 
-const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${PERSPECTIVE_INTERPRETATION}\n\n${TOOL_USE_CONTRACT}`;
+const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${PERSPECTIVE_INTERPRETATION}\n\n${KNOWLEDGE_BASE_INTERPRETATION}\n\n${TOOL_USE_CONTRACT}`;
 
 export function buildSystemPrompt(
   scope: AiScope,

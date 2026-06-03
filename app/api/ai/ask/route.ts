@@ -54,6 +54,11 @@ import {
 import { buildSystemPrompt } from "@/lib/ai/prompts";
 import { CUSTOMER_360_TOOLS, toAnthropicTools } from "@/lib/ai/tools";
 import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
+// Phase G — Knowledge Base. Each request retrieves top-K relevant docs
+// scoped to the surface; the chunks are injected into CONTEXT and a kb
+// citation lookup is merged alongside the scope-specific one.
+import { searchDocs } from "@/lib/ai/knowledge";
+import { buildKnowledgeCitations } from "@/lib/ai/citations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -204,6 +209,44 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 },
     );
+  }
+
+  // Phase G — Knowledge Base retrieval. Search beacon_ai_docs for chunks
+  // relevant to this question, filtered to docs tagged with the current
+  // scope (or 'all'). Top-3 chunks get inlined into the CONTEXT blob and
+  // their citation keys merged into the lookup so the model can emit
+  // [cite:kb:<slug>] markers. Soft-fails to no-op on retrieval errors —
+  // the rest of the request still works without KB context.
+  try {
+    const kbChunks = await searchDocs(question, scope, 3);
+    if (kbChunks.length > 0) {
+      // Inject the chunks into the existing JSON blob. Reuses the loader's
+      // already-stringified blob: parse → add → restringify. This is the
+      // cleanest patch point that doesn't require every per-scope loader
+      // to know about KB.
+      try {
+        const blobObj = JSON.parse(ctx.blob);
+        blobObj._knowledge_base = kbChunks.map((c) => ({
+          slug: c.slug,
+          title: c.title,
+          section: c.section,
+          excerpt: c.excerpt,
+          citation_key: `kb:${c.slug}`,
+        }));
+        ctx.blob = JSON.stringify(blobObj, null, 2);
+      } catch {
+        // Loader emitted non-JSON blob (shouldn't happen with current
+        // loaders, but guard against future scopes). Skip injection.
+      }
+      // Merge KB citations into the lookup so the client renders chips.
+      const kbCitations = buildKnowledgeCitations(kbChunks);
+      ctx.citationLookup = {
+        ...(ctx.citationLookup ?? {}),
+        ...kbCitations,
+      };
+    }
+  } catch (kbErr) {
+    console.warn("[ask] KB retrieval failed (non-fatal):", kbErr);
   }
 
   // Trim conversation history sent by the client (in-memory turns from

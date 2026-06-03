@@ -47,7 +47,11 @@ export type CitationCategory =
   | "billing"
   | "comm"
   | "usage"
-  | "count";
+  | "count"
+  // Phase G — Beacon AI Knowledge Base. KB chips link to a doc in
+  // beacon_ai_docs. id = the doc's slug. The popover shows title +
+  // section + excerpt; clicking opens /admin/knowledge/<doc_id>.
+  | "kb";
 
 export interface CitationEntry {
   /** Short human label shown at the top of the popover. */
@@ -92,6 +96,43 @@ export const CITATION_PATTERN_SOURCE = "\\[cite:([^\\]\\s]+)\\]";
  */
 export const CONFIDENCE_PATTERN_SOURCE =
   "<confidence:\\s*(\\d{1,3})%\\s*[—-]\\s*([^>]+)>";
+
+/**
+ * Phase G — Knowledge Base citation builder. Knowledge chunks layer on
+ * TOP of any scope's discriminated-union lookup; they're additive, not
+ * mutually exclusive. Each chunk surfaces as a kb:<slug> entry the
+ * model can cite when it draws on the doc.
+ *
+ * Caller pattern in context loaders:
+ *   const baseCitations = buildCitationLookup({ kind: "...", ... });
+ *   const kbChunks = await searchDocs(question, scope);
+ *   const kbCitations = buildKnowledgeCitations(kbChunks);
+ *   const citationLookup = { ...baseCitations, ...kbCitations };
+ */
+export function buildKnowledgeCitations(
+  chunks: Array<{
+    slug: string;
+    title: string;
+    section: string | null;
+    excerpt: string;
+  }>,
+): CitationLookup {
+  const out: CitationLookup = {};
+  for (const c of chunks) {
+    if (!c.slug) continue;
+    out[makeCitationKey("kb", c.slug)] = {
+      category: "kb",
+      label: c.title,
+      value: c.section ? `${c.title} · ${c.section}` : c.title,
+      raw: {
+        slug: c.slug,
+        section: c.section,
+        excerpt: c.excerpt.slice(0, 240),
+      },
+    };
+  }
+  return out;
+}
 
 /* ────────────────────────────────────────────────────────────────
  * Loader-side builders
