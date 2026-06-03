@@ -56,6 +56,27 @@ export type BookAggregates = {
   green_count: number;
 };
 
+// Phase F-polish-AI-5 — Miss Payment summary injected into Monday briefing.
+// Per-AM slice of unpaid-invoice aggregates. Optional — when this AM has
+// zero open invoices the field is absent + the briefing skips the section.
+export type MissPaymentAmSummary = {
+  /** Total open invoice count across this AM's book. */
+  open_invoice_count: number;
+  /** Sum of amountDue in USD across this AM's open invoices. */
+  total_outstanding_usd: number;
+  /** Count of customers with unpaid invoices spanning 2+ months. */
+  multi_month_customer_count: number;
+  /** Count of invoices on auto-debit Off with amount >= $500. */
+  auto_debit_off_high_balance_count: number;
+  /** Top 3 invoices by amount, with bizname for the briefing voice. */
+  top_3_invoices: Array<{
+    biz_name: string;
+    amount_due_usd: number;
+    invoice_date: string;
+    auto_debit: string;
+  }>;
+};
+
 export interface PromptPair {
   system: string;
   user: string;
@@ -70,6 +91,10 @@ export function buildMondayBriefingPrompt(
   topCustomers: BriefingTopCustomer[],
   bookAggregates: BookAggregates,
   factsBlock: string | null,
+  // Phase F-polish-AI-5 — optional miss-payment slice. Null/undefined when
+  // this AM has no open unpaid invoices in their book. Briefing skips the
+  // section in that case.
+  missPayment?: MissPaymentAmSummary | null,
 ): PromptPair {
   const styleSection = factsBlock
     ? `THE AM'S WORKING STYLE (apply naturally — don't recite):\n${factsBlock}\n\n`
@@ -112,12 +137,28 @@ ${styleSection}HARD RULES:
     2,
   );
 
+  // Phase F-polish-AI-5 — render the miss-payment block when the AM has
+  // any open unpaid invoices. Omit cleanly when zero so the briefing isn't
+  // padded with "$0 outstanding" lines.
+  const missPaymentBlock =
+    missPayment && missPayment.open_invoice_count > 0
+      ? `\nMISS PAYMENT — open unpaid invoices in ${amName}'s book:
+- Open invoice count: ${missPayment.open_invoice_count}
+- Total outstanding: $${missPayment.total_outstanding_usd.toLocaleString()}
+- Multi-month repeat customers (unpaid across 2+ cycles): ${missPayment.multi_month_customer_count}
+- Auto-debit Off + balance >= $500 (manual chase priority): ${missPayment.auto_debit_off_high_balance_count}
+- Top 3 by amount: ${JSON.stringify(missPayment.top_3_invoices, null, 2)}
+
+When the unpaid balance is material (>= $500, or multi-month repeats > 0), include a single line in the closing about it (e.g. "also: $2,140 unpaid across SKIN and TONIC + 1 other multi-month repeat — auto-debit Off, manual chase").
+`
+      : "";
+
   const user = `BOOK SUMMARY for ${amName}:
 - Total active customers: ${bookAggregates.total_active}
 - RED (needs attention): ${bookAggregates.red_count}
 - YELLOW (watching): ${bookAggregates.yellow_count}
 - GREEN (healthy): ${bookAggregates.green_count}
-
+${missPaymentBlock}
 TOP 5 customers for this week (sorted worst → least-worst, snoozed + pinned already removed):
 ${customerJson}
 

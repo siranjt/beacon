@@ -25,8 +25,27 @@ import {
   type BookAggregates,
   type DailyChange,
   type DailyDigestSummary,
+  type MissPaymentAmSummary,
 } from "@/lib/ai/proactive-prompts";
 import type { ScoredCustomerV2, SnapshotV2 } from "@/lib/customer/types";
+// Phase F-polish-AI-5 — fetch the full miss-payment book once per cron
+// run, slice per AM. Each AM's briefing then gets concrete unpaid-invoice
+// numbers for their book without 13 separate Chargebee pulls.
+import {
+  fetchOpenInvoices as fetchMpInvoices,
+  fetchInProgressTransactions as fetchMpAchTx,
+  fetchCustomers as fetchMpCustomers,
+  fetchSubscriptions as fetchMpSubs,
+} from "@/lib/miss-payment/chargebee";
+import {
+  fetchBaseSheet as fetchMpBaseSheet,
+  indexBaseSheet as indexMpBaseSheet,
+} from "@/lib/miss-payment/basesheet";
+import {
+  buildInvoiceRows as buildMpInvoiceRows,
+  multiMonthCustomerIds as mpMultiMonthCustomerIds,
+} from "@/lib/miss-payment/enrich";
+import type { InvoiceRow as MpInvoiceRow } from "@/lib/miss-payment/types";
 
 const PROACTIVE_MODEL =
   process.env.ANTHROPIC_PROACTIVE_MODEL ?? "claude-haiku-4-5-20251001";
@@ -232,10 +251,98 @@ export type MondayBriefingMeta = {
   picked: number;
 };
 
+/**
+ * Phase F-polish-AI-5 — fetch the full Miss Payment book once + index by
+ * AM. Each AM's Monday briefing then gets a concrete unpaid-invoice slice
+ * for their book without 13 separate Chargebee pulls. Falls back to null
+ * (no miss-payment section in any briefing) if the Chargebee call fails
+ * — the briefing should still ship.
+ */
+async function pullMissPaymentByAm(): Promise<Map<string, MissPaymentAmSummary> | null> {
+  try {
+    const [invoices, achTx, baseRows] = await Promise.all([
+      fetchMpInvoices(),
+      fetchMpAchTx(),
+      fetchMpBaseSheet(),
+    ]);
+    const baseSheet = indexMpBaseSheet(baseRows);
+    const customerIds = invoices.map((i: any) => i.customer_id).filter(Boolean);
+    const subIds = invoices.map((i: any) => i.subscription_id).filter(Boolean);
+    const [cbCustomers, cbSubs] = await Promise.all([
+      fetchMpCustomers(customerIds),
+      fetchMpSubs(subIds),
+    ]);
+    const rows: MpInvoiceRow[] = buildMpInvoiceRows({
+      invoices,
+      customers: cbCustomers,
+      subs: cbSubs,
+      achTransactions: achTx,
+      baseSheet,
+      ticketsByEntity: undefined,
+    });
+    const multiSet = mpMultiMonthCustomerIds(rows);
+
+    // Group by AM name (case-sensitive — matches BaseSheet exactly). The
+    // dashboard route uses the same convention, so per-AM slices line up
+    // with what AMs see when they open /miss-payment themselves.
+    const byAm = new Map<
+      string,
+      {
+        rows: MpInvoiceRow[];
+        multi_customers: Set<string>;
+      }
+    >();
+    for (const r of rows) {
+      const am = (r.amName || "").trim();
+      if (!am) continue;
+      if (!byAm.has(am)) byAm.set(am, { rows: [], multi_customers: new Set() });
+      const entry = byAm.get(am)!;
+      entry.rows.push(r);
+      const key = r.entityId || r.customerId;
+      if (multiSet.has(key)) entry.multi_customers.add(key);
+    }
+
+    const out = new Map<string, MissPaymentAmSummary>();
+    for (const [am, entry] of byAm) {
+      const total = entry.rows.reduce((s, r) => s + (r.amountDue || 0), 0);
+      const autoOffHigh = entry.rows.filter(
+        (r) => r.autoDebit === "Off" && (r.amountDue || 0) >= 500,
+      ).length;
+      const top3 = [...entry.rows]
+        .sort((a, b) => (b.amountDue || 0) - (a.amountDue || 0))
+        .slice(0, 3)
+        .map((r) => ({
+          biz_name: r.bizName,
+          amount_due_usd: Math.round(r.amountDue),
+          invoice_date: r.invoiceDate,
+          auto_debit: r.autoDebit,
+        }));
+      out.set(am, {
+        open_invoice_count: entry.rows.length,
+        total_outstanding_usd: Math.round(total),
+        multi_month_customer_count: entry.multi_customers.size,
+        auto_debit_off_high_balance_count: autoOffHigh,
+        top_3_invoices: top3,
+      });
+    }
+    return out;
+  } catch (err) {
+    console.warn(
+      "[proactive-beacon] miss-payment fetch failed; Monday briefings will omit the miss-payment section",
+      err,
+    );
+    return null;
+  }
+}
+
 export async function runMondayBriefingForAm(
   amEmail: string,
   snapshot: SnapshotV2,
-  opts: { dryRun?: boolean } = {},
+  opts: {
+    dryRun?: boolean;
+    /** Optional per-cron-run map; absent = no miss-payment section. */
+    missPaymentByAm?: Map<string, MissPaymentAmSummary> | null;
+  } = {},
 ): Promise<ProactiveResult<MondayBriefingMeta>> {
   const amName = await resolveAmNameForEmail(amEmail).catch(() => null);
   if (!amName) {
@@ -301,11 +408,17 @@ export async function runMondayBriefingForAm(
 
   const facts = await listFactsForUser(amEmail, {}).catch(() => []);
   const factsBlock = renderFactsForPrompt(facts);
+  // Phase F-polish-AI-5 — resolve this AM's miss-payment slice from the
+  // per-cron-run map. Null = no map was passed (e.g. unit-test caller) OR
+  // this AM has zero unpaid invoices. Either way the briefing renders
+  // cleanly without the section.
+  const amMissPayment = opts.missPaymentByAm?.get(amName) ?? null;
   const { system, user } = buildMondayBriefingPrompt(
     amName,
     top5Shaped,
     aggregates,
     factsBlock,
+    amMissPayment,
   );
   const llm = await callHaiku(system, user, MONDAY_BRIEFING_PROMPT_MAX_TOKENS);
   if ("error" in llm) {
@@ -398,9 +511,18 @@ export async function runMondayBriefingForAllAms(opts: {
     };
   }
 
+  // Phase F-polish-AI-5 — single Chargebee pull, then slice per AM. The
+  // briefing fan-out re-uses the same map across all 13 AMs instead of
+  // 13 separate Chargebee round-trips. Failure here is non-fatal — the
+  // briefing renders cleanly without the miss-payment section.
+  const missPaymentByAm = await pullMissPaymentByAm();
+
   const results: ProactiveResult<MondayBriefingMeta>[] = [];
   for (const email of AM_EMAILS) {
-    const r = await runMondayBriefingForAm(email, snapshot, { dryRun });
+    const r = await runMondayBriefingForAm(email, snapshot, {
+      dryRun,
+      missPaymentByAm,
+    });
     results.push(r);
 
     // Telemetry — write one row per AM (success OR skip OR error).

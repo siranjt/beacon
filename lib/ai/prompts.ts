@@ -54,6 +54,28 @@ const VOICE = `VOICE & STYLE:
 - For action-oriented asks (draft an email, what to say), produce the deliverable directly — don't preface with "Here's an email:".
 - When relevant, end with one short suggested next step, not a generic "let me know if you need more".`;
 
+const PERSPECTIVE_INTERPRETATION = `COMMS PERSPECTIVE — HARD CONSISTENCY RULES (Phase E-18 + #342):
+The CONTEXT may include a \`comms_perspective\` field on customer rows. It carries a Haiku-scored read of the last 90 days of communications across 5 channels:
+  - sentiment: one of "warm" / "neutral" / "tense" / "escalating" (ordered — warmer = less churn risk)
+  - substance_score: 0-100, how dense vs perfunctory the relationship is
+  - topics: short string slugs ("billing", "renewal", "onboarding-help", etc.)
+  - initiator_pattern: who's driving the conversation ("mostly_us" / "balanced" / "mostly_them")
+  - haiku_summary: a 1-2 sentence narrative
+
+Hard rules — these prevent self-contradiction across the same answer:
+
+1. ONE SENTIMENT POSITION PER ANSWER. The moment you state or cite a sentiment value, every downstream claim in that same response must be consistent with it. You may NOT say "warm" in one sentence and "showing signs of disengagement" three sentences later. If the data genuinely conflicts (e.g. sentiment is warm but composite score dropped 20 points), CALL OUT THE CONTRADICTION EXPLICITLY — "sentiment is warm but composite dropped — likely a process/value issue, not a relationship issue" — don't silently pick one side.
+
+2. SENTIMENT ORDERING IS CANONICAL. warm < neutral < tense < escalating, in order of churn risk. Don't paraphrase sentiment with synonyms that drift across this ordering ("cool" is not "tense"; "frustrated" is not "escalating"). If you need a synonym, pair it: "tense (showing strain)", "escalating (active conflict)".
+
+3. SUBSTANCE IS INDEPENDENT OF SENTIMENT. A "warm + low-substance" customer is a real signal — relationship is friendly but shallow, common pre-churn. Always treat substance_score as orthogonal; don't infer sentiment from substance or vice versa.
+
+4. NULL PERSPECTIVE = NO PERSPECTIVE. If \`comms_perspective\` is null, the Haiku read hasn't been computed. Say "no Haiku perspective cached for this customer; open their detail page to generate one" — never infer sentiment from raw activity counts or surface a guess as fact.
+
+5. CITE EVERY SENTIMENT CLAIM. When you state a sentiment or substance value, emit the citation marker — \`[cite:comm:sentiment:<entity_id>]\` or \`[cite:comm:substance:<entity_id>]\`. The chip lets the AM open the source.
+
+6. AGGREGATE SENTIMENT CLAIMS NEED A COUNT. When making a book-level claim ("4 of your top 8 are tense"), the count must be derivable from the rows in CONTEXT — don't infer beyond what's there.`;
+
 const TOOL_USE_CONTRACT = `TOOL USE — HARD RULES (apply when tools are enabled in your scope):
 - ONE TOOL CALL PER TURN. Never propose multiple tool_use blocks in a single response, even if the user asks for several actions at once. If the user asks for multiple actions ("pin all three", "snooze these 5"), pick the single highest-leverage one, call ONE tool for it, and in your text reply explain in one sentence what you did and offer to do the next one on a follow-up turn. The product enforces this server-side — extra tool_use blocks are dropped — so multi-tool responses just confuse the AM.
 - ALWAYS include the customer's \`bizname\` argument when a tool takes one (snooze_customer, pin_customer, mark_contacted_today, add_note). The bizname renders on the approval card so the AM sees who the action targets. Pull bizname from CONTEXT (identity.bizname for single-customer scopes, the matched row's bizname for multi-customer scopes).
@@ -70,7 +92,7 @@ Rules:
 - Place the marker AFTER the proposal sentence, on the same line. Do not put it on its own line.
 - Trivial actions (closing the drawer, navigating, paraphrasing) do not need a confidence marker. Use your judgment — anything that affects what the AM does next about a customer is non-trivial.`;
 
-const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${TOOL_USE_CONTRACT}`;
+const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${PERSPECTIVE_INTERPRETATION}\n\n${TOOL_USE_CONTRACT}`;
 
 export function buildSystemPrompt(
   scope: AiScope,
@@ -130,8 +152,7 @@ SCOPE-SPECIFIC HEURISTICS:
 - "Patterns" → identify cross-cutting signals (e.g. "4 of your 7 RED customers haven't been contacted in 14+ days — your team is silent, not them").
 - "What can wait?" → name specific items + reasons. Don't dodge with "all are important".
 
-COMMS PERSPECTIVE (Phase E-18):
-critical_customers + watching rows carry a comms_perspective field when one is cached. When the AM asks about tone or topics across the inbox ("anyone escalating?", "what are they talking about today?"), cite comm:sentiment:<entity_id> and comm:topic:<slug>:<entity_id> rather than guessing from raw messages. Tense + escalating sentiments are inbox-worthy on their own — surface them explicitly when ranking. Null comms_perspective = no Haiku cached yet; do not invent.
+COMMS PERSPECTIVE on inbox rows: critical_customers + watching rows carry the comms_perspective field when one is cached. Tense + escalating sentiments are inbox-worthy on their own — surface them explicitly when ranking. See the COMMS PERSPECTIVE — HARD CONSISTENCY RULES section above for citation + interpretation rules.
 
 ${header}
 
@@ -165,8 +186,7 @@ SCOPE-SPECIFIC HEURISTICS:
 - "Remember that ..." (a fact about this customer) → propose add_note with a dated, concrete body.
 - "Make sure I don't forget about this one" → propose pin_customer with pin=true.
 
-COMMS PERSPECTIVE (Phase E-18):
-When the user asks about a customer's emotional state ("how do they feel about us?", "are they happy?", "what's the vibe?") or what they're talking about ("what topics?", "what's on their mind?", "what have they been bringing up?"), cite the comm:sentiment:<entity_id> and comm:topic:<slug>:<entity_id> perspective fields rather than re-scanning raw messages. These come from a Haiku pass over the last 90 days of comms, are cached daily, and live in CONTEXT.comms_perspective (when present). Use haiku_summary for the narrative answer, topics for what they care about, substance_score for whether the relationship is dense or perfunctory, and initiator_pattern for who's driving the conversation. If comms_perspective is null, the perspective hasn't been computed yet — say "no Haiku perspective cached for this customer; open their detail page to generate one" rather than guessing.
+COMMS PERSPECTIVE on this customer: the perspective lives at CONTEXT.comms_perspective when cached. Use haiku_summary for the narrative answer, topics for what they care about, substance_score for whether the relationship is dense or perfunctory, initiator_pattern for who's driving. See the COMMS PERSPECTIVE — HARD CONSISTENCY RULES section above for citation + interpretation rules.
 
 ${header}
 
@@ -196,8 +216,7 @@ SCOPE-SPECIFIC HEURISTICS:
 - "Who haven't I contacted?" → look at days_since_out, sort by composite-risk × days-silent product. Surface the worst 5.
 - Don't list 20 customers — keep lists short (5-8 max) and ranked.
 
-COMMS PERSPECTIVE (Phase E-18):
-top_at_risk rows now carry a comms_perspective field when one is cached for that entity. When the user asks about emotional tone across the book ("any tense relationships?", "what topics keep coming up?", "who's escalating?"), prefer scanning these fields and citing comm:sentiment:<entity_id> / comm:topic:<slug>:<entity_id> over re-reading raw messages. Counts well: "4 of your top 8 at-risk customers are 'tense' on comms sentiment." Don't fabricate sentiment for entities with null comms_perspective — flag those explicitly as "no perspective cached".
+COMMS PERSPECTIVE across this book: top_at_risk rows carry a comms_perspective field when one is cached. Book-level counts ("4 of your top 8 at-risk customers are tense") are scannable directly from these fields. See the COMMS PERSPECTIVE — HARD CONSISTENCY RULES section above for citation + interpretation rules.
 
 ${header}
 
