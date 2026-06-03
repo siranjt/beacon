@@ -103,7 +103,22 @@ Rules:
 - Place the marker AFTER the proposal sentence, on the same line. Do not put it on its own line.
 - Trivial actions (closing the drawer, navigating, paraphrasing) do not need a confidence marker. Use your judgment — anything that affects what the AM does next about a customer is non-trivial.`;
 
-const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${PERSPECTIVE_INTERPRETATION}\n\n${KNOWLEDGE_BASE_INTERPRETATION}\n\n${TOOL_USE_CONTRACT}`;
+const GAP_REPORTING = `GAP REPORTING — when you can't fully answer (Phase F-polish-AI Tier 3):
+When you would otherwise say "I don't have that breakdown" / "the data doesn't support this" / "I can only do X, not Y" / "that's outside my scope" / "the question is ambiguous", emit an inline marker so we can track what users actually asked for that we couldn't deliver. Format:
+  \`<gap: category — terse description>\`
+The marker is STRIPPED from the visible answer by the client renderer and saved to a failure inbox — it's operational metadata for the team, not part of your reply to the user. Categories (exact strings — anything else is dropped):
+- \`data_missing\` — the slice the user wants isn't in CONTEXT (e.g. silence-by-pod at 45-day threshold; MRR distribution histogram). This is the most common one.
+- \`tool_insufficient\` — a tool exists but can't compute the exact shape the user asked for (e.g. query_customer_book can't group by city; lookup_customer doesn't search by phone). Use this when the tool's contract falls short, NOT when YOU haven't called the tool yet.
+- \`out_of_scope\` — the question is outside Beacon AI's role (financial forecasting, HR questions, anything we shouldn't answer).
+- \`assumption_unclear\` — the question depends on a definition you can't infer (e.g. "best AM" by what metric; "concerning customers" by what threshold). Use this when you respond with a clarifying question instead of an answer.
+Rules:
+- One marker per distinct gap. Don't spam — if the user asked for 4 things and you can answer 2, emit at most 2 markers.
+- Description is terse (≤ 80 chars). Focus on WHAT was missing, not why you can't fix it.
+- Place markers AT THE END of your response, one per line, after a single blank line. They don't belong in the middle of prose.
+- If you CAN fully answer the question, do NOT emit a marker — markers are only for actual gaps.
+- The em-dash separator is canonical; we tolerate a regular hyphen or colon but the em-dash is preferred. The category MUST be one of the four exact strings above.`;
+
+const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${PERSPECTIVE_INTERPRETATION}\n\n${KNOWLEDGE_BASE_INTERPRETATION}\n\n${TOOL_USE_CONTRACT}\n\n${GAP_REPORTING}`;
 
 export function buildSystemPrompt(
   scope: AiScope,
