@@ -344,26 +344,37 @@ export async function updateDoc(
 ): Promise<KnowledgeDoc | null> {
   const sql = getSql();
   if (!sql) return null;
-  // Build the SET clause dynamically. Neon's tagged-template SQL doesn't
-  // support raw fragment composition cleanly, so we do field-at-a-time
-  // updates wrapped in a single transaction-style block. Each helper
-  // call hits the trigger which bumps version + updated_at.
+  // Read current row, merge the patch, then write the whole row in one
+  // UPDATE so version bumps exactly once per save. The schema removed
+  // its trigger (see migration comment) so updated_at + version are
+  // maintained here explicitly.
   try {
-    if (patch.title !== undefined) {
-      await sql`UPDATE beacon_ai_docs SET title = ${patch.title} WHERE id = ${id}`;
-    }
-    if (patch.body !== undefined) {
-      await sql`UPDATE beacon_ai_docs SET body = ${patch.body} WHERE id = ${id}`;
-    }
-    if (patch.section !== undefined) {
-      await sql`UPDATE beacon_ai_docs SET section = ${patch.section} WHERE id = ${id}`;
-    }
-    if (patch.scope_tags !== undefined) {
-      await sql`UPDATE beacon_ai_docs SET scope_tags = ${patch.scope_tags as any}::text[] WHERE id = ${id}`;
-    }
-    if (patch.last_edited_by !== undefined) {
-      await sql`UPDATE beacon_ai_docs SET last_edited_by = ${patch.last_edited_by} WHERE id = ${id}`;
-    }
+    const current = await getDoc(id);
+    if (!current) return null;
+
+    const next = {
+      title: patch.title !== undefined ? patch.title : current.title,
+      body: patch.body !== undefined ? patch.body : current.body,
+      section: patch.section !== undefined ? patch.section : current.section,
+      scope_tags:
+        patch.scope_tags !== undefined ? patch.scope_tags : current.scope_tags,
+      last_edited_by:
+        patch.last_edited_by !== undefined
+          ? patch.last_edited_by
+          : current.last_edited_by,
+    };
+
+    await sql`
+      UPDATE beacon_ai_docs
+      SET title = ${next.title},
+          body = ${next.body},
+          section = ${next.section},
+          scope_tags = ${next.scope_tags as any}::text[],
+          last_edited_by = ${next.last_edited_by},
+          updated_at = now(),
+          version = version + 1
+      WHERE id = ${id}
+    `;
     return getDoc(id);
   } catch (err) {
     console.warn("[knowledge] updateDoc failed:", err);
