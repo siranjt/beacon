@@ -46,7 +46,6 @@ import { lookupCustomerTool } from "./lookup-customer";
 import { draftEmailToContactTool } from "./draft-email";
 import { draftSlackMessageTool } from "./draft-slack";
 import { queryCustomerBookTool } from "./query-customer-book";
-import { readCustomerNotesTool } from "./read-customer-notes";
 
 /**
  * The execution context passed to every tool's `execute()` handler. Filled
@@ -126,9 +125,6 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   // compose tabular answers without needing every cross-product
   // pre-computed in CONTEXT.
   queryCustomerBookTool,
-  // F-ai-context chunk 2 — read per-customer private AM notes. AM-scoped
-  // (own only) or manager-scoped (all AMs' notes) based on the asker's role.
-  readCustomerNotesTool,
 ];
 
 /** Alias for callers that prefer the umbrella naming. */
@@ -171,5 +167,4 @@ export {
   draftEmailToContactTool,
   draftSlackMessageTool,
   queryCustomerBookTool,
-  readCustomerNotesTool,
 };

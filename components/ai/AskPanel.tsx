@@ -590,8 +590,7 @@ export default function AskPanel() {
                   // (matches the flow other tools follow on Approve).
                   if (
                     tu.name === "lookup_customer" ||
-                    tu.name === "query_customer_book" ||
-                    tu.name === "read_customer_notes"
+                    tu.name === "query_customer_book"
                   ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
@@ -826,7 +825,6 @@ export default function AskPanel() {
           mark_contacted_today: "mark-contacted",
           add_note: "add-note",
           lookup_customer: "lookup",
-          read_customer_notes: "read notes",
           draft_email_to_contact: "draft-email",
           draft_slack_message: "draft-slack",
           query_customer_book: "query",
@@ -876,44 +874,6 @@ export default function AskPanel() {
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_customer_book" && !outcome.ok) {
         followUp = `[Beacon's query_customer_book proposal was not run — ${outcome.error}.]`;
-      } else if (action.toolName === "read_customer_notes" && outcome.ok) {
-        // F-ai-context chunk 2 — inline the actual note content into the
-        // follow-up so the model can quote/summarize. The one-line summary
-        // alone tells it how many notes exist but not what's in them.
-        const rich = (outcome.data ?? null) as
-          | {
-              entity_id?: string;
-              scope?: "own-am" | "all-ams";
-              note?: { note: string; updated_at: string } | null;
-              notes?: Array<{
-                am_name: string;
-                bizname: string | null;
-                note: string;
-                updated_at: string;
-              }>;
-            }
-          | null;
-        const lines: string[] = [
-          `[Beacon ran read_customer_notes → ${outcome.summary}`,
-        ];
-        if (rich?.scope === "own-am" && rich.note) {
-          lines.push(`Your saved note (updated ${rich.note.updated_at}):`);
-          lines.push(rich.note.note);
-        } else if (rich?.scope === "all-ams" && Array.isArray(rich.notes)) {
-          lines.push("");
-          for (const n of rich.notes) {
-            lines.push(`— ${n.am_name} (updated ${n.updated_at}):`);
-            lines.push(n.note);
-            lines.push("");
-          }
-        }
-        lines.push("");
-        lines.push(
-          "Now answer the user's question using these notes. Quote relevant lines directly when helpful. If the notes are empty / missing, say so plainly — don't apologize or hedge with 'I don't have access'; the tool ran and this is the result.",
-        );
-        followUp = lines.join("\n") + "]";
-      } else if (action.toolName === "read_customer_notes" && !outcome.ok) {
-        followUp = `[Beacon's read_customer_notes proposal was not run — ${outcome.error}.]`;
       } else {
         followUp = outcome.ok
           ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
