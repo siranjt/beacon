@@ -19,26 +19,59 @@ export type TopicCategory =
   | "identity"
   | "operational"
   | "behavioral"
-  | "concerns";
+  | "concerns"
+  // Wave 1.1 — relationship is a NEW top-level category for advocacy
+  // + engagement facts. Conceptually distinct from behavioral (which
+  // is day-to-day patterns); relationship captures the strategic arc
+  // between Zoca and the customer.
+  | "relationship";
 
 export type TopicSubcategory =
   // identity
   | "owner_info"
   | "decision_makers"
   | "sold_by"
+  // Wave 1.1 — AM ownership + transition history. Includes 4 DERIVED
+  // fields (current_am, current_ae, current_pod, current_sp) that
+  // are synthesized from snapshot at retrieval time, NOT stored in
+  // beacon_brain_facts. See DERIVED_ASSIGNMENT_FIELDS below.
+  | "assignment"
+  // Wave 1.1 — the actual shape of the business (services, staff,
+  // locations, ownership structure).
+  | "business_profile"
   // operational
   | "contract"
   | "integration"
   | "feature_usage"
+  // Wave 1.1 — broader customer tech ecosystem (GBP, website, POS,
+  // social) distinct from operational/integration which holds the
+  // Zoca-side booking integration.
+  | "tech_stack"
+  // Wave 1.1 — forward-looking renewal narrative (advocates, pull/push
+  // factors, retention strategy). Contract dates stay in contract;
+  // this holds the story.
+  | "renewal"
+  // Wave 1.1 — onboarding + first-value history. CS handoff story.
+  | "onboarding"
+  // Wave 1.1 — performance context narrative (why are the snapshot
+  // signals like they are). Sits alongside the raw numbers from the
+  // Performance Beacon.
+  | "performance_context"
   // behavioral
   | "payment_pattern"
   | "comms_preference"
   | "seasonal"
   | "demo_style"
+  // Wave 1.1 — competitive / switching context. Where did they come
+  // from, what could pull them away.
+  | "competitive_context"
   // concerns
   | "latent_risk"
   | "next_call_agenda"
-  | "soft_red_flag";
+  | "soft_red_flag"
+  // Wave 1.1 — relationship category subcategories
+  | "advocacy"
+  | "engagement";
 
 /**
  * Source taxonomy — the Validate inbox renders these as colored pills,
@@ -88,6 +121,13 @@ export interface BrainFact {
   topic_subcategory: TopicSubcategory;
   field_name: string;
   value: string;
+  /**
+   * Wave 1.1 — parsed integer for numeric-shaped fields (staff_count,
+   * location_count). Populated by writeBrainFact when field_name is in
+   * NUMERIC_FIELDS; NULL for everything else. Enables manager queries
+   * like "staff_count >= 5" via searchFacts.
+   */
+  value_numeric: number | null;
   confidence_state: ConfidenceState;
   source_type: FactSourceType;
   source_ref: string | null;
@@ -196,6 +236,34 @@ export const FIELD_CATALOG: Record<
       "time_to_first_value",
     ],
   },
+  // Wave 1.1 — AM ownership + transition history. The 4 DERIVED fields
+  // (current_am, current_ae, current_pod, current_sp) are listed in
+  // DERIVED_ASSIGNMENT_FIELDS below and are NOT in named_fields here
+  // because add_fact_to_brain shouldn't accept them — they come from
+  // snapshot, auto-synced.
+  assignment: {
+    category: "identity",
+    named_fields: [
+      "transition_history",
+      "last_transition_at",
+      "transition_reason",
+      "customer_relationship_context",
+    ],
+  },
+  // Wave 1.1 — the actual shape of the business.
+  business_profile: {
+    category: "identity",
+    named_fields: [
+      "service_focus",
+      "service_mix",
+      "location_count",
+      "staff_count",
+      "business_age",
+      "ownership_structure",
+      "business_model_note",
+      "aesthetic_market_segment",
+    ],
+  },
   // operational
   contract: {
     category: "operational",
@@ -217,6 +285,53 @@ export const FIELD_CATALOG: Record<
       "features_active",
       "features_inactive",
       "feature_adoption_notes",
+    ],
+  },
+  // Wave 1.1 — broader customer tech ecosystem.
+  tech_stack: {
+    category: "operational",
+    named_fields: [
+      "gbp_url",
+      "website_url",
+      "booking_url",
+      "review_platforms",
+      "pos_system",
+      "social_handles",
+      "email_marketing_tool",
+    ],
+  },
+  // Wave 1.1 — forward-looking renewal narrative.
+  renewal: {
+    category: "operational",
+    named_fields: [
+      "renewal_advocates",
+      "renewal_pull_factors",
+      "renewal_push_factors",
+      "renewal_risk_level",
+      "retention_strategy",
+      "pricing_sensitivity_notes",
+      "renewal_decision_makers",
+    ],
+  },
+  // Wave 1.1 — onboarding + first-value history.
+  onboarding: {
+    category: "operational",
+    named_fields: [
+      "onboarded_by_csm",
+      "onboarding_completed_at",
+      "time_to_first_lead",
+      "first_value_event",
+      "onboarding_friction_points",
+    ],
+  },
+  // Wave 1.1 — performance context narrative.
+  performance_context: {
+    category: "operational",
+    named_fields: [
+      "gbp_setup_quality",
+      "review_velocity_pattern",
+      "seasonal_dependency_strength",
+      "known_growth_levers",
     ],
   },
   // behavioral
@@ -245,6 +360,17 @@ export const FIELD_CATALOG: Record<
     category: "behavioral",
     named_fields: ["demo_engagement", "follow_up_pattern"],
   },
+  // Wave 1.1 — competitive / switching context.
+  competitive_context: {
+    category: "behavioral",
+    named_fields: [
+      "prior_platforms",
+      "competing_offers_seen",
+      "why_chose_zoca",
+      "switch_risks",
+      "churn_attempt_history",
+    ],
+  },
   // concerns
   latent_risk: {
     category: "concerns",
@@ -258,7 +384,67 @@ export const FIELD_CATALOG: Record<
     category: "concerns",
     named_fields: ["flag_description", "flag_category"],
   },
+  // Wave 1.1 — NEW relationship category.
+  advocacy: {
+    category: "relationship",
+    named_fields: [
+      "nps_score",
+      "would_refer_likelihood",
+      "has_referred",
+      "case_study_eligible",
+      "public_quote_eligible",
+    ],
+  },
+  engagement: {
+    category: "relationship",
+    named_fields: [
+      "meeting_cadence",
+      "last_in_person_meeting",
+      "community_events_attended",
+    ],
+  },
 };
+
+/**
+ * Derived fields for identity/assignment — synthesized from the snapshot
+ * at retrieval time, NOT stored in beacon_brain_facts. The Brain panel
+ * + prompt block surface these alongside the curated facts, but
+ * writeBrainFact rejects them (they aren't in FIELD_CATALOG.named_fields).
+ *
+ * Updates to these fields happen automatically when the snapshot
+ * refreshes. The version log only tracks AM-curated facts; derived
+ * fields don't have history (they're always the snapshot's current view).
+ */
+export const DERIVED_ASSIGNMENT_FIELDS = [
+  "current_am",
+  "current_ae",
+  "current_pod",
+  "current_sp",
+] as const;
+export type DerivedAssignmentField = (typeof DERIVED_ASSIGNMENT_FIELDS)[number];
+
+/**
+ * Numeric-shaped fields. When writeBrainFact writes to one of these,
+ * it parses the leading integer from `value` and stores it in
+ * `value_numeric` so manager queries can do `staff_count > 5` via
+ * searchFacts. Other fields leave value_numeric NULL.
+ *
+ * If a user types "Variable, 5-8 stylists" we extract 5; the original
+ * text stays in `value` for human reading. Beacon AI can quote either.
+ */
+export const NUMERIC_FIELDS: ReadonlySet<string> = new Set([
+  "staff_count",
+  "location_count",
+]);
+
+/** Parse the leading integer from free text. Returns null if no integer found. */
+export function parseLeadingInteger(value: string): number | null {
+  if (!value) return null;
+  const match = /^\s*(\d+)/.exec(value);
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Number.isFinite(n) ? n : null;
+}
 
 /** Returns the TopicCategory for a given subcategory — derived from the catalog. */
 export function categoryForSubcategory(

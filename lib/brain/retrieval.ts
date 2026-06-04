@@ -19,6 +19,7 @@
  */
 
 import { getFactsForCustomer } from "./repo";
+import { readLatestSnapshotV2 } from "../customer/postgres";
 import type {
   BrainFact,
   TopicCategory,
@@ -55,10 +56,23 @@ const FLOOR_CATEGORIES: ReadonlySet<TopicCategory> = new Set([
  */
 export interface BrainPromptInjection {
   prompt_block: {
+    /**
+     * Wave 1.1 — Currently-managed-by section. Derived from snapshot,
+     * not stored in beacon_brain_facts. Always populated when the
+     * customer is on the active book; null otherwise.
+     */
+    currently_managed: {
+      current_am: string | null;
+      current_ae: string | null;
+      current_pod: string | null;
+      current_sp: string | null;
+    } | null;
     identity: Record<string, string>;
     operational: Record<string, string>;
     behavioral: Record<string, string>;
     concerns: Record<string, string>;
+    /** Wave 1.1 — relationship category (advocacy + engagement subcategories). */
+    relationship: Record<string, string>;
     other: Array<{ subcategory: TopicSubcategory; value: string }>;
     facts_returned: number;
     facts_dropped: number;
@@ -89,7 +103,25 @@ export async function loadBrainForPrompt(
   if (!customer_id) return null;
 
   const facts = await getFactsForCustomer(customer_id, { confirmedOnly: true });
-  if (facts.length === 0) return null;
+
+  // Wave 1.1 — fetch derived assignment fields from snapshot, regardless
+  // of whether facts exist. Brain entries may be empty but the customer
+  // still has a current AM in BaseSheet, and we want to surface that.
+  const snap = await readLatestSnapshotV2().catch(() => null);
+  const snapRow = snap?.customers?.find((c) => c.customer_id === customer_id);
+  const currentlyManaged = snapRow
+    ? {
+        current_am: snapRow.am_name || null,
+        current_ae: snapRow.ae_name || null,
+        current_pod:
+          ((snapRow as { pod?: string | null }).pod ?? null) || null,
+        current_sp: snapRow.sp_name || null,
+      }
+    : null;
+
+  // If there are no facts AND no derived data, return null (caller skips
+  // injecting an empty block).
+  if (facts.length === 0 && !currentlyManaged) return null;
 
   // Split into floor + tail.
   const floor = facts.filter((f) => FLOOR_CATEGORIES.has(f.topic_category));
@@ -116,6 +148,7 @@ export async function loadBrainForPrompt(
   const operational: Record<string, string> = {};
   const behavioral: Record<string, string> = {};
   const concerns: Record<string, string> = {};
+  const relationship: Record<string, string> = {};
   const other: Array<{ subcategory: TopicSubcategory; value: string }> = [];
 
   const fact_ids_for_citation: BrainPromptInjection["fact_ids_for_citation"] = {};
@@ -135,7 +168,8 @@ export async function loadBrainForPrompt(
     // Key format: "subcategory.field_name" so the model can disambiguate
     // multiple subcategories sharing similar field names in the future.
     const key = `${f.topic_subcategory}.${f.field_name}`;
-    if (f.topic_category === "identity") identity[key] = f.value;
+    if (f.topic_category === "relationship") relationship[key] = f.value;
+    else if (f.topic_category === "identity") identity[key] = f.value;
     else if (f.topic_category === "operational") operational[key] = f.value;
     else if (f.topic_category === "behavioral") behavioral[key] = f.value;
     else if (f.topic_category === "concerns") concerns[key] = f.value;
@@ -143,10 +177,12 @@ export async function loadBrainForPrompt(
 
   return {
     prompt_block: {
+      currently_managed: currentlyManaged,
       identity,
       operational,
       behavioral,
       concerns,
+      relationship,
       other,
       facts_returned: kept.length,
       facts_dropped: dropped,
@@ -166,10 +202,25 @@ export function renderBrainSummaryText(
   injection: BrainPromptInjection | null,
 ): string {
   if (!injection) return "";
-  const { identity, operational, behavioral, concerns, other } =
-    injection.prompt_block;
+  const {
+    currently_managed,
+    identity,
+    operational,
+    behavioral,
+    concerns,
+    relationship,
+    other,
+  } = injection.prompt_block;
 
   const lines: string[] = [];
+  if (currently_managed) {
+    const parts: string[] = [];
+    if (currently_managed.current_am) parts.push(`AM: ${currently_managed.current_am}`);
+    if (currently_managed.current_ae) parts.push(`AE: ${currently_managed.current_ae}`);
+    if (currently_managed.current_pod) parts.push(`Pod: ${currently_managed.current_pod}`);
+    if (currently_managed.current_sp) parts.push(`SP: ${currently_managed.current_sp}`);
+    if (parts.length) lines.push(`Currently managed — ${parts.join(", ")}`);
+  }
   if (Object.keys(identity).length) {
     lines.push("Identity:");
     for (const [k, v] of Object.entries(identity)) lines.push(`  • ${k}: ${v}`);
@@ -187,6 +238,11 @@ export function renderBrainSummaryText(
   if (Object.keys(concerns).length) {
     lines.push("Concerns:");
     for (const [k, v] of Object.entries(concerns)) lines.push(`  • ${k}: ${v}`);
+  }
+  if (Object.keys(relationship).length) {
+    lines.push("Relationship:");
+    for (const [k, v] of Object.entries(relationship))
+      lines.push(`  • ${k}: ${v}`);
   }
   if (other.length) {
     lines.push("Other:");

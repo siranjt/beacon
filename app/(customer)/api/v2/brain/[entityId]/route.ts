@@ -63,7 +63,8 @@ export async function GET(
           customer_id: null,
           bizname: null,
           facts: [],
-          grouped: { identity: [], operational: [], behavioral: [], concerns: [] },
+          grouped: { identity: [], operational: [], behavioral: [], concerns: [], relationship: [] },
+          currently_managed: null,
           facts_count: 0,
           reason: "entity_not_in_active_book",
         },
@@ -79,7 +80,8 @@ export async function GET(
           customer_id: null,
           bizname: customer.company ?? null,
           facts: [],
-          grouped: { identity: [], operational: [], behavioral: [], concerns: [] },
+          grouped: { identity: [], operational: [], behavioral: [], concerns: [], relationship: [] },
+          currently_managed: null,
           facts_count: 0,
           reason: "no_chargebee_customer_id",
         },
@@ -96,10 +98,23 @@ export async function GET(
       operational: [],
       behavioral: [],
       concerns: [],
+      // Wave 1.1 — relationship category.
+      relationship: [],
     };
     for (const f of facts) {
       if (grouped[f.topic_category]) grouped[f.topic_category].push(f);
     }
+
+    // Wave 1.1 — derive currently-managed-by section from snapshot.
+    // These fields are not stored in beacon_brain_facts; they're shown
+    // alongside the curated facts so the AM sees the full picture.
+    const currentlyManaged = {
+      current_am: customer.am_name || null,
+      current_ae: customer.ae_name || null,
+      current_pod:
+        ((customer as { pod?: string | null }).pod ?? null) || null,
+      current_sp: customer.sp_name || null,
+    };
 
     return NextResponse.json(
       {
@@ -107,6 +122,7 @@ export async function GET(
         entity_id: entityId,
         customer_id: cbCustomerId,
         bizname: customer.company ?? null,
+        currently_managed: currentlyManaged,
         facts,
         grouped,
         facts_count: facts.length,

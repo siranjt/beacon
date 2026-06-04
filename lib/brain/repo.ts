@@ -20,7 +20,12 @@ import type {
   ConfidenceState,
   ChangeReason,
 } from "./types";
-import { categoryForSubcategory, isNamedField } from "./types";
+import {
+  categoryForSubcategory,
+  isNamedField,
+  NUMERIC_FIELDS,
+  parseLeadingInteger,
+} from "./types";
 
 /**
  * Write a new fact OR upsert if a row already exists for the same
@@ -68,11 +73,19 @@ export async function writeBrainFact(
     : "candidate";
   const confTime = input.confirmed_by_email ? new Date().toISOString() : null;
 
+  // Wave 1.1 — parse a leading integer into value_numeric for numeric-
+  // shaped fields (staff_count, location_count). Other fields stay NULL.
+  // Lets managers run "staff_count > 5" queries via searchFacts.
+  const valueNumeric: number | null = NUMERIC_FIELDS.has(input.field_name)
+    ? parseLeadingInteger(input.value)
+    : null;
+
   if (!named || input.field_name === "other") {
     // Insert-only path.
     const rows = (await sql`
       INSERT INTO beacon_brain_facts (
         customer_id, topic_category, topic_subcategory, field_name, value,
+        value_numeric,
         confidence_state, source_type, source_ref, owning_am_email,
         confirmed_by_email, confirmed_at, sunset_at
       ) VALUES (
@@ -81,6 +94,7 @@ export async function writeBrainFact(
         ${input.topic_subcategory},
         ${input.field_name},
         ${input.value},
+        ${valueNumeric},
         ${confState},
         ${input.source_type},
         ${input.source_ref ?? null},
@@ -124,6 +138,7 @@ export async function writeBrainFact(
     const rows = (await sql`
       INSERT INTO beacon_brain_facts (
         customer_id, topic_category, topic_subcategory, field_name, value,
+        value_numeric,
         confidence_state, source_type, source_ref, owning_am_email,
         confirmed_by_email, confirmed_at, sunset_at
       ) VALUES (
@@ -132,6 +147,7 @@ export async function writeBrainFact(
         ${input.topic_subcategory},
         ${input.field_name},
         ${input.value},
+        ${valueNumeric},
         ${confState},
         ${input.source_type},
         ${input.source_ref ?? null},
@@ -180,6 +196,7 @@ export async function writeBrainFact(
   const updated = (await sql`
     UPDATE beacon_brain_facts
     SET value = ${input.value},
+        value_numeric = ${valueNumeric},
         source_type = ${input.source_type},
         source_ref = ${input.source_ref ?? null},
         current_version = ${newVersion},
@@ -422,6 +439,11 @@ export async function searchFacts(opts: {
   topic_category?: string;
   limit?: number;
   offset?: number;
+  // Wave 1.1 — numeric range filters for fields with parsed value_numeric
+  // (currently staff_count + location_count). Ignored on non-numeric fields
+  // because their value_numeric is NULL and the IS NULL clause excludes them.
+  value_numeric_gte?: number;
+  value_numeric_lte?: number;
 }): Promise<{ rows: BrainFact[]; total: number }> {
   const sql = getSql();
   if (!sql) return { rows: [], total: 0 };
@@ -436,6 +458,10 @@ export async function searchFacts(opts: {
   const contains = opts.value_contains
     ? `%${opts.value_contains}%`
     : null;
+  const numGte =
+    typeof opts.value_numeric_gte === "number" ? opts.value_numeric_gte : null;
+  const numLte =
+    typeof opts.value_numeric_lte === "number" ? opts.value_numeric_lte : null;
   try {
     const [rowsResult, countResult] = await Promise.all([
       sql`
@@ -447,6 +473,8 @@ export async function searchFacts(opts: {
           AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
           AND (${field}::text IS NULL OR field_name = ${field})
           AND (${contains}::text IS NULL OR value ILIKE ${contains})
+          AND (${numGte}::int IS NULL OR value_numeric >= ${numGte})
+          AND (${numLte}::int IS NULL OR value_numeric <= ${numLte})
         ORDER BY updated_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
@@ -460,6 +488,8 @@ export async function searchFacts(opts: {
           AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
           AND (${field}::text IS NULL OR field_name = ${field})
           AND (${contains}::text IS NULL OR value ILIKE ${contains})
+          AND (${numGte}::int IS NULL OR value_numeric >= ${numGte})
+          AND (${numLte}::int IS NULL OR value_numeric <= ${numLte})
       `,
     ]);
     const rows = rowsResult as BrainFact[];
@@ -477,7 +507,13 @@ export async function getCategoryBreakdown(
 ): Promise<Record<TopicCategory, number>> {
   const sql = getSql();
   if (!sql) {
-    return { identity: 0, operational: 0, behavioral: 0, concerns: 0 };
+    return {
+      identity: 0,
+      operational: 0,
+      behavioral: 0,
+      concerns: 0,
+      relationship: 0,
+    };
   }
   const rows = (await sql`
     SELECT topic_category, COUNT(*)::int AS n
@@ -492,6 +528,7 @@ export async function getCategoryBreakdown(
     operational: 0,
     behavioral: 0,
     concerns: 0,
+    relationship: 0,
   };
   for (const row of rows) out[row.topic_category] = row.n;
   return out;

@@ -28,12 +28,21 @@ type FetchResponse = {
   entity_id: string;
   customer_id: string | null;
   bizname: string | null;
+  /** Wave 1.1 — derived from snapshot; null when entity not on the book. */
+  currently_managed: {
+    current_am: string | null;
+    current_ae: string | null;
+    current_pod: string | null;
+    current_sp: string | null;
+  } | null;
   facts: BrainFact[];
   grouped: {
     identity: BrainFact[];
     operational: BrainFact[];
     behavioral: BrainFact[];
     concerns: BrainFact[];
+    /** Wave 1.1 — new top-level category. */
+    relationship: BrainFact[];
   };
   facts_count: number;
   reason?: string;
@@ -42,47 +51,122 @@ type FetchResponse = {
 
 /** Maps schema field_name → human-friendly label for panel display. */
 const FIELD_LABELS: Record<string, string> = {
+  // identity / owner_info
   owner_name: "Owner",
   owner_nickname: "Nickname",
   owner_role: "Role",
   decision_style: "Decision style",
+  // identity / decision_makers
   secondary_contacts: "Secondary contacts",
   manager_relationships: "Manager relationships",
+  // identity / sold_by
   sold_by_ae: "Sold by",
   sold_at: "Sale date",
   sales_promise: "Sales promise",
   time_to_first_value: "Time to value",
+  // identity / assignment (Wave 1.1)
+  transition_history: "Transition history",
+  last_transition_at: "Last transition",
+  transition_reason: "Transition reason",
+  customer_relationship_context: "Relationship context",
+  current_am: "AM",
+  current_ae: "AE",
+  current_pod: "Pod",
+  current_sp: "SP",
+  // identity / business_profile (Wave 1.1)
+  service_focus: "Service focus",
+  service_mix: "Service mix",
+  location_count: "Locations",
+  staff_count: "Staff",
+  business_age: "In business",
+  ownership_structure: "Ownership",
+  business_model_note: "Business model",
+  aesthetic_market_segment: "Market segment",
+  // operational / contract
   contract_terms: "Contract terms",
   custom_pricing: "Custom pricing",
   contract_start: "Contract start",
   contract_renewal_at: "Renews",
   mrr_amount: "MRR",
+  // operational / integration
   platform: "Platform",
   integration_state: "Integration state",
   integration_notes: "Integration notes",
+  // operational / feature_usage
   features_active: "Features active",
   features_inactive: "Features inactive",
   feature_adoption_notes: "Feature notes",
+  // operational / tech_stack (Wave 1.1)
+  gbp_url: "GBP",
+  website_url: "Website",
+  booking_url: "Booking page",
+  review_platforms: "Review platforms",
+  pos_system: "POS",
+  social_handles: "Social",
+  email_marketing_tool: "Email marketing",
+  // operational / renewal (Wave 1.1)
+  renewal_advocates: "Renewal advocates",
+  renewal_pull_factors: "Pull factors",
+  renewal_push_factors: "Push factors",
+  renewal_risk_level: "Renewal risk",
+  retention_strategy: "Retention play",
+  pricing_sensitivity_notes: "Pricing sensitivity",
+  renewal_decision_makers: "Renewal approvers",
+  // operational / onboarding (Wave 1.1)
+  onboarded_by_csm: "Onboarded by",
+  onboarding_completed_at: "Onboarded at",
+  time_to_first_lead: "Time to first lead",
+  first_value_event: "First value",
+  onboarding_friction_points: "Onboarding friction",
+  // operational / performance_context (Wave 1.1)
+  gbp_setup_quality: "GBP setup",
+  review_velocity_pattern: "Review velocity",
+  seasonal_dependency_strength: "Seasonality",
+  known_growth_levers: "Growth levers",
+  // behavioral / payment_pattern
   payment_timing: "Payment timing",
   payment_method_preference: "Payment method",
   auto_debit_history: "Auto-debit history",
+  // behavioral / comms_preference
   preferred_channel: "Preferred channel",
   channel_avoid: "Avoid channel",
   response_pattern: "Response pattern",
   best_time_to_reach: "Best time to reach",
+  // behavioral / seasonal
   high_season_months: "High season",
   low_season_notes: "Low season notes",
   vacation_dates: "Vacation",
+  // behavioral / demo_style
   demo_engagement: "Demo engagement",
   follow_up_pattern: "Follow-up pattern",
+  // behavioral / competitive_context (Wave 1.1)
+  prior_platforms: "Prior platforms",
+  competing_offers_seen: "Competing offers",
+  why_chose_zoca: "Why Zoca",
+  switch_risks: "Switch risks",
+  churn_attempt_history: "Churn attempts",
+  // concerns / latent_risk
   risk_description: "Risk",
   risk_severity: "Risk severity",
   watch_until: "Watch until",
+  // concerns / next_call_agenda
   agenda_item: "Next-call agenda",
   raised_by: "Raised by",
   raised_at: "Raised at",
+  // concerns / soft_red_flag
   flag_description: "Red flag",
   flag_category: "Flag category",
+  // relationship / advocacy (Wave 1.1)
+  nps_score: "NPS",
+  would_refer_likelihood: "Would refer?",
+  has_referred: "Has referred",
+  case_study_eligible: "Case-study eligible",
+  public_quote_eligible: "Quote eligible",
+  // relationship / engagement (Wave 1.1)
+  meeting_cadence: "Meeting cadence",
+  last_in_person_meeting: "Last in-person",
+  community_events_attended: "Community events",
+  // long-tail
   other: "Other",
 };
 
@@ -257,6 +341,44 @@ export default function V2BrainPanel({ entityId }: Props) {
                   : "No facts saved yet. Tell Beacon AI to remember things about this customer — they'll show up here."}
             </div>
           )}
+          {/* Wave 1.1 — Currently-managed-by section. Surfaces even when
+              there are 0 curated facts, so AMs always see who's on this
+              customer right now (per BaseSheet). */}
+          {!loading && !error && data?.currently_managed && (
+            <div className="mb-3 rounded-md border border-zoca-border/40 bg-zoca-bg/50 p-2.5">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zoca-text-2/80">
+                Currently managed
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12px]">
+                {data.currently_managed.current_am && (
+                  <span>
+                    <span className="text-zoca-text-2">AM:</span>{" "}
+                    <span className="font-medium">
+                      {data.currently_managed.current_am}
+                    </span>
+                  </span>
+                )}
+                {data.currently_managed.current_ae && (
+                  <span>
+                    <span className="text-zoca-text-2">AE:</span>{" "}
+                    {data.currently_managed.current_ae}
+                  </span>
+                )}
+                {data.currently_managed.current_pod && (
+                  <span>
+                    <span className="text-zoca-text-2">Pod:</span>{" "}
+                    {data.currently_managed.current_pod}
+                  </span>
+                )}
+                {data.currently_managed.current_sp && (
+                  <span>
+                    <span className="text-zoca-text-2">SP:</span>{" "}
+                    {data.currently_managed.current_sp}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           {!loading && !error && data && data.facts_count > 0 && (
             <div>
               <TopicSection label="Identity" facts={data.grouped.identity} />
@@ -269,6 +391,10 @@ export default function V2BrainPanel({ entityId }: Props) {
                 facts={data.grouped.behavioral}
               />
               <TopicSection label="Concerns" facts={data.grouped.concerns} />
+              <TopicSection
+                label="Relationship"
+                facts={data.grouped.relationship}
+              />
               <div className="mt-3 text-[10px] text-zoca-text-2/60">
                 Beacon AI reads from this Brain when answering questions
                 about {data.bizname ?? "this customer"}. Tell Beacon to
