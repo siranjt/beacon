@@ -47,6 +47,8 @@ import { draftEmailToContactTool } from "./draft-email";
 import { draftSlackMessageTool } from "./draft-slack";
 import { queryCustomerBookTool } from "./query-customer-book";
 import { readCustomerNotesTool } from "./read-customer-notes";
+import { getChargebeeBillingTool } from "./get-chargebee-billing";
+import { getCustomerPerformanceTool } from "./get-customer-performance";
 
 /**
  * The execution context passed to every tool's `execute()` handler. Filled
@@ -129,6 +131,13 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   // F-ai-context chunk 2 — read per-customer private AM notes. AM-scoped
   // (own only) or manager-scoped (all AMs' notes) based on the asker's role.
   readCustomerNotesTool,
+  // F-ai-context — per-customer billing pull from Chargebee live (customer
+  // record, subscriptions, last 20 invoices, last 20 transactions).
+  getChargebeeBillingTool,
+  // F-ai-context — per-customer performance pull from Metabase Aurora
+  // (GBP click trend, keyword rankings, leads, reviews). Mirrors the
+  // zoca-performance-report data layer.
+  getCustomerPerformanceTool,
 ];
 
 /** Alias for callers that prefer the umbrella naming. */
@@ -172,4 +181,6 @@ export {
   draftSlackMessageTool,
   queryCustomerBookTool,
   readCustomerNotesTool,
+  getChargebeeBillingTool,
+  getCustomerPerformanceTool,
 };
