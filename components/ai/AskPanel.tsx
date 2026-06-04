@@ -608,7 +608,9 @@ export default function AskPanel() {
                     tu.name === "query_customer_book" ||
                     tu.name === "read_customer_notes" ||
                     tu.name === "get_chargebee_billing" ||
-                    tu.name === "get_customer_performance"
+                    tu.name === "get_customer_performance" ||
+                    // Brain Wave 2a.1 — read-only, auto-approve.
+                    tu.name === "read_customer_brain"
                   ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
@@ -856,6 +858,7 @@ export default function AskPanel() {
           add_note: "add-note",
           lookup_customer: "lookup",
           read_customer_notes: "read notes",
+          read_customer_brain: "read brain",
           get_chargebee_billing: "pull billing",
           get_customer_performance: "pull performance",
           draft_email_to_contact: "draft-email",
@@ -945,6 +948,41 @@ export default function AskPanel() {
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "read_customer_notes" && !outcome.ok) {
         followUp = `[Beacon's read_customer_notes proposal was not run — ${outcome.error}.]`;
+      } else if (action.toolName === "read_customer_brain" && outcome.ok) {
+        // Brain Wave 2a.1 — inline the topic-clustered Brain block so the
+        // model can quote specific field values directly in its reply.
+        const rich = (outcome.data ?? null) as
+          | {
+              entity_id?: string;
+              customer_id?: string;
+              bizname?: string | null;
+              found?: boolean;
+              facts_returned?: number;
+              brain?: {
+                identity: Record<string, string>;
+                operational: Record<string, string>;
+                behavioral: Record<string, string>;
+                concerns: Record<string, string>;
+                other: Array<{ subcategory: string; value: string }>;
+                facts_returned: number;
+                facts_dropped: number;
+              } | null;
+            }
+          | null;
+        const lines: string[] = [
+          `[Beacon ran read_customer_brain → ${outcome.summary}`,
+        ];
+        if (rich?.brain) {
+          lines.push("Brain data:");
+          lines.push(JSON.stringify(rich.brain));
+        }
+        lines.push("");
+        lines.push(
+          "Now answer the user's question using the Brain facts above. The Brain is AUTHORITATIVE — prefer it over inference from raw signals. Quote field values directly (e.g. 'Sarah Chen' not 'owner_name: Sarah Chen'). If the Brain has no entry for this customer, say so plainly without hedging.",
+        );
+        followUp = lines.join("\n") + "]";
+      } else if (action.toolName === "read_customer_brain" && !outcome.ok) {
+        followUp = `[Beacon's read_customer_brain proposal was not run — ${outcome.error}.]`;
       } else if (
         (action.toolName === "get_chargebee_billing" ||
           action.toolName === "get_customer_performance") &&

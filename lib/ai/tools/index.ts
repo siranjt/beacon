@@ -47,6 +47,7 @@ import { draftEmailToContactTool } from "./draft-email";
 import { draftSlackMessageTool } from "./draft-slack";
 import { queryCustomerBookTool } from "./query-customer-book";
 import { readCustomerNotesTool } from "./read-customer-notes";
+import { readCustomerBrainTool } from "./read-customer-brain";
 import { getChargebeeBillingTool } from "./get-chargebee-billing";
 import { getCustomerPerformanceTool } from "./get-customer-performance";
 
@@ -131,6 +132,10 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   // F-ai-context chunk 2 — read per-customer private AM notes. AM-scoped
   // (own only) or manager-scoped (all AMs' notes) based on the asker's role.
   readCustomerNotesTool,
+  // Brain Wave 2a.1 — read per-customer confirmed Brain facts (curated
+  // canonical truth). Reachable from any scope; resolves entity_id →
+  // customer_id internally. Sister tool to read_customer_notes.
+  readCustomerBrainTool,
   // F-ai-context — per-customer billing pull from Chargebee live (customer
   // record, subscriptions, last 20 invoices, last 20 transactions).
   getChargebeeBillingTool,
@@ -181,6 +186,7 @@ export {
   draftSlackMessageTool,
   queryCustomerBookTool,
   readCustomerNotesTool,
+  readCustomerBrainTool,
   getChargebeeBillingTool,
   getCustomerPerformanceTool,
 };

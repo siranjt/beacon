@@ -65,6 +65,8 @@ const READ_ONLY_TOOLS = new Set([
   "read_customer_notes",
   "get_chargebee_billing",
   "get_customer_performance",
+  // Brain Wave 2a.1 — read-only per-customer fact fetcher.
+  "read_customer_brain",
 ]);
 function rateLimitKind(toolName: string): "read" | "write" {
   return READ_ONLY_TOOLS.has(toolName) ? "read" : "write";
@@ -96,6 +98,8 @@ const TOOLS_WITHOUT_CUSTOMER_ID_ARG = new Set([
   "read_customer_notes",
   "get_chargebee_billing",
   "get_customer_performance",
+  // Brain Wave 2a.1 — read_customer_brain takes entity_id directly.
+  "read_customer_brain",
 ]);
 
 interface ExecuteBody {
