@@ -209,12 +209,8 @@ function parseAssistantContent(raw: string): ParsedAssistantContent {
     }
     return "";
   });
-  // F-ai-context L1 — strip `<gap: ...>` telemetry markers. These get parsed
-  // server-side into the failure inbox at /admin/beacon-ai-gaps; they're
-  // never user-facing content. Pattern matches a single line up to the
-  // closing `>` and won't span newlines.
+  // Collapse the extra whitespace the marker leaves behind.
   const cleaned = stripped
-    .replace(/<gap:[^>\n]*>/gi, "")
     .replace(/[ \t]+([.,;:!?])/g, "$1")
     .replace(/[ \t]{2,}/g, " ");
   return { text: cleaned, confidence: firstMatch };
