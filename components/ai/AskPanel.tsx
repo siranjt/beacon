@@ -590,7 +590,9 @@ export default function AskPanel() {
                   ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
+                    console.log("[beacon-debug] SSE: scheduling auto-approve", { toolName: tu.name, turnIdx, toolUseId });
                     queueMicrotask(() => {
+                      console.log("[beacon-debug] microtask FIRED", { hasRef: !!resolveToolUseRef.current });
                       resolveToolUseRef.current?.(
                         turnIdx,
                         toolUseId,
@@ -667,6 +669,12 @@ export default function AskPanel() {
       toolUseId: string,
       decision: "approve" | "discard",
     ) => {
+      // [beacon-debug] entry
+      console.log("[beacon-debug] resolveToolUse ENTER", {
+        turnIndex,
+        toolUseId,
+        decision,
+      });
       // Snapshot the relevant tool_use entry up-front so the closure doesn't
       // race with intermediate setTurns calls.
       let entry:
@@ -675,12 +683,22 @@ export default function AskPanel() {
       setTurns((prev) => {
         const next = [...prev];
         const turn = next[turnIndex];
-        if (!turn || turn.role !== "assistant") return prev;
+        if (!turn || turn.role !== "assistant") {
+          console.log("[beacon-debug] updater: no turn at index", turnIndex, "prev.length", prev.length);
+          return prev;
+        }
         const uses = turn.toolUses ?? [];
         const idx = uses.findIndex((u) => u.data.toolUseId === toolUseId);
-        if (idx === -1) return prev;
+        if (idx === -1) {
+          console.log("[beacon-debug] updater: tool_use not found", toolUseId, "in", uses.map((u) => u.data.toolUseId));
+          return prev;
+        }
         entry = uses[idx];
-        if (entry.status !== "pending") return prev;
+        console.log("[beacon-debug] updater: found entry", { idx, status: entry.status });
+        if (entry.status !== "pending") {
+          console.log("[beacon-debug] updater: status not pending, returning prev");
+          return prev;
+        }
         const updatedUses = uses.slice();
         updatedUses[idx] = {
           ...entry,
@@ -689,8 +707,13 @@ export default function AskPanel() {
         next[turnIndex] = { ...turn, toolUses: updatedUses };
         return next;
       });
-      if (!entry || entry.status !== "pending") return;
+      console.log("[beacon-debug] after setTurns, entry=", entry);
+      if (!entry || entry.status !== "pending") {
+        console.log("[beacon-debug] EARLY RETURN — entry missing or not pending", { entry });
+        return;
+      }
       const { data } = entry;
+      console.log("[beacon-debug] proceeding to fetch", { toolName: data.toolName });
 
       const writeResult = (
         status: ActionCardStatus,
@@ -743,6 +766,7 @@ export default function AskPanel() {
       }
 
       // Approve — actually execute.
+      console.log("[beacon-debug] about to fetch /api/ai/action/execute", { toolName: data.toolName });
       try {
         const res = await fetch("/api/ai/action/execute", {
           method: "POST",
