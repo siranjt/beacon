@@ -958,7 +958,11 @@ export default function AskPanel() {
         ];
         if (outcome.data) {
           lines.push("Result data:");
-          lines.push(JSON.stringify(outcome.data, null, 2));
+          // Use compact JSON (no indent) — the chunk-3 tools (Chargebee +
+          // Performance) return ~3-8KB of structured data per call, and the
+          // pretty-printed version blew past the server's char cap. The
+          // model handles compact JSON fine; humans don't read this bubble.
+          lines.push(JSON.stringify(outcome.data));
         }
         lines.push("");
         lines.push(

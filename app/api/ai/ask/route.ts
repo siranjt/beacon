@@ -74,7 +74,17 @@ export const maxDuration = 60;
 const MODEL = process.env.ANTHROPIC_ASK_MODEL ?? "claude-sonnet-4-6";
 const MAX_TOKENS = 2400;
 const MAX_HISTORY_TURNS = 6;
+// 2000 chars for human-typed questions. Tool-continuation messages
+// (synthetic follow-ups from askWithToolResult containing the tool
+// output that should feed back to the model) can carry several KB of
+// structured data — Chargebee/Performance tools easily produce 3-8KB
+// JSON payloads. We detect those by their "[Beacon ran" / "[Beacon's"
+// prefix and allow up to MAX_TOOL_CONTINUATION_CHARS.
 const MAX_QUESTION_CHARS = 2000;
+const MAX_TOOL_CONTINUATION_CHARS = 16000;
+function isToolContinuation(q: string): boolean {
+  return q.startsWith("[Beacon ran ") || q.startsWith("[Beacon's ");
+}
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY ?? "",
@@ -209,9 +219,12 @@ export async function POST(req: NextRequest) {
   if (!question) {
     return NextResponse.json({ error: "question is required" }, { status: 400 });
   }
-  if (question.length > MAX_QUESTION_CHARS) {
+  const lengthCap = isToolContinuation(question)
+    ? MAX_TOOL_CONTINUATION_CHARS
+    : MAX_QUESTION_CHARS;
+  if (question.length > lengthCap) {
     return NextResponse.json(
-      { error: `question too long (max ${MAX_QUESTION_CHARS} chars)` },
+      { error: `question too long (max ${lengthCap} chars)` },
       { status: 400 },
     );
   }
