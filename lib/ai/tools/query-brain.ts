@@ -84,9 +84,15 @@ export const queryBrainTool: BeaconTool = {
       limit: {
         type: "number",
         description:
-          "Max rows to return. Default 50, max 200. Use larger limits sparingly.",
+          "Max rows to return in this page. Default 50, max 200. Use larger limits sparingly.",
         minimum: 1,
         maximum: MAX_ROWS_HARD,
+      },
+      offset: {
+        type: "number",
+        description:
+          "Skip the first N rows. Used for pagination when an earlier result trimmed at 20 and the user asked for more. Example: 'show next 20' → offset=20. Combine with limit to scroll a window.",
+        minimum: 0,
       },
     },
     additionalProperties: false,
@@ -116,6 +122,10 @@ export const queryBrainTool: BeaconTool = {
       typeof args.limit === "number"
         ? Math.max(1, Math.min(MAX_ROWS_HARD, Math.floor(args.limit)))
         : MAX_ROWS_DEFAULT;
+    const offset =
+      typeof args.offset === "number"
+        ? Math.max(0, Math.floor(args.offset))
+        : 0;
 
     if (
       !topic_category &&
@@ -131,12 +141,13 @@ export const queryBrainTool: BeaconTool = {
     }
 
     try {
-      const facts = await searchFacts({
+      const { rows: facts, total } = await searchFacts({
         topic_category,
         topic_subcategory,
         field_name,
         value_contains,
         limit,
+        offset,
       });
 
       if (facts.length === 0) {
@@ -237,12 +248,20 @@ export const queryBrainTool: BeaconTool = {
           field_name,
           value_contains,
           rows: rows.length,
+          total,
+          offset,
+          limit,
         },
       });
 
+      const pageInfo =
+        total > rows.length
+          ? ` (page ${Math.floor(offset / limit) + 1}: rows ${offset + 1}-${offset + rows.length} of ${total} total)`
+          : "";
+
       return {
         ok: true,
-        summary: `Found ${rows.length} Brain fact${rows.length === 1 ? "" : "s"} matching ${filterSummary}.`,
+        summary: `Found ${total} Brain fact${total === 1 ? "" : "s"} matching ${filterSummary}${pageInfo}.`,
         data: {
           filter: {
             topic_category: topic_category ?? null,
@@ -252,6 +271,10 @@ export const queryBrainTool: BeaconTool = {
           },
           rows,
           row_count: rows.length,
+          total,
+          offset,
+          limit,
+          has_more: total > offset + rows.length,
         },
       };
     } catch (e) {

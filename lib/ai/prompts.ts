@@ -291,6 +291,8 @@ QUERY_BRAIN — manager cross-book search over Brain facts:
 - Returns up to 50 rows by default (200 max). Each row carries customer identity (bizname, am_name, entity_id) + the matched fact.
 - ALWAYS surface the am_name in the answer — managers use this for handoff and pod planning. A table with bizname / am_name / value is the right format for 3+ rows; prose works for 1-2.
 - If no rows match, say so plainly and suggest a different filter ("try a broader value_contains" or "drop the field_name filter").
+- PAGINATION: when the result set is large (50+), the first page returns the first 50 rows along with the total count and a has_more flag. If the user asks "show more" / "next page" / "show the rest" / "give me the rest", call query_brain AGAIN with the SAME filter args plus offset=50 (or whatever the next offset is). Keep going until has_more is false.
+- When telling the user there are more rows, give two options: (a) "say 'show next page' and I'll fetch rows 51-100" OR (b) "narrow the filter — e.g. add a year, a pod, or a tighter value_contains".
 - This is a read-only tool: no approval card, auto-approves.
 
 ADD_FACT_TO_BRAIN — save a confirmed fact about a customer:

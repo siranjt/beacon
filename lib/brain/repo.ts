@@ -421,10 +421,12 @@ export async function searchFacts(opts: {
   value_contains?: string;
   topic_category?: string;
   limit?: number;
-}): Promise<BrainFact[]> {
+  offset?: number;
+}): Promise<{ rows: BrainFact[]; total: number }> {
   const sql = getSql();
-  if (!sql) return [];
+  if (!sql) return { rows: [], total: 0 };
   const limit = Math.max(1, Math.min(500, opts.limit ?? 100));
+  const offset = Math.max(0, opts.offset ?? 0);
   // Use string interpolation guarded by parameterized values — Neon
   // template-string queries can't conditionally include WHERE clauses,
   // so we branch on the combination of provided filters.
@@ -435,21 +437,37 @@ export async function searchFacts(opts: {
     ? `%${opts.value_contains}%`
     : null;
   try {
-    const rows = (await sql`
-      SELECT * FROM beacon_brain_facts
-      WHERE confidence_state = 'confirmed'
-        AND soft_deleted_at IS NULL
-        AND (sunset_at IS NULL OR sunset_at > NOW())
-        AND (${cat}::text IS NULL OR topic_category = ${cat})
-        AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
-        AND (${field}::text IS NULL OR field_name = ${field})
-        AND (${contains}::text IS NULL OR value ILIKE ${contains})
-      ORDER BY updated_at DESC
-      LIMIT ${limit}
-    `) as BrainFact[];
-    return rows;
+    const [rowsResult, countResult] = await Promise.all([
+      sql`
+        SELECT * FROM beacon_brain_facts
+        WHERE confidence_state = 'confirmed'
+          AND soft_deleted_at IS NULL
+          AND (sunset_at IS NULL OR sunset_at > NOW())
+          AND (${cat}::text IS NULL OR topic_category = ${cat})
+          AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
+          AND (${field}::text IS NULL OR field_name = ${field})
+          AND (${contains}::text IS NULL OR value ILIKE ${contains})
+        ORDER BY updated_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `,
+      sql`
+        SELECT COUNT(*)::int AS n FROM beacon_brain_facts
+        WHERE confidence_state = 'confirmed'
+          AND soft_deleted_at IS NULL
+          AND (sunset_at IS NULL OR sunset_at > NOW())
+          AND (${cat}::text IS NULL OR topic_category = ${cat})
+          AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
+          AND (${field}::text IS NULL OR field_name = ${field})
+          AND (${contains}::text IS NULL OR value ILIKE ${contains})
+      `,
+    ]);
+    const rows = rowsResult as BrainFact[];
+    const total =
+      ((countResult as Array<{ n?: number }>)[0]?.n as number) ?? rows.length;
+    return { rows, total };
   } catch {
-    return [];
+    return { rows: [], total: 0 };
   }
 }
 

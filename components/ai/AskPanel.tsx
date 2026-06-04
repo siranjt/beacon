@@ -1055,6 +1055,10 @@ export default function AskPanel() {
                 confirmed_at: string | null;
               }>;
               row_count?: number;
+              total?: number;
+              offset?: number;
+              limit?: number;
+              has_more?: boolean;
             }
           | null;
         const ROWS_FOR_PROMPT = 20;
@@ -1062,7 +1066,9 @@ export default function AskPanel() {
           `[Beacon ran query_brain → ${outcome.summary}`,
         ];
         if (rich?.rows && rich.rows.length > 0) {
-          const total = rich.rows.length;
+          const pageCount = rich.rows.length;
+          const total = rich.total ?? pageCount;
+          const offset = rich.offset ?? 0;
           const trimmed = rich.rows.slice(0, ROWS_FOR_PROMPT).map((r) => ({
             bizname: r.bizname,
             am_name: r.am_name,
@@ -1071,17 +1077,25 @@ export default function AskPanel() {
             field_name: r.field_name,
             value: r.value,
           }));
-          lines.push("Matched rows (trimmed for prompt):");
+          lines.push(
+            `Matched rows (showing ${trimmed.length} of ${pageCount} on this page; ${total} total across all pages):`,
+          );
           lines.push(JSON.stringify(trimmed));
-          if (total > ROWS_FOR_PROMPT) {
+          if (pageCount > ROWS_FOR_PROMPT) {
             lines.push(
-              `(${total - ROWS_FOR_PROMPT} additional rows omitted — total ${total}. Tell the user to narrow the filter if they need the full set.)`,
+              `(${pageCount - ROWS_FOR_PROMPT} additional rows on this page omitted from the prompt to fit the char cap.)`,
+            );
+          }
+          if (rich.has_more) {
+            const nextOffset = offset + pageCount;
+            lines.push(
+              `MORE PAGES AVAILABLE — there are ${total - offset - pageCount} more rows. If the user asks "show more" / "next page" / "show the rest", call query_brain again with the SAME filter args plus offset=${nextOffset}.`,
             );
           }
         }
         lines.push("");
         lines.push(
-          "Compose the answer as a short markdown table (bizname | am_name | value) when there are 3+ rows; use prose when there are 1-2. Don't drop the AM name from each row — that's load-bearing for handoff decisions. If many rows were omitted, surface the total count and offer to narrow. If no rows, say so plainly and suggest a different filter.",
+          "Compose the answer as a short markdown table (bizname | am_name | value) when there are 3+ rows; use prose when there are 1-2. Don't drop the AM name from each row — that's load-bearing for handoff decisions. If the result was a single page of a larger set, surface the total count and tell the user they can ask for the next page. If no rows, say so plainly and suggest a different filter.",
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_brain" && !outcome.ok) {
