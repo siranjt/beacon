@@ -91,6 +91,12 @@ export function RefreshButton() {
       const msg = e instanceof Error ? e.message : String(e);
       setStatus("error");
       setErrorMsg(msg);
+      // Fix: remove the desaturation class on error so the session isn't
+      // left stuck in "refreshing" visual state (which previously persisted
+      // until a manual page reload).
+      if (typeof document !== "undefined") {
+        document.body.classList.remove("beacon-refreshing");
+      }
       setTimeout(() => setStatus("idle"), 5000);
     }
   }
