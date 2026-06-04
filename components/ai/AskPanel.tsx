@@ -269,6 +269,21 @@ export default function AskPanel() {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // FIX: React 18 batches setState — the functional updater passed to
+  // setTurns() runs ASYNCHRONOUSLY, after the surrounding code has already
+  // continued. Previously `resolveToolUse` captured `entry` inside the
+  // updater via closure side-effect, which meant `entry` was still
+  // `undefined` when checked right after `setTurns(...)`. The early-return
+  // fired before the updater ever ran, so the fetch was never dispatched
+  // and the action card hung on "Running…".
+  //
+  // The fix is a ref that mirrors `turns` synchronously. `resolveToolUse`
+  // reads the entry from `turnsRef.current` BEFORE calling setTurns, and
+  // setTurns is then used purely for the visual state transition.
+  const turnsRef = useRef<Turn[]>([]);
+  useEffect(() => {
+    turnsRef.current = turns;
+  }, [turns]);
   // Phase E-16 Wave 2 — forward ref for resolveToolUse so the stream handler
   // (inside `ask`) can auto-approve lookup_customer without a definition
   // ordering loop with the later useCallback.
@@ -590,9 +605,7 @@ export default function AskPanel() {
                   ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
-                    console.log("[beacon-debug] SSE: scheduling auto-approve", { toolName: tu.name, turnIdx, toolUseId });
                     queueMicrotask(() => {
-                      console.log("[beacon-debug] microtask FIRED", { hasRef: !!resolveToolUseRef.current });
                       resolveToolUseRef.current?.(
                         turnIdx,
                         toolUseId,
@@ -669,51 +682,42 @@ export default function AskPanel() {
       toolUseId: string,
       decision: "approve" | "discard",
     ) => {
-      // [beacon-debug] entry
-      console.log("[beacon-debug] resolveToolUse ENTER", {
-        turnIndex,
-        toolUseId,
-        decision,
-      });
-      // Snapshot the relevant tool_use entry up-front so the closure doesn't
-      // race with intermediate setTurns calls.
-      let entry:
-        | { data: ActionCardData; status: ActionCardStatus }
-        | undefined;
+      // FIX: Look up the entry SYNCHRONOUSLY from `turnsRef.current` before
+      // calling setTurns. Previously we captured `entry` via closure
+      // side-effect inside the setTurns updater — but React 18 runs the
+      // updater asynchronously, so `entry` was always `undefined` when the
+      // outer code checked it. That triggered an early return and the
+      // approval fetch never fired. Read first, mutate second.
+      const currentTurns = turnsRef.current;
+      const currentTurn = currentTurns[turnIndex];
+      if (!currentTurn || currentTurn.role !== "assistant") return;
+      const currentUses = currentTurn.toolUses ?? [];
+      const entryIdx = currentUses.findIndex(
+        (u) => u.data.toolUseId === toolUseId,
+      );
+      if (entryIdx === -1) return;
+      const entry = currentUses[entryIdx];
+      if (entry.status !== "pending") return;
+      const { data } = entry;
+
+      // Now transition the visual state. The updater is allowed to run
+      // async — we no longer rely on its side effects.
       setTurns((prev) => {
         const next = [...prev];
         const turn = next[turnIndex];
-        if (!turn || turn.role !== "assistant") {
-          console.log("[beacon-debug] updater: no turn at index", turnIndex, "prev.length", prev.length);
-          return prev;
-        }
+        if (!turn || turn.role !== "assistant") return prev;
         const uses = turn.toolUses ?? [];
         const idx = uses.findIndex((u) => u.data.toolUseId === toolUseId);
-        if (idx === -1) {
-          console.log("[beacon-debug] updater: tool_use not found", toolUseId, "in", uses.map((u) => u.data.toolUseId));
-          return prev;
-        }
-        entry = uses[idx];
-        console.log("[beacon-debug] updater: found entry", { idx, status: entry.status });
-        if (entry.status !== "pending") {
-          console.log("[beacon-debug] updater: status not pending, returning prev");
-          return prev;
-        }
+        if (idx === -1) return prev;
+        if (uses[idx].status !== "pending") return prev;
         const updatedUses = uses.slice();
         updatedUses[idx] = {
-          ...entry,
+          ...uses[idx],
           status: decision === "approve" ? "approving" : "discarded",
         };
         next[turnIndex] = { ...turn, toolUses: updatedUses };
         return next;
       });
-      console.log("[beacon-debug] after setTurns, entry=", entry);
-      if (!entry || entry.status !== "pending") {
-        console.log("[beacon-debug] EARLY RETURN — entry missing or not pending", { entry });
-        return;
-      }
-      const { data } = entry;
-      console.log("[beacon-debug] proceeding to fetch", { toolName: data.toolName });
 
       const writeResult = (
         status: ActionCardStatus,
@@ -766,7 +770,6 @@ export default function AskPanel() {
       }
 
       // Approve — actually execute.
-      console.log("[beacon-debug] about to fetch /api/ai/action/execute", { toolName: data.toolName });
       try {
         const res = await fetch("/api/ai/action/execute", {
           method: "POST",
