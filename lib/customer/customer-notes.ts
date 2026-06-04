@@ -37,6 +37,48 @@ async function ensureNotesSchema(): Promise<boolean> {
   return true;
 }
 
+export type CustomerNoteWithAuthor = CustomerNote & {
+  am_name: string;
+  bizname: string | null;
+};
+
+/**
+ * F-ai-context — read EVERY AM's note for a single customer. Used by the
+ * manager-scoped Beacon AI tool `read_customer_notes`. Sorted newest first.
+ */
+export async function listNotesByEntity(
+  entityId: string,
+): Promise<CustomerNoteWithAuthor[]> {
+  const ready = await ensureNotesSchema();
+  if (!ready) return [];
+  const sql = getSql();
+  if (!sql) return [];
+  const rows = await sql`
+    SELECT am_name, entity_id, bizname, note, updated_at
+    FROM customer_notes
+    WHERE entity_id = ${entityId}
+      AND note IS NOT NULL
+      AND length(trim(note)) > 0
+    ORDER BY updated_at DESC
+  `;
+  return (rows as Array<{
+    am_name: string;
+    entity_id: string;
+    bizname: string | null;
+    note: string;
+    updated_at: string | Date;
+  }>).map((r) => ({
+    am_name: r.am_name,
+    entity_id: r.entity_id,
+    bizname: r.bizname ?? null,
+    note: r.note,
+    updated_at:
+      typeof r.updated_at === "string"
+        ? r.updated_at
+        : r.updated_at.toISOString(),
+  }));
+}
+
 /** Read the saved note for (am_name, entity_id), or null if none. */
 export async function getNote(
   amName: string,
