@@ -67,6 +67,8 @@ const READ_ONLY_TOOLS = new Set([
   "get_customer_performance",
   // Brain Wave 2a.1 — read-only per-customer fact fetcher.
   "read_customer_brain",
+  // Brain Wave 2a.3 — read-only manager search over Brain facts.
+  "query_brain",
 ]);
 function rateLimitKind(toolName: string): "read" | "write" {
   return READ_ONLY_TOOLS.has(toolName) ? "read" : "write";
@@ -103,6 +105,9 @@ const TOOLS_WITHOUT_CUSTOMER_ID_ARG = new Set([
   // Brain Wave 2a.2 — add_fact_to_brain takes entity_id directly. NOT read-only
   // (writes a fact row), so consumes the WRITE rate-limit tier.
   "add_fact_to_brain",
+  // Brain Wave 2a.3 — query_brain operates across the whole book; no
+  // top-level customer_id. Manager + admin only (enforced inside the tool).
+  "query_brain",
 ]);
 
 interface ExecuteBody {

@@ -403,6 +403,56 @@ export async function getBrainRollup(): Promise<{
   );
 }
 
+/**
+ * Manager cross-book search. Returns matching confirmed facts across
+ * every customer, optionally filtered by topic_subcategory, field_name,
+ * and a value substring (ILIKE).
+ *
+ * Used by the query_brain tool (Wave 2a.3) so managers can ask Beacon AI
+ * things like "which customers prefer WhatsApp?" or "show all latent
+ * risks in the book".
+ *
+ * Returns up to `limit` rows. The caller is responsible for joining to
+ * bizname / am_name (via the snapshot) for the response.
+ */
+export async function searchFacts(opts: {
+  topic_subcategory?: string;
+  field_name?: string;
+  value_contains?: string;
+  topic_category?: string;
+  limit?: number;
+}): Promise<BrainFact[]> {
+  const sql = getSql();
+  if (!sql) return [];
+  const limit = Math.max(1, Math.min(500, opts.limit ?? 100));
+  // Use string interpolation guarded by parameterized values — Neon
+  // template-string queries can't conditionally include WHERE clauses,
+  // so we branch on the combination of provided filters.
+  const sub = opts.topic_subcategory ?? null;
+  const cat = opts.topic_category ?? null;
+  const field = opts.field_name ?? null;
+  const contains = opts.value_contains
+    ? `%${opts.value_contains}%`
+    : null;
+  try {
+    const rows = (await sql`
+      SELECT * FROM beacon_brain_facts
+      WHERE confidence_state = 'confirmed'
+        AND soft_deleted_at IS NULL
+        AND (sunset_at IS NULL OR sunset_at > NOW())
+        AND (${cat}::text IS NULL OR topic_category = ${cat})
+        AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
+        AND (${field}::text IS NULL OR field_name = ${field})
+        AND (${contains}::text IS NULL OR value ILIKE ${contains})
+      ORDER BY updated_at DESC
+      LIMIT ${limit}
+    `) as BrainFact[];
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
 /** Counts per topic for the rollup card. */
 export async function getCategoryBreakdown(
   customer_id: string,

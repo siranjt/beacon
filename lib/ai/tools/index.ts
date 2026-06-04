@@ -49,6 +49,7 @@ import { queryCustomerBookTool } from "./query-customer-book";
 import { readCustomerNotesTool } from "./read-customer-notes";
 import { readCustomerBrainTool } from "./read-customer-brain";
 import { addFactToBrainTool } from "./add-fact-to-brain";
+import { queryBrainTool } from "./query-brain";
 import { getChargebeeBillingTool } from "./get-chargebee-billing";
 import { getCustomerPerformanceTool } from "./get-customer-performance";
 
@@ -142,6 +143,9 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   // free-form content into (topic_category, topic_subcategory,
   // field_name, value) using FIELD_CATALOG.
   addFactToBrainTool,
+  // Brain Wave 2a.3 — manager cross-book search over Brain facts.
+  // Read-only, manager + admin only.
+  queryBrainTool,
   // F-ai-context — per-customer billing pull from Chargebee live (customer
   // record, subscriptions, last 20 invoices, last 20 transactions).
   getChargebeeBillingTool,
@@ -194,6 +198,7 @@ export {
   readCustomerNotesTool,
   readCustomerBrainTool,
   addFactToBrainTool,
+  queryBrainTool,
   getChargebeeBillingTool,
   getCustomerPerformanceTool,
 };

@@ -610,7 +610,9 @@ export default function AskPanel() {
                     tu.name === "get_chargebee_billing" ||
                     tu.name === "get_customer_performance" ||
                     // Brain Wave 2a.1 — read-only, auto-approve.
-                    tu.name === "read_customer_brain"
+                    tu.name === "read_customer_brain" ||
+                    // Brain Wave 2a.3 — read-only manager search, auto-approve.
+                    tu.name === "query_brain"
                   ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
@@ -860,6 +862,7 @@ export default function AskPanel() {
           read_customer_notes: "read notes",
           read_customer_brain: "read brain",
           add_fact_to_brain: "save to brain",
+          query_brain: "search brain",
           get_chargebee_billing: "pull billing",
           get_customer_performance: "pull performance",
           draft_email_to_contact: "draft-email",
@@ -1024,6 +1027,42 @@ export default function AskPanel() {
         // details in the error string. Pass that through so the model can
         // surface the conflict to the AM and offer the force=true option.
         followUp = `[Beacon's add_fact_to_brain proposal was not run — ${outcome.error}. Tell the AM what the conflict is and ask if they want to overwrite (resend with force=true) or save as 'other' to keep both.]`;
+      } else if (action.toolName === "query_brain" && outcome.ok) {
+        // Brain Wave 2a.3 — manager cross-book search result. Inline the
+        // matched rows so the model can compose a table or narrative.
+        const rich = (outcome.data ?? null) as
+          | {
+              filter?: Record<string, string | null>;
+              rows?: Array<{
+                fact_id: string;
+                customer_id: string;
+                entity_id: string | null;
+                bizname: string | null;
+                am_name: string | null;
+                topic_category: string;
+                topic_subcategory: string;
+                field_name: string;
+                value: string;
+                source_type: string;
+                confirmed_at: string | null;
+              }>;
+              row_count?: number;
+            }
+          | null;
+        const lines: string[] = [
+          `[Beacon ran query_brain → ${outcome.summary}`,
+        ];
+        if (rich?.rows && rich.rows.length > 0) {
+          lines.push("Matched rows:");
+          lines.push(JSON.stringify(rich.rows));
+        }
+        lines.push("");
+        lines.push(
+          "Compose the answer as a short markdown table (bizname | am_name | value) when there are 3+ rows; use prose when there are 1-2. Don't drop the AM name from each row — that's load-bearing for handoff decisions. If no rows, say so plainly and suggest a different filter.",
+        );
+        followUp = lines.join("\n") + "]";
+      } else if (action.toolName === "query_brain" && !outcome.ok) {
+        followUp = `[Beacon's query_brain proposal was not run — ${outcome.error}.]`;
       } else if (
         (action.toolName === "get_chargebee_billing" ||
           action.toolName === "get_customer_performance") &&
