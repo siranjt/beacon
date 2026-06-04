@@ -859,6 +859,7 @@ export default function AskPanel() {
           lookup_customer: "lookup",
           read_customer_notes: "read notes",
           read_customer_brain: "read brain",
+          add_fact_to_brain: "save to brain",
           get_chargebee_billing: "pull billing",
           get_customer_performance: "pull performance",
           draft_email_to_contact: "draft-email",
@@ -983,6 +984,46 @@ export default function AskPanel() {
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "read_customer_brain" && !outcome.ok) {
         followUp = `[Beacon's read_customer_brain proposal was not run — ${outcome.error}.]`;
+      } else if (action.toolName === "add_fact_to_brain" && outcome.ok) {
+        // Brain Wave 2a.2 — success message. The data payload carries the
+        // fact_id + topic + value; the model uses these to confirm to the
+        // AM what was saved (or that it was already known).
+        const rich = (outcome.data ?? null) as
+          | {
+              entity_id?: string;
+              customer_id?: string;
+              fact_id?: string;
+              topic_category?: string;
+              topic_subcategory?: string;
+              field_name?: string;
+              value?: string;
+              version?: number;
+              idempotent?: boolean;
+            }
+          | null;
+        const lines: string[] = [
+          `[Beacon ran add_fact_to_brain → ${outcome.summary}`,
+        ];
+        if (rich) {
+          lines.push("");
+          if (rich.idempotent) {
+            lines.push("This fact was already in the Brain — no change made.");
+          } else {
+            lines.push(
+              `Saved to ${rich.topic_category}/${rich.topic_subcategory}/${rich.field_name} as version ${rich.version}.`,
+            );
+          }
+        }
+        lines.push("");
+        lines.push(
+          "Confirm to the AM that the fact was saved (or that it was already there). Keep the response short — they just told you something, they don't need a paragraph back.",
+        );
+        followUp = lines.join("\n") + "]";
+      } else if (action.toolName === "add_fact_to_brain" && !outcome.ok) {
+        // Conflict case: the executor returns ok=false with the conflict
+        // details in the error string. Pass that through so the model can
+        // surface the conflict to the AM and offer the force=true option.
+        followUp = `[Beacon's add_fact_to_brain proposal was not run — ${outcome.error}. Tell the AM what the conflict is and ask if they want to overwrite (resend with force=true) or save as 'other' to keep both.]`;
       } else if (
         (action.toolName === "get_chargebee_billing" ||
           action.toolName === "get_customer_performance") &&

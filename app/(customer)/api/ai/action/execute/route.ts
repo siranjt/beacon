@@ -100,6 +100,9 @@ const TOOLS_WITHOUT_CUSTOMER_ID_ARG = new Set([
   "get_customer_performance",
   // Brain Wave 2a.1 — read_customer_brain takes entity_id directly.
   "read_customer_brain",
+  // Brain Wave 2a.2 — add_fact_to_brain takes entity_id directly. NOT read-only
+  // (writes a fact row), so consumes the WRITE rate-limit tier.
+  "add_fact_to_brain",
 ]);
 
 interface ExecuteBody {

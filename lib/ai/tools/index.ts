@@ -48,6 +48,7 @@ import { draftSlackMessageTool } from "./draft-slack";
 import { queryCustomerBookTool } from "./query-customer-book";
 import { readCustomerNotesTool } from "./read-customer-notes";
 import { readCustomerBrainTool } from "./read-customer-brain";
+import { addFactToBrainTool } from "./add-fact-to-brain";
 import { getChargebeeBillingTool } from "./get-chargebee-billing";
 import { getCustomerPerformanceTool } from "./get-customer-performance";
 
@@ -136,6 +137,11 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   // canonical truth). Reachable from any scope; resolves entity_id →
   // customer_id internally. Sister tool to read_customer_notes.
   readCustomerBrainTool,
+  // Brain Wave 2a.2 — write a confirmed Brain fact from the AM's
+  // conversational input. Confirmation card required; model classifies
+  // free-form content into (topic_category, topic_subcategory,
+  // field_name, value) using FIELD_CATALOG.
+  addFactToBrainTool,
   // F-ai-context — per-customer billing pull from Chargebee live (customer
   // record, subscriptions, last 20 invoices, last 20 transactions).
   getChargebeeBillingTool,
@@ -187,6 +193,7 @@ export {
   queryCustomerBookTool,
   readCustomerNotesTool,
   readCustomerBrainTool,
+  addFactToBrainTool,
   getChargebeeBillingTool,
   getCustomerPerformanceTool,
 };
