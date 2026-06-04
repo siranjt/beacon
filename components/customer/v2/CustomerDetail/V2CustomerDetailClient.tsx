@@ -7,6 +7,7 @@ import V2PerformancePanel from "@/components/customer/v2/V2PerformancePanel";
 import V2DetailHeader from "./V2DetailHeader";
 import V2ActionLogPanel from "./V2ActionLogPanel";
 import V2NotesPanel from "./V2NotesPanel";
+import V2BrainPanel from "./V2BrainPanel";
 import V2BillingPanel from "./V2BillingPanel";
 import V2TicketsPanel from "./V2TicketsPanel";
 import V2HubspotPanel from "./V2HubspotPanel";
@@ -137,6 +138,8 @@ function V2CustomerDetailClient({ entityId }: Props) {
                 customerId={customer.customer_id || null}
                 bizname={customer.company || null}
               />
+              {/* Brain Wave 2c — confirmed per-customer facts (Beacon AI grounds on these). */}
+              <V2BrainPanel entityId={customer.entity_id} />
               <V2BillingPanel customer={customer} />
               <V2TicketsPanel customer={customer} />
             </div>
