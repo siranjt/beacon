@@ -47,8 +47,31 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const RATE_LIMIT_MAX = 20;
+// Tiered rate limiting (June 2026): read-only tools get a much higher
+// budget than mutating tools. Power-use scenarios (a manager exploring
+// 10+ customers in an hour) easily fire 50+ read-tool calls but rarely
+// need more than ~30 writes — and a runaway write loop costs more
+// (DB rows, Slack pings, emails) than a runaway read loop.
+//
+// Tools are classified by which set they're in below. The COUNT query
+// filters am_activity_log on metadata->>'tool' against the matching set
+// so each tier consumes its own budget.
+const RATE_LIMIT_READ_MAX = 100;
+const RATE_LIMIT_WRITE_MAX = 30;
 const RATE_LIMIT_WINDOW_MIN = 60;
+const READ_ONLY_TOOLS = new Set([
+  "lookup_customer",
+  "query_customer_book",
+  "read_customer_notes",
+  "get_chargebee_billing",
+  "get_customer_performance",
+]);
+function rateLimitKind(toolName: string): "read" | "write" {
+  return READ_ONLY_TOOLS.has(toolName) ? "read" : "write";
+}
+function rateLimitMaxFor(kind: "read" | "write"): number {
+  return kind === "read" ? RATE_LIMIT_READ_MAX : RATE_LIMIT_WRITE_MAX;
+}
 // Tools that swallow re-runs of identical args within the idempotent window.
 // Wave 1 keeps snooze/pin/mark-contacted here (re-running them is almost
 // always an accidental double-tap). Wave 2 deliberately omits the draft tools
@@ -104,20 +127,41 @@ function hashArgs(toolName: string, args: Record<string, unknown>): string {
 
 /**
  * Count beacon_ai action writes by this AM in the last RATE_LIMIT_WINDOW_MIN
- * minutes. Discard/error events DO count — that's intentional, they consume
- * the same model budget as approvals.
+ * minutes, filtered to the requested tier ("read" or "write"). Discard /
+ * error events DO count — they consume the same model + UI budget as
+ * approvals. Filter on metadata->>'tool' so each tier consumes its own
+ * budget independently.
+ *
+ * Unknown tools (anything not in READ_ONLY_TOOLS) count against the write
+ * tier — safer default, since the unknown set is far more likely to be a
+ * future mutator than a future reader.
  */
-async function countRecentActions(email: string): Promise<number> {
+async function countRecentActions(
+  email: string,
+  kind: "read" | "write",
+): Promise<number> {
   const sql = getSql();
   if (!sql) return 0;
+  const readTools = Array.from(READ_ONLY_TOOLS);
   try {
-    const rows = await sql`
-      SELECT COUNT(*)::int AS n
-      FROM am_activity_log
-      WHERE email = ${email}
-        AND event_name LIKE 'beacon_ai:action:%'
-        AND ts > (NOW() - (${RATE_LIMIT_WINDOW_MIN}::int * INTERVAL '1 minute'))
-    `;
+    const rows =
+      kind === "read"
+        ? await sql`
+            SELECT COUNT(*)::int AS n
+            FROM am_activity_log
+            WHERE email = ${email}
+              AND event_name LIKE 'beacon_ai:action:%'
+              AND ts > (NOW() - (${RATE_LIMIT_WINDOW_MIN}::int * INTERVAL '1 minute'))
+              AND (metadata->>'tool') = ANY(${readTools})
+          `
+        : await sql`
+            SELECT COUNT(*)::int AS n
+            FROM am_activity_log
+            WHERE email = ${email}
+              AND event_name LIKE 'beacon_ai:action:%'
+              AND ts > (NOW() - (${RATE_LIMIT_WINDOW_MIN}::int * INTERVAL '1 minute'))
+              AND ((metadata->>'tool') IS NULL OR NOT ((metadata->>'tool') = ANY(${readTools})))
+          `;
     const n = (rows[0] as { n?: number } | undefined)?.n;
     return typeof n === "number" ? n : 0;
   } catch {
@@ -267,9 +311,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Rate limit ────────────────────────────────────────────────────────
-  const recentCount = await countRecentActions(email);
-  if (recentCount >= RATE_LIMIT_MAX) {
+  // ── Rate limit (tiered: read vs write) ────────────────────────────────
+  const kind = rateLimitKind(tool_name);
+  const limit = rateLimitMaxFor(kind);
+  const recentCount = await countRecentActions(email, kind);
+  if (recentCount >= limit) {
     void logUmbrellaActivity({
       email,
       role,
@@ -281,16 +327,17 @@ export async function POST(req: NextRequest) {
       metadata: {
         tool: tool_name,
         tool_use_id,
+        kind,
         count_in_window: recentCount,
         window_min: RATE_LIMIT_WINDOW_MIN,
-        limit: RATE_LIMIT_MAX,
+        limit,
       },
     });
     return NextResponse.json(
       {
         ok: false,
         tool_use_id,
-        error: `Rate limit hit — Beacon AI can take at most ${RATE_LIMIT_MAX} actions per hour. Try again in a few minutes.`,
+        error: `Rate limit hit — Beacon AI can take at most ${limit} ${kind} actions per hour. Try again in a few minutes.`,
       },
       { status: 429 },
     );
