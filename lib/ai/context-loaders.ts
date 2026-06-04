@@ -33,6 +33,10 @@ import {
   readPerspectivesForEntities,
   type PerspectiveRow,
 } from "@/lib/customer/comms-perspective-store";
+// Brain Wave 2a — confirmed per-customer facts (bootstrap-seeded today
+// from BaseSheet + Chargebee + location_insights). Beacon AI grounds
+// answers on these instead of synthesizing from raw snapshot fields.
+import { loadBrainForPrompt } from "@/lib/brain/retrieval";
 // Phase F-polish-AI — Miss Payment Beacon loader reuses the same fetchers
 // the dashboard route uses. Single source of truth for the unpaid-invoice
 // pull; AI loader + page route stay in lockstep on column shape, ACH
@@ -378,17 +382,22 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
   const snap = await readLatestSnapshotV2().catch(() => null);
   const sc = findInSnapshot(snap, entityId);
 
-  const [perfR, escR, ppR, perspectiveR] = await Promise.allSettled([
+  const [perfR, escR, ppR, perspectiveR, brainR] = await Promise.allSettled([
     fetchEntityReportData(entityId),
     fetchTicketsForCustomer({ entityId }),
     sc?.customer_id ? getCustomer(sc.customer_id) : Promise.resolve(null),
     readPerspective(entityId),
+    // Brain Wave 2a — confirmed per-customer facts. Null when no
+    // customer_id (snapshot row without Chargebee handle) or no
+    // facts seeded yet for this customer.
+    sc?.customer_id ? loadBrainForPrompt(sc.customer_id) : Promise.resolve(null),
   ]);
 
   const perf = perfR.status === "fulfilled" ? perfR.value : null;
   const escalations = escR.status === "fulfilled" ? escR.value : [];
   const postPayment = ppR.status === "fulfilled" ? ppR.value : null;
   const perspective = perspectiveR.status === "fulfilled" ? perspectiveR.value : null;
+  const brain = brainR.status === "fulfilled" ? brainR.value : null;
 
   // Phase E-17 Wave 3a — build citation lookup ahead of the blob so we can
   // inject the legal-keys map into CONTEXT under `_citation_lookup`. The
@@ -554,6 +563,13 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
             computed_at: perspective.computed_at,
           }
         : null,
+      // Brain Wave 2a — per-customer canonical facts that an AM (or
+      // bootstrap from BaseSheet/Chargebee) has confirmed as ground truth.
+      // Topic-clustered (identity / operational / behavioral / concerns /
+      // other) and capped at ~40 facts per customer. Use these facts
+      // before reasoning from raw signals — they're the AM's curated
+      // knowledge about this customer.
+      brain: brain ? brain.prompt_block : null,
     },
     null,
     2,

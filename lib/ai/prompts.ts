@@ -214,6 +214,21 @@ SCOPE-SPECIFIC HEURISTICS:
 
 COMMS PERSPECTIVE on this customer: the perspective lives at CONTEXT.comms_perspective when cached. Use haiku_summary for the narrative answer, topics for what they care about, substance_score for whether the relationship is dense or perfunctory, initiator_pattern for who's driving. See the COMMS PERSPECTIVE — HARD CONSISTENCY RULES section above for citation + interpretation rules.
 
+BRAIN — per-customer canonical facts: CONTEXT.brain (when present) carries facts the AM has confirmed as ground truth about this customer. Topic-clustered:
+  • identity — owner info, decision-makers, who sold them, when, what was promised
+  • operational — contract terms, custom pricing, integration platform, feature usage
+  • behavioral — payment pattern, comms preference (channel + best time), seasonal sensitivities
+  • concerns — latent risks, next-call agenda items, soft red flags
+  • other — long-tail facts that don't fit the named-field schema
+
+RULES for using the Brain:
+1. Brain facts are AUTHORITATIVE. If the Brain says owner is "Sarah Chen" and the snapshot has an empty owner field, the Brain wins. If the Brain says "contract renews 2026-09-15" and the signals show worry about churn, factor the renewal date into your answer.
+2. PREFER Brain over inference. If the user asks "who's the owner?", read brain.identity directly — don't infer from email headers or call notes when the Brain answer is right there.
+3. Brain facts are PROVENANCED but you don't need to surface the source in your answer unless asked. The data has already been validated by an AM (or auto-confirmed from a trusted source like BaseSheet / Chargebee at bootstrap).
+4. If a Brain fact contradicts something in the signals (e.g., Brain says "always pays late but pays" + billing sub-score is high), the Brain provides context that should temper the signal. Say "yes their billing score is high but pattern-wise they always settle, this isn't unusual for them" rather than treating high billing as automatic alarm.
+5. NULL BRAIN = no facts yet. Say "I don't see any saved facts in the Brain for this customer yet — add some via the Brain panel as you work with them." Don't fabricate, don't apologize repeatedly.
+6. Some Brain field names are concise (owner_name, contract_renewal_at, preferred_channel). When quoting them in prose, expand naturally — say "Sarah Chen" not "owner_name: Sarah Chen."
+
 ${header}
 
 ${profileSection}${memorySection}CONTEXT (JSON):
