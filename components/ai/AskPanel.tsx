@@ -1030,6 +1030,14 @@ export default function AskPanel() {
       } else if (action.toolName === "query_brain" && outcome.ok) {
         // Brain Wave 2a.3 — manager cross-book search result. Inline the
         // matched rows so the model can compose a table or narrative.
+        //
+        // Char-cap defense: when 'Chandan sold 50 customers' the raw
+        // payload easily exceeds MAX_TOOL_CONTINUATION_CHARS (16KB).
+        // Trim aggressively for the model:
+        //   - Slice to first 20 rows; report omitted_count
+        //   - Drop fact_id / source_type / confirmed_at — not needed
+        //     for the answer (the panel UI surfaces these when the AM
+        //     opens a customer detail)
         const rich = (outcome.data ?? null) as
           | {
               filter?: Record<string, string | null>;
@@ -1049,16 +1057,31 @@ export default function AskPanel() {
               row_count?: number;
             }
           | null;
+        const ROWS_FOR_PROMPT = 20;
         const lines: string[] = [
           `[Beacon ran query_brain → ${outcome.summary}`,
         ];
         if (rich?.rows && rich.rows.length > 0) {
-          lines.push("Matched rows:");
-          lines.push(JSON.stringify(rich.rows));
+          const total = rich.rows.length;
+          const trimmed = rich.rows.slice(0, ROWS_FOR_PROMPT).map((r) => ({
+            bizname: r.bizname,
+            am_name: r.am_name,
+            entity_id: r.entity_id,
+            topic_subcategory: r.topic_subcategory,
+            field_name: r.field_name,
+            value: r.value,
+          }));
+          lines.push("Matched rows (trimmed for prompt):");
+          lines.push(JSON.stringify(trimmed));
+          if (total > ROWS_FOR_PROMPT) {
+            lines.push(
+              `(${total - ROWS_FOR_PROMPT} additional rows omitted — total ${total}. Tell the user to narrow the filter if they need the full set.)`,
+            );
+          }
         }
         lines.push("");
         lines.push(
-          "Compose the answer as a short markdown table (bizname | am_name | value) when there are 3+ rows; use prose when there are 1-2. Don't drop the AM name from each row — that's load-bearing for handoff decisions. If no rows, say so plainly and suggest a different filter.",
+          "Compose the answer as a short markdown table (bizname | am_name | value) when there are 3+ rows; use prose when there are 1-2. Don't drop the AM name from each row — that's load-bearing for handoff decisions. If many rows were omitted, surface the total count and offer to narrow. If no rows, say so plainly and suggest a different filter.",
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_brain" && !outcome.ok) {
