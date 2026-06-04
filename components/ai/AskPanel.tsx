@@ -596,9 +596,7 @@ export default function AskPanel() {
                   if (
                     tu.name === "lookup_customer" ||
                     tu.name === "query_customer_book" ||
-                    tu.name === "read_customer_notes" ||
-                    tu.name === "get_chargebee_billing" ||
-                    tu.name === "get_customer_performance"
+                    tu.name === "read_customer_notes"
                   ) {
                     const turnIdx = next.length - 1;
                     const toolUseId = tu.id;
@@ -834,8 +832,6 @@ export default function AskPanel() {
           add_note: "add-note",
           lookup_customer: "lookup",
           read_customer_notes: "read notes",
-          get_chargebee_billing: "pull billing",
-          get_customer_performance: "pull performance",
           draft_email_to_contact: "draft-email",
           draft_slack_message: "draft-slack",
           query_customer_book: "query",
@@ -921,32 +917,6 @@ export default function AskPanel() {
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "read_customer_notes" && !outcome.ok) {
         followUp = `[Beacon's read_customer_notes proposal was not run — ${outcome.error}.]`;
-      } else if (
-        (action.toolName === "get_chargebee_billing" ||
-          action.toolName === "get_customer_performance") &&
-        outcome.ok
-      ) {
-        // F-ai-context L3b + L3c — inline the structured payload so the model
-        // can read fields like unpaid_total / current_month clicks / keyword
-        // counts directly. Without this it only sees the one-line summary.
-        const lines: string[] = [
-          `[Beacon ran ${action.toolName} → ${outcome.summary}`,
-        ];
-        if (outcome.data) {
-          lines.push("Result data:");
-          lines.push(JSON.stringify(outcome.data, null, 2));
-        }
-        lines.push("");
-        lines.push(
-          "Now answer the user's question using this data. Quote the relevant numbers / fields directly. If a field is null or zero, say so plainly — don't apologize. Format with a short markdown table if comparing values across rows; otherwise prose.",
-        );
-        followUp = lines.join("\n") + "]";
-      } else if (
-        (action.toolName === "get_chargebee_billing" ||
-          action.toolName === "get_customer_performance") &&
-        !outcome.ok
-      ) {
-        followUp = `[Beacon's ${action.toolName} proposal was not run — ${outcome.error}.]`;
       } else {
         followUp = outcome.ok
           ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`

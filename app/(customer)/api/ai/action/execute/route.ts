@@ -69,10 +69,8 @@ const IDEMPOTENT_WINDOW_SEC = 60;
 const TOOLS_WITHOUT_CUSTOMER_ID_ARG = new Set([
   "lookup_customer",
   "query_customer_book",
-  // F-ai-context — take entity_id directly, no top-level customer_id needed.
+  // F-ai-context — takes entity_id directly, no top-level customer_id needed.
   "read_customer_notes",
-  "get_chargebee_billing",
-  "get_customer_performance",
 ]);
 
 interface ExecuteBody {
