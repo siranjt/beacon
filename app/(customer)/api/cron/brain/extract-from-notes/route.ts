@@ -4,11 +4,14 @@ import { runExtractionSince } from "@/lib/brain/extract-from-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Extraction is sequential per customer and Haiku adds ~4s/call. ~166
-// customers worst-case = ~12 min — over Vercel's 900s ceiling. The daily
-// incremental path will only ever touch a handful of customers though.
-// Backfill mode is opt-in via ?since=all and should be invoked with care.
-export const maxDuration = 900;
+// Extraction is sequential per customer and Haiku adds ~4s/call. Vercel
+// Pro caps at 800s. ~166 customers × 4s = ~11 min — over the cap, so
+// backfill mode (?since=all) must be split. The daily incremental path
+// only ever touches a handful of customers, fits easily.
+//
+// If the cron runs to the timeout, it returns partial results in the
+// response body. Re-invoke with ?since=<last_seen_updated_at> to resume.
+export const maxDuration = 800;
 
 /**
  * Wave 1.5 — Keeper notes-extraction cron.
