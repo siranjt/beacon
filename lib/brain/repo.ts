@@ -533,3 +533,272 @@ export async function getCategoryBreakdown(
   for (const row of rows) out[row.topic_category] = row.n;
   return out;
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Wave 1.5 — Validate inbox: candidate triage operations.
+ *
+ * Candidates are facts with confidence_state='candidate', written by the
+ * Haiku notes-extraction cron (source_type='beacon_ai_extracted'). AMs
+ * triage them via /admin/brain/validate with four actions:
+ *   - confirm:     candidate → confirmed (version log change_reason='confirm')
+ *   - editConfirm: value updated + candidate → confirmed ('refine')
+ *   - reject:      soft-delete ('reject')
+ *   - reclassify:  reject old at (sub_a, field_a) + insert new at (sub_b,
+ *                  field_b) with same value, confirmed ('reject' + 'create')
+ *
+ * All four go through the existing version log so the full audit trail
+ * is preserved. Reads via listCandidates() filter to live, non-deleted
+ * candidates only.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export interface CandidateRow extends BrainFact {
+  /** Hydrated at the API layer from snapshot.am_name (lookup via customer_id). */
+  am_name?: string | null;
+  /** Hydrated from snapshot.company / customer.bizname. */
+  bizname?: string | null;
+  /** Verbatim source quote pulled from the version log if available. */
+  source_quote?: string | null;
+}
+
+/**
+ * List all live candidates (non-confirmed, non-deleted) for the Validate
+ * inbox. Sorted by customer_id so candidates for the same customer cluster
+ * together; the API layer re-sorts by am_name once hydrated from snapshot.
+ *
+ * `am_emails` (optional) restricts to candidates whose owning_am_email is
+ * in the set — used to scope to a single AM's book. Manager view passes
+ * nothing and sees everything.
+ */
+export async function listCandidates(opts: {
+  owning_am_emails?: string[];
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ rows: BrainFact[]; total: number }> {
+  const sql = getSql();
+  if (!sql) return { rows: [], total: 0 };
+  const limit = Math.max(1, Math.min(500, opts.limit ?? 200));
+  const offset = Math.max(0, opts.offset ?? 0);
+  const ams =
+    opts.owning_am_emails && opts.owning_am_emails.length > 0
+      ? opts.owning_am_emails
+      : null;
+  try {
+    const [rowsResult, countResult] = await Promise.all([
+      sql`
+        SELECT * FROM beacon_brain_facts
+        WHERE confidence_state = 'candidate'
+          AND soft_deleted_at IS NULL
+          AND (${ams}::text[] IS NULL OR owning_am_email = ANY(${ams}))
+        ORDER BY customer_id, topic_category, topic_subcategory, field_name, created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `,
+      sql`
+        SELECT COUNT(*)::int AS n FROM beacon_brain_facts
+        WHERE confidence_state = 'candidate'
+          AND soft_deleted_at IS NULL
+          AND (${ams}::text[] IS NULL OR owning_am_email = ANY(${ams}))
+      `,
+    ]);
+    const rows = rowsResult as BrainFact[];
+    const total =
+      ((countResult as Array<{ n?: number }>)[0]?.n as number) ?? rows.length;
+    return { rows, total };
+  } catch {
+    return { rows: [], total: 0 };
+  }
+}
+
+/** Look up a single fact by id (any state, any source). */
+export async function getFactById(fact_id: string): Promise<BrainFact | null> {
+  const sql = getSql();
+  if (!sql) return null;
+  const rows = (await sql`
+    SELECT * FROM beacon_brain_facts WHERE fact_id = ${fact_id} LIMIT 1
+  `) as BrainFact[];
+  return rows[0] ?? null;
+}
+
+/**
+ * Get the most recent source_quote for a fact from the version log. The
+ * Haiku extractor stores the quote on the version-log row for the initial
+ * 'create' so the Validate inbox can show what evidence the candidate is
+ * grounded in.
+ *
+ * Returns null if the version log has no quote (older facts, manual writes).
+ */
+export async function getSourceQuoteForFact(fact_id: string): Promise<string | null> {
+  const sql = getSql();
+  if (!sql) return null;
+  const rows = (await sql`
+    SELECT source_ref FROM beacon_brain_fact_versions
+    WHERE fact_id = ${fact_id}
+    ORDER BY version ASC
+    LIMIT 1
+  `) as Array<{ source_ref: string | null }>;
+  const first = rows[0]?.source_ref ?? null;
+  if (!first) return null;
+  // source_ref convention for beacon_ai_extracted candidates:
+  //   "note:<am_name>:<entity_id>::quote:<verbatim>"
+  // Strip the prefix when present.
+  const idx = first.indexOf("::quote:");
+  if (idx < 0) return null;
+  return first.slice(idx + "::quote:".length);
+}
+
+/** Flip a candidate to confirmed. No value change. */
+export async function confirmCandidateFact(
+  fact_id: string,
+  by_email: string,
+): Promise<BrainFact | null> {
+  const sql = getSql();
+  if (!sql) return null;
+  const current = await getFactById(fact_id);
+  if (!current || current.confidence_state !== "candidate" || current.soft_deleted_at) {
+    return null;
+  }
+  const newVersion = current.current_version + 1;
+  const updated = (await sql`
+    UPDATE beacon_brain_facts
+    SET confidence_state = 'confirmed',
+        confirmed_by_email = ${by_email},
+        confirmed_at = NOW(),
+        current_version = ${newVersion},
+        updated_at = NOW()
+    WHERE fact_id = ${fact_id}
+    RETURNING *
+  `) as BrainFact[];
+  const row = updated[0];
+  if (row) {
+    await sql`
+      INSERT INTO beacon_brain_fact_versions (
+        customer_id, fact_id, version, value, confidence_state,
+        source_type, source_ref, prior_value, changed_by_email, change_reason
+      ) VALUES (
+        ${row.customer_id}, ${row.fact_id}, ${newVersion}, ${row.value},
+        ${row.confidence_state}, ${row.source_type}, ${row.source_ref},
+        ${current.value}, ${by_email}, 'confirm'
+      )
+    `;
+  }
+  return row ?? null;
+}
+
+/** Update value AND flip candidate → confirmed. Logged as 'refine'. */
+export async function editAndConfirmCandidateFact(
+  fact_id: string,
+  new_value: string,
+  by_email: string,
+): Promise<BrainFact | null> {
+  const sql = getSql();
+  if (!sql) return null;
+  if (!new_value || !new_value.trim()) return null;
+  const current = await getFactById(fact_id);
+  if (!current || current.confidence_state !== "candidate" || current.soft_deleted_at) {
+    return null;
+  }
+  const newVersion = current.current_version + 1;
+  const valueNumeric: number | null = NUMERIC_FIELDS.has(current.field_name)
+    ? parseLeadingInteger(new_value)
+    : null;
+  const updated = (await sql`
+    UPDATE beacon_brain_facts
+    SET value = ${new_value},
+        value_numeric = ${valueNumeric},
+        confidence_state = 'confirmed',
+        confirmed_by_email = ${by_email},
+        confirmed_at = NOW(),
+        current_version = ${newVersion},
+        updated_at = NOW()
+    WHERE fact_id = ${fact_id}
+    RETURNING *
+  `) as BrainFact[];
+  const row = updated[0];
+  if (row) {
+    await sql`
+      INSERT INTO beacon_brain_fact_versions (
+        customer_id, fact_id, version, value, confidence_state,
+        source_type, source_ref, prior_value, changed_by_email, change_reason
+      ) VALUES (
+        ${row.customer_id}, ${row.fact_id}, ${newVersion}, ${row.value},
+        ${row.confidence_state}, ${row.source_type}, ${row.source_ref},
+        ${current.value}, ${by_email}, 'refine'
+      )
+    `;
+  }
+  return row ?? null;
+}
+
+/** Soft-delete a candidate. Logged as 'reject'. */
+export async function rejectCandidateFact(
+  fact_id: string,
+  by_email: string,
+): Promise<boolean> {
+  const sql = getSql();
+  if (!sql) return false;
+  const current = await getFactById(fact_id);
+  if (!current || current.soft_deleted_at) return false;
+  const newVersion = current.current_version + 1;
+  await sql`
+    UPDATE beacon_brain_facts
+    SET soft_deleted_at = NOW(),
+        current_version = ${newVersion},
+        updated_at = NOW()
+    WHERE fact_id = ${fact_id}
+  `;
+  await sql`
+    INSERT INTO beacon_brain_fact_versions (
+      customer_id, fact_id, version, value, confidence_state,
+      source_type, source_ref, prior_value, changed_by_email, change_reason
+    ) VALUES (
+      ${current.customer_id}, ${current.fact_id}, ${newVersion}, ${current.value},
+      ${current.confidence_state}, ${current.source_type}, ${current.source_ref},
+      ${current.value}, ${by_email}, 'reject'
+    )
+  `;
+  return true;
+}
+
+/**
+ * Reclassify a candidate to a different (category, subcategory, field_name).
+ * Rejects the original and inserts a new confirmed fact at the target.
+ * Returns the new fact, or null if validation fails.
+ */
+export async function reclassifyCandidateFact(
+  fact_id: string,
+  target: {
+    topic_category: TopicCategory;
+    topic_subcategory: TopicSubcategory;
+    field_name: string;
+  },
+  by_email: string,
+): Promise<BrainFact | null> {
+  const current = await getFactById(fact_id);
+  if (!current || current.confidence_state !== "candidate" || current.soft_deleted_at) {
+    return null;
+  }
+  // Validate target shape before mutating.
+  const expectedCategory = categoryForSubcategory(target.topic_subcategory);
+  if (target.topic_category !== expectedCategory) return null;
+  const validField =
+    target.field_name === "other" ||
+    isNamedField(target.topic_subcategory, target.field_name);
+  if (!validField) return null;
+
+  // Reject the original first.
+  const ok = await rejectCandidateFact(fact_id, by_email);
+  if (!ok) return null;
+
+  // Insert the new fact at the target location, confirmed.
+  return writeBrainFact({
+    customer_id: current.customer_id,
+    topic_category: target.topic_category,
+    topic_subcategory: target.topic_subcategory,
+    field_name: target.field_name,
+    value: current.value,
+    source_type: current.source_type,
+    source_ref: current.source_ref ?? undefined,
+    owning_am_email: current.owning_am_email ?? undefined,
+    confirmed_by_email: by_email,
+  });
+}

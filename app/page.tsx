@@ -184,6 +184,16 @@ export default async function LauncherPage() {
               >
                 Admin · Beam gaps
               </Link>
+              <Link
+                href="/admin/brain/validate"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Keeper validate
+              </Link>
             </>
           )}
         </div>
