@@ -3,16 +3,16 @@
 /**
  * Keeper Validate inbox — client view component.
  *
- * Renders a per-AM grouped table of candidate facts. Each row exposes
- * four actions: Confirm / Edit + Confirm / Reject / Reclassify. Inline
- * editors render in-place when the user picks Edit or Reclassify.
+ * Renders candidate facts grouped by AM → Customer, with the four
+ * triage actions per row (Confirm / Edit+Confirm / Reclassify / Reject).
+ * Category filter chips trim the queue; collapsible AM sections let
+ * users focus; keyboard shortcuts (J/K/C/R/E/X) speed the triage pass.
  *
- * Optimistic UI: on a successful POST, the row is removed from the
- * local state immediately. On error, surfaces a per-row banner with
- * the server's message and re-enables the action buttons.
+ * Optimistic UI: on a successful POST, the row disappears immediately
+ * and the keyboard focus advances to the next row.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FIELD_CATALOG } from "@/lib/brain/types";
 import type {
   TopicCategory,
@@ -101,6 +101,16 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
   // Manager-only toggle: see only my candidates (treat like AM).
   const [mineOnly, setMineOnly] = useState(false);
 
+  // Category filter ('all' shows everything).
+  const [categoryFilter, setCategoryFilter] = useState<TopicCategory | "all">("all");
+
+  // Collapsed AM sections (default: all expanded).
+  const [collapsedAms, setCollapsedAms] = useState<Set<string>>(new Set());
+
+  // Active row for keyboard navigation. Null = no row focused yet.
+  const [activeFactId, setActiveFactId] = useState<string | null>(null);
+  const activeRowRef = useRef<HTMLDivElement | null>(null);
+
   const fetchRows = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -122,26 +132,63 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
     void fetchRows();
   }, [fetchRows]);
 
-  const grouped = useMemo(() => {
-    const out: Record<string, CandidateRow[]> = {};
-    for (const r of rows) {
-      const key = r.am_name_resolved || "Unassigned";
-      if (!out[key]) out[key] = [];
-      out[key].push(r);
-    }
-    // Sort each AM's candidates by bizname.
-    for (const key of Object.keys(out)) {
-      out[key].sort((a, b) =>
-        (a.bizname || "").localeCompare(b.bizname || ""),
-      );
-    }
-    return out;
+  // Category counts derived from ALL rows (not filtered), so the chip
+  // numbers reflect the full queue regardless of current filter.
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: rows.length,
+      identity: 0,
+      operational: 0,
+      behavioral: 0,
+      concerns: 0,
+      relationship: 0,
+    };
+    for (const r of rows) counts[r.topic_category]++;
+    return counts;
   }, [rows]);
 
+  // Filtered rows respect the category chip.
+  const filteredRows = useMemo(() => {
+    if (categoryFilter === "all") return rows;
+    return rows.filter((r) => r.topic_category === categoryFilter);
+  }, [rows, categoryFilter]);
+
+  // Two-level grouping: AM name → bizname → candidates.
+  // Empty-bizname rows land under "(no bizname)".
+  const groupedByAmThenCustomer = useMemo(() => {
+    const out: Record<string, Record<string, CandidateRow[]>> = {};
+    for (const r of filteredRows) {
+      const am = r.am_name_resolved || "Unassigned";
+      const biz = r.bizname || "(no bizname)";
+      if (!out[am]) out[am] = {};
+      if (!out[am][biz]) out[am][biz] = [];
+      out[am][biz].push(r);
+    }
+    return out;
+  }, [filteredRows]);
+
   const orderedAmNames = useMemo(
-    () => Object.keys(grouped).sort((a, b) => a.localeCompare(b)),
-    [grouped],
+    () => Object.keys(groupedByAmThenCustomer).sort((a, b) => a.localeCompare(b)),
+    [groupedByAmThenCustomer],
   );
+
+  // Flat ordered list of fact_ids matching the current grouping +
+  // collapse state. Used for J/K keyboard navigation.
+  const flatFactIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const am of orderedAmNames) {
+      if (collapsedAms.has(am)) continue;
+      const biznames = Object.keys(groupedByAmThenCustomer[am]).sort((a, b) =>
+        a.localeCompare(b),
+      );
+      for (const biz of biznames) {
+        for (const r of groupedByAmThenCustomer[am][biz]) {
+          ids.push(r.fact_id);
+        }
+      }
+    }
+    return ids;
+  }, [orderedAmNames, groupedByAmThenCustomer, collapsedAms]);
 
   /* ────── action handlers ────── */
 
@@ -263,11 +310,117 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
     }));
   };
 
+  /* ────── keyboard nav ────── */
+
+  // Pick the next/prev fact_id relative to activeFactId in flatFactIds.
+  // Wraps around at the boundaries.
+  const moveActive = useCallback(
+    (delta: 1 | -1) => {
+      if (flatFactIds.length === 0) return;
+      let next: string;
+      if (!activeFactId || !flatFactIds.includes(activeFactId)) {
+        next = delta === 1 ? flatFactIds[0] : flatFactIds[flatFactIds.length - 1];
+      } else {
+        const idx = flatFactIds.indexOf(activeFactId);
+        const nextIdx = (idx + delta + flatFactIds.length) % flatFactIds.length;
+        next = flatFactIds[nextIdx];
+      }
+      setActiveFactId(next);
+    },
+    [flatFactIds, activeFactId],
+  );
+
+  // When a row is acted on and removed, advance to the next row.
+  // Wired via wrapping callAction.
+  const callActionAndAdvance = useCallback(
+    async (factId: string, body: Record<string, unknown>) => {
+      const wasActive = activeFactId === factId;
+      const idxBefore = flatFactIds.indexOf(factId);
+      const result = await callAction(factId, body);
+      if (result.ok && wasActive) {
+        // After deletion, the remaining list shifts; pick whatever now
+        // sits at the same index, or the previous one if we were at the end.
+        const remaining = flatFactIds.filter((id) => id !== factId);
+        if (remaining.length === 0) {
+          setActiveFactId(null);
+        } else {
+          const nextIdx = Math.min(idxBefore, remaining.length - 1);
+          setActiveFactId(remaining[nextIdx]);
+        }
+      }
+      return result;
+    },
+    [activeFactId, flatFactIds, callAction],
+  );
+
+  // Active row scroll-into-view when activeFactId changes.
+  useEffect(() => {
+    if (activeRowRef.current) {
+      activeRowRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [activeFactId]);
+
+  // Global keydown listener. Bails if user is typing in any input/textarea
+  // or currently editing/reclassifying a row (so the user can type values
+  // without triggering shortcuts).
+  useEffect(() => {
+    function isTextInputFocused() {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = el.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        (el as HTMLElement).isContentEditable
+      );
+    }
+
+    function onKey(e: KeyboardEvent) {
+      if (isTextInputFocused()) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "j") {
+        e.preventDefault();
+        moveActive(1);
+      } else if (k === "k") {
+        e.preventDefault();
+        moveActive(-1);
+      } else if (k === "c" && activeFactId) {
+        e.preventDefault();
+        void callActionAndAdvance(activeFactId, { action: "confirm" });
+      } else if (k === "r" && activeFactId) {
+        e.preventDefault();
+        void callActionAndAdvance(activeFactId, { action: "reject" });
+      } else if (k === "e" && activeFactId) {
+        e.preventDefault();
+        const row = rows.find((r) => r.fact_id === activeFactId);
+        if (row) beginEdit(row);
+      } else if (k === "x" && activeFactId) {
+        e.preventDefault();
+        const row = rows.find((r) => r.fact_id === activeFactId);
+        if (row) beginReclassify(row);
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [moveActive, callActionAndAdvance, activeFactId, rows]);
+
   /* ────── render ────── */
+
+  const toggleAm = (amName: string) => {
+    setCollapsedAms((prev) => {
+      const next = new Set(prev);
+      if (next.has(amName)) next.delete(amName);
+      else next.add(amName);
+      return next;
+    });
+  };
 
   return (
     <div className="px-6 pb-10 max-w-[1200px] mx-auto">
-      <header className="mb-5 flex items-baseline justify-between">
+      <header className="mb-4 flex items-baseline justify-between">
         <div>
           <h1 className="text-[26px] font-medium text-zoca-text tracking-tight" style={{ fontFamily: "Georgia, serif" }}>
             Keeper validate inbox
@@ -277,7 +430,7 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
               ? "Loading…"
               : total === 0
                 ? "Inbox is clear. New extractions land here for triage."
-                : `${total} candidate fact${total === 1 ? "" : "s"} awaiting review${mineOnly ? " (mine)" : ""}.`}
+                : `${total} candidate fact${total === 1 ? "" : "s"} awaiting review${mineOnly ? " (mine)" : ""}${categoryFilter !== "all" ? ` · filtered to ${categoryFilter}` : ""}.`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -306,6 +459,47 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
         </div>
       </header>
 
+      {/* Category filter chips */}
+      {!loading && rows.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {(["all", ...ALL_CATEGORIES] as const).map((cat) => {
+            const count = categoryCounts[cat];
+            const isActive = categoryFilter === cat;
+            const label = cat === "all" ? "All" : cat[0].toUpperCase() + cat.slice(1);
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoryFilter(cat)}
+                disabled={count === 0 && cat !== "all"}
+                className={`px-2.5 py-1 text-[11px] rounded-full border transition-colors ${
+                  isActive
+                    ? "bg-zoca-char text-zoca-parchment border-zoca-char"
+                    : "bg-transparent text-zoca-text border-zoca-border hover:border-zoca-text-2"
+                } ${count === 0 && cat !== "all" ? "opacity-40 cursor-not-allowed" : ""}`}
+              >
+                {label} <span className="opacity-70 ml-0.5">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Keyboard shortcuts hint */}
+      {!loading && rows.length > 0 && (
+        <div className="mb-4 text-[10px] text-zoca-text-2/70 font-mono">
+          <kbd className="px-1 border border-zoca-border rounded">J</kbd> / <kbd className="px-1 border border-zoca-border rounded">K</kbd> navigate
+          {" · "}
+          <kbd className="px-1 border border-zoca-border rounded">C</kbd> confirm
+          {" · "}
+          <kbd className="px-1 border border-zoca-border rounded">E</kbd> edit
+          {" · "}
+          <kbd className="px-1 border border-zoca-border rounded">X</kbd> reclassify
+          {" · "}
+          <kbd className="px-1 border border-zoca-border rounded">R</kbd> reject
+        </div>
+      )}
+
       {error && (
         <section className="rounded-zoca-lg border border-red-200 bg-red-50 p-4 mb-5 text-[13px] text-red-800">
           {error}
@@ -321,29 +515,90 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
         </section>
       )}
 
-      {orderedAmNames.map((amName) => (
-        <section
-          key={amName}
-          className="mb-6 rounded-zoca-lg border border-zoca-border bg-zoca-bg-soft"
-        >
-          <header className="flex items-baseline justify-between px-4 py-3 border-b border-zoca-border">
-            <h2 className="text-[14px] font-semibold uppercase tracking-wider text-zoca-text-2">
-              {amName}
-            </h2>
-            <span className="text-[11px] text-zoca-text-2">
-              {grouped[amName].length} candidate{grouped[amName].length === 1 ? "" : "s"}
-            </span>
-          </header>
+      {!loading && !error && filteredRows.length === 0 && rows.length > 0 && (
+        <section className="rounded-zoca-lg border border-zoca-border bg-zoca-bg-soft p-6 text-center">
+          <div className="text-[13px] text-zoca-text">No candidates in {categoryFilter}.</div>
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("all")}
+            className="mt-2 text-[11px] underline text-zoca-text-2"
+          >
+            Clear filter
+          </button>
+        </section>
+      )}
+
+      {orderedAmNames.map((amName) => {
+        const isCollapsed = collapsedAms.has(amName);
+        const customers = groupedByAmThenCustomer[amName];
+        const totalForAm = Object.values(customers).reduce(
+          (acc, arr) => acc + arr.length,
+          0,
+        );
+        const orderedBiznames = Object.keys(customers).sort((a, b) => a.localeCompare(b));
+
+        return (
+          <section
+            key={amName}
+            className="mb-6 rounded-zoca-lg border border-zoca-border bg-zoca-bg-soft"
+          >
+            <button
+              type="button"
+              onClick={() => toggleAm(amName)}
+              className="w-full flex items-baseline justify-between px-4 py-3 border-b border-zoca-border hover:bg-zoca-border/10 text-left"
+            >
+              <h2 className="text-[14px] font-semibold uppercase tracking-wider text-zoca-text-2 flex items-center gap-2">
+                <span className="text-zoca-text-2/60 text-[10px]">
+                  {isCollapsed ? "▸" : "▾"}
+                </span>
+                {amName}
+              </h2>
+              <span className="text-[11px] text-zoca-text-2">
+                {totalForAm} candidate{totalForAm === 1 ? "" : "s"} across {orderedBiznames.length} customer{orderedBiznames.length === 1 ? "" : "s"}
+              </span>
+            </button>
+
+            {!isCollapsed && orderedBiznames.map((biz) => {
+              const customerRows = customers[biz];
+              const firstRow = customerRows[0];
+              const entityId = firstRow?.entity_id ?? null;
+              return (
+                <div key={biz} className="border-b border-zoca-border/40 last:border-b-0">
+                  <div className="flex items-baseline justify-between gap-3 px-4 py-2 bg-zoca-bg-soft/50">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="font-medium text-[13px] text-zoca-text">{biz}</span>
+                      <span className="text-[10px] text-zoca-text-2/70">
+                        {customerRows.length} candidate{customerRows.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    {entityId && (
+                      <a
+                        href={`/360/${entityId}`}
+                        className="text-[10px] text-zoca-text-2 hover:text-zoca-text underline"
+                        title="Open Customer 360"
+                      >
+                        open 360
+                      </a>
+                    )}
+                  </div>
 
           <div className="divide-y divide-zoca-border/40">
-            {grouped[amName].map((row) => {
+            {customerRows.map((row) => {
               const isBusy = busyFactId === row.fact_id;
               const rowErr = rowErrors[row.fact_id];
               const isEditing = row.fact_id in editingValue;
               const isReclassifying = row.fact_id in reclassifying;
+              const isActive = activeFactId === row.fact_id;
 
               return (
-                <div key={row.fact_id} className="p-4">
+                <div
+                  key={row.fact_id}
+                  ref={isActive ? activeRowRef : null}
+                  onClick={() => setActiveFactId(row.fact_id)}
+                  className={`p-4 transition-colors cursor-pointer ${
+                    isActive ? "bg-zoca-brass/10 ring-1 ring-zoca-brass/40" : ""
+                  }`}
+                >
                   {/* Header row: bizname + classification */}
                   <div className="flex items-baseline justify-between gap-3 flex-wrap">
                     <div className="flex items-baseline gap-2 flex-wrap">
@@ -537,8 +792,12 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
               );
             })}
           </div>
-        </section>
-      ))}
+                </div>
+              );
+            })}
+          </section>
+        );
+      })}
     </div>
   );
 }
