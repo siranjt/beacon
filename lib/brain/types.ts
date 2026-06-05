@@ -139,6 +139,17 @@ export interface BrainFact {
   created_at: string;
   updated_at: string;
   soft_deleted_at: string | null;
+  /**
+   * Wave 2b — pgvector(1024) embedding from Voyage voyage-3-lite over
+   * `${topic_subcategory} / ${field_name}: ${value}`. NULL until backfill
+   * runs or until VOYAGE_API_KEY is set. Not surfaced to clients — used
+   * server-side for semantic-conflict gate + (Wave 2b.2) top-K retrieval.
+   *
+   * Typed as `number[] | null` in TS even though Postgres returns it as
+   * a string literal "[0.1, 0.2, ...]" via the Neon driver. Consumers
+   * should not access this field directly; query through the helper.
+   */
+  embedding?: number[] | string | null;
 }
 
 /** Version log row — append-only history. */
@@ -196,6 +207,16 @@ export interface BrainFactWrite {
    */
   confirmed_by_email?: string | null;
   sunset_at?: string | null;
+  /**
+   * Wave 2b — when true, skip the semantic-conflict gate (cosine
+   * similarity check against existing same-customer facts). Used by
+   * the `force` path in add_fact_to_brain so AMs can override a
+   * flagged near-duplicate when they actually meant to write one.
+   *
+   * Default false: writes that semantically collide throw
+   * SemanticConflictError.
+   */
+  force_semantic_conflict?: boolean;
 }
 
 /**

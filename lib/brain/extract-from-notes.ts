@@ -27,7 +27,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSql } from "../customer/postgres";
 import { readLatestSnapshotV2 } from "../customer/postgres";
-import { writeBrainFact } from "./repo";
+import { writeBrainFact, SemanticConflictError } from "./repo";
 import {
   FIELD_CATALOG,
   categoryForSubcategory,
@@ -463,7 +463,14 @@ export async function extractAndPersistForEntity(
         result.errors.push(`writeBrainFact returned null for ${c.topic_subcategory}/${c.field_name}`);
       }
     } catch (e) {
-      // Category/field mismatch errors thrown by writeBrainFact land here.
+      if (e instanceof SemanticConflictError) {
+        // Wave 2b — Haiku emitted a near-duplicate of an already-stored
+        // fact. Count separately (not as "invalid" — it's a soft signal
+        // that the extractor is being too generous). Don't write.
+        result.candidates_duplicate++;
+        continue;
+      }
+      // Category/field mismatch + other write errors land here.
       result.candidates_invalid++;
       result.errors.push(
         `write failed for ${c.topic_subcategory}/${c.field_name}: ${e instanceof Error ? e.message : String(e)}`,

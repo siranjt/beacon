@@ -26,6 +26,94 @@ import {
   NUMERIC_FIELDS,
   parseLeadingInteger,
 } from "./types";
+import {
+  embedText,
+  factEmbeddingText,
+  formatVectorLiteral,
+  SEMANTIC_DUPLICATE_THRESHOLD,
+} from "./embeddings";
+
+/**
+ * Wave 2b — semantic conflict surfaced when an incoming fact's embedding
+ * sits too close to an existing same-customer fact's embedding. Caller
+ * sees the conflicting fact_id + value + similarity score and can
+ * choose to override via `force_semantic_conflict: true` (or fold the
+ * new fact into the existing one via 'other').
+ */
+export class SemanticConflictError extends Error {
+  public readonly conflicting_fact_id: string;
+  public readonly conflicting_value: string;
+  public readonly similarity: number;
+  public readonly proposed_value: string;
+  constructor(opts: {
+    conflicting_fact_id: string;
+    conflicting_value: string;
+    similarity: number;
+    proposed_value: string;
+  }) {
+    super(
+      `semantic conflict: proposed "${opts.proposed_value.slice(0, 60)}" overlaps existing fact ${opts.conflicting_fact_id} ("${opts.conflicting_value.slice(0, 60)}") at similarity ${(opts.similarity * 100).toFixed(0)}%`,
+    );
+    this.name = "SemanticConflictError";
+    this.conflicting_fact_id = opts.conflicting_fact_id;
+    this.conflicting_value = opts.conflicting_value;
+    this.similarity = opts.similarity;
+    this.proposed_value = opts.proposed_value;
+  }
+}
+
+/**
+ * Embed the proposed fact and query the closest existing same-customer
+ * fact (any confidence_state, not soft-deleted). Returns the nearest
+ * match + cosine similarity. Returns null when:
+ *   - VOYAGE_API_KEY missing or embedding call failed
+ *   - No existing facts for this customer have embeddings
+ */
+async function findSemanticNeighbor(
+  customer_id: string,
+  topic_subcategory: string,
+  field_name: string,
+  value: string,
+): Promise<{
+  fact_id: string;
+  value: string;
+  similarity: number;
+  proposed_embedding: number[];
+} | null> {
+  const sql = getSql();
+  if (!sql) return null;
+
+  const embedResult = await embedText(
+    factEmbeddingText(topic_subcategory, field_name, value),
+  );
+  if (!embedResult) return null;
+
+  const vec = formatVectorLiteral(embedResult.embedding);
+  const rows = (await sql`
+    SELECT fact_id, value, 1 - (embedding <=> ${vec}::vector) AS similarity
+    FROM beacon_brain_facts
+    WHERE customer_id = ${customer_id}
+      AND soft_deleted_at IS NULL
+      AND embedding IS NOT NULL
+    ORDER BY embedding <=> ${vec}::vector
+    LIMIT 1
+  `) as Array<{ fact_id: string; value: string; similarity: number }>;
+
+  if (rows.length === 0) {
+    return {
+      fact_id: "",
+      value: "",
+      similarity: 0,
+      proposed_embedding: embedResult.embedding,
+    };
+  }
+  return {
+    fact_id: rows[0].fact_id,
+    value: rows[0].value,
+    similarity: rows[0].similarity,
+    proposed_embedding: embedResult.embedding,
+  };
+}
 
 /**
  * Write a new fact OR upsert if a row already exists for the same
@@ -80,6 +168,59 @@ export async function writeBrainFact(
     ? parseLeadingInteger(input.value)
     : null;
 
+  // Wave 2b — compute embedding upfront so we can both (a) gate inserts
+  // on semantic conflict and (b) store the vector in the same INSERT/
+  // UPDATE. Soft-fails to null when VOYAGE_API_KEY is missing or the
+  // call errors; in that case we skip the conflict check and write
+  // without an embedding (caught by the next backfill run).
+  const neighbor = await findSemanticNeighbor(
+    input.customer_id,
+    input.topic_subcategory,
+    input.field_name,
+    input.value,
+  );
+  const proposedEmbedding = neighbor?.proposed_embedding ?? null;
+  const embeddingLiteral = proposedEmbedding
+    ? formatVectorLiteral(proposedEmbedding)
+    : null;
+
+  // For named fields, check for an existing row at (customer, sub, field)
+  // FIRST — that tells us whether this is a true insert (semantic gate
+  // applies) or an existing-row update (gate would always self-flag, so
+  // we skip it).
+  let existing: BrainFact[] = [];
+  if (named && input.field_name !== "other") {
+    existing = (await sql`
+      SELECT * FROM beacon_brain_facts
+      WHERE customer_id = ${input.customer_id}
+        AND topic_subcategory = ${input.topic_subcategory}
+        AND field_name = ${input.field_name}
+        AND soft_deleted_at IS NULL
+      LIMIT 1
+    `) as BrainFact[];
+  }
+
+  // True insert paths: (a) non-named/other field, or (b) named field
+  // with no existing row. These get the semantic-conflict gate. Update
+  // paths skip it.
+  const willInsert =
+    !named || input.field_name === "other" || existing.length === 0;
+
+  if (
+    willInsert &&
+    !input.force_semantic_conflict &&
+    neighbor &&
+    neighbor.fact_id &&
+    neighbor.similarity >= SEMANTIC_DUPLICATE_THRESHOLD
+  ) {
+    throw new SemanticConflictError({
+      conflicting_fact_id: neighbor.fact_id,
+      conflicting_value: neighbor.value,
+      similarity: neighbor.similarity,
+      proposed_value: input.value,
+    });
+  }
+
   if (!named || input.field_name === "other") {
     // Insert-only path.
     const rows = (await sql`
@@ -87,7 +228,7 @@ export async function writeBrainFact(
         customer_id, topic_category, topic_subcategory, field_name, value,
         value_numeric,
         confidence_state, source_type, source_ref, owning_am_email,
-        confirmed_by_email, confirmed_at, sunset_at
+        confirmed_by_email, confirmed_at, sunset_at, embedding
       ) VALUES (
         ${input.customer_id},
         ${input.topic_category},
@@ -101,7 +242,8 @@ export async function writeBrainFact(
         ${input.owning_am_email ?? null},
         ${input.confirmed_by_email ?? null},
         ${confTime},
-        ${input.sunset_at ?? null}
+        ${input.sunset_at ?? null},
+        ${embeddingLiteral}::vector
       )
       RETURNING *
     `) as BrainFact[];
@@ -123,15 +265,8 @@ export async function writeBrainFact(
     return newRow ?? null;
   }
 
-  // Named field path: check for existing row, upsert if present.
-  const existing = (await sql`
-    SELECT * FROM beacon_brain_facts
-    WHERE customer_id = ${input.customer_id}
-      AND topic_subcategory = ${input.topic_subcategory}
-      AND field_name = ${input.field_name}
-      AND soft_deleted_at IS NULL
-    LIMIT 1
-  `) as BrainFact[];
+  // Named field path: existing row already fetched above for the
+  // semantic-gate decision. Branch on whether we have one.
 
   if (existing.length === 0) {
     // No existing row — insert as new.
@@ -140,7 +275,7 @@ export async function writeBrainFact(
         customer_id, topic_category, topic_subcategory, field_name, value,
         value_numeric,
         confidence_state, source_type, source_ref, owning_am_email,
-        confirmed_by_email, confirmed_at, sunset_at
+        confirmed_by_email, confirmed_at, sunset_at, embedding
       ) VALUES (
         ${input.customer_id},
         ${input.topic_category},
@@ -154,7 +289,8 @@ export async function writeBrainFact(
         ${input.owning_am_email ?? null},
         ${input.confirmed_by_email ?? null},
         ${confTime},
-        ${input.sunset_at ?? null}
+        ${input.sunset_at ?? null},
+        ${embeddingLiteral}::vector
       )
       RETURNING *
     `) as BrainFact[];
@@ -189,9 +325,9 @@ export async function writeBrainFact(
   }
 
   // Different value — write a version-log row and update the live row.
-  // For Wave 1, this path is treated as an edit, not a conflict (the
-  // semantic-Haiku conflict check ships in Wave 2 alongside the
-  // add_fact_to_brain conversational tool).
+  // This path is treated as an edit, not a conflict. The semantic gate
+  // is intentionally skipped here (it would always self-flag).
+  // Re-embed the new value so the stored vector tracks the latest text.
   const newVersion = current.current_version + 1;
   const updated = (await sql`
     UPDATE beacon_brain_facts
@@ -201,6 +337,7 @@ export async function writeBrainFact(
         source_ref = ${input.source_ref ?? null},
         current_version = ${newVersion},
         updated_at = NOW(),
+        embedding = ${embeddingLiteral}::vector,
         confirmed_by_email = COALESCE(${input.confirmed_by_email ?? null}, confirmed_by_email),
         confirmed_at = CASE
           WHEN ${input.confirmed_by_email ?? null}::text IS NOT NULL

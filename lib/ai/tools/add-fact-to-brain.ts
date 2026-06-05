@@ -30,7 +30,11 @@
  */
 
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
-import { writeBrainFact, getFactsForCustomer } from "@/lib/brain/repo";
+import {
+  writeBrainFact,
+  getFactsForCustomer,
+  SemanticConflictError,
+} from "@/lib/brain/repo";
 import {
   FIELD_CATALOG,
   categoryForSubcategory,
@@ -231,17 +235,31 @@ export const addFactToBrainTool: BeaconTool = {
       }
 
       // Step 3 — write the fact (confirmed, since AM is in the loop).
-      const written = await writeBrainFact({
-        customer_id: cbCustomerId,
-        topic_category: topicCategory,
-        topic_subcategory: topicSubcategory,
-        field_name: fieldNameRaw,
-        value,
-        source_type: "beacon_ai_conversation",
-        source_ref: ctx.amEmail,
-        owning_am_email: ctx.amEmail,
-        confirmed_by_email: ctx.amEmail,
-      });
+      // Wave 2b — if AM passed force=true, also override the semantic
+      // conflict gate so this write isn't blocked by a near-duplicate.
+      let written;
+      try {
+        written = await writeBrainFact({
+          customer_id: cbCustomerId,
+          topic_category: topicCategory,
+          topic_subcategory: topicSubcategory,
+          field_name: fieldNameRaw,
+          value,
+          source_type: "beacon_ai_conversation",
+          source_ref: ctx.amEmail,
+          owning_am_email: ctx.amEmail,
+          confirmed_by_email: ctx.amEmail,
+          force_semantic_conflict: force,
+        });
+      } catch (e) {
+        if (e instanceof SemanticConflictError) {
+          return {
+            ok: false,
+            error: `Near-duplicate detected: this fact looks like an existing one for ${customer.company ?? entityId.slice(0, 8)} ("${e.conflicting_value.slice(0, 100)}", similarity ${(e.similarity * 100).toFixed(0)}%). Resend with force=true if you want both. Existing fact_id: ${e.conflicting_fact_id}.`,
+          };
+        }
+        throw e;
+      }
 
       if (!written) {
         return { ok: false, error: "Failed to write Keeper fact" };
