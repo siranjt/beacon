@@ -1,5 +1,5 @@
 /**
- * POST /api/ai/suggest — Beacon AI proactive recommendations. Phase E-9.
+ * POST /api/ai/suggest — Beam proactive recommendations. Phase E-9.
  *
  * Body:
  *   { scope: AiScope }

@@ -1,18 +1,18 @@
 /**
- * read_customer_brain — Beacon AI tool. Wave 2a.1.
+ * read_customer_brain — Beam tool. Wave 2a.1.
  *
- * Fetches the per-customer Brain (confirmed canonical facts) for a
- * specific entity. Lets Beacon access the Brain from any scope, not
+ * Fetches the per-customer Keeper (confirmed canonical facts) for a
+ * specific entity. Lets Beam access the Keeper from any scope, not
  * just /customer/[entityId] where the customer-360 context loader
  * pre-injects it.
  *
  * Read-only, no approval required. Resolves entity_id → customer_id
- * via the latest snapshot (Brain facts are keyed on customer_id /
+ * via the latest snapshot (Keeper facts are keyed on customer_id /
  * Chargebee handle, not entity_id). Returns topic-clustered facts
  * via the same shape Wave 2a uses in the customer-360 prompt.
  *
  * Sister tool to read_customer_notes: notes are private AM scratch
- * pads; Brain facts are curated canonical truth. Use BOTH when
+ * pads; Keeper facts are curated canonical truth. Use BOTH when
  * answering "what do we know about X" questions — the union gives
  * the fullest picture.
  */
@@ -25,9 +25,9 @@ import type { BeaconTool, ToolExecutionContext, ToolResult } from "./index";
 export const readCustomerBrainTool: BeaconTool = {
   name: "read_customer_brain",
   description:
-    "Read the Beacon Brain (confirmed canonical facts) for a specific customer. The Brain holds curated per-customer truth: owner identity (name, decision style), how they were sold (AE, sale date, promise), contract terms (start date, MRR, custom pricing), integration platform, behavioral patterns (payment timing, comms preference, seasonal), and open concerns (latent risks, next-call agenda). Facts are auto-confirmed at bootstrap from BaseSheet + Chargebee for the high-trust subset, and AM-confirmed for everything else. " +
+    "Read the Keeper (confirmed canonical facts) for a specific customer. The Keeper holds curated per-customer truth: owner identity (name, decision style), how they were sold (AE, sale date, promise), contract terms (start date, MRR, custom pricing), integration platform, behavioral patterns (payment timing, comms preference, seasonal), and open concerns (latent risks, next-call agenda). Facts are auto-confirmed at bootstrap from BaseSheet + Chargebee for the high-trust subset, and AM-confirmed for everything else. " +
     "Reach for this tool when the user asks about ANYTHING that might be a stored fact: 'who's the owner', 'when did they sign', 'what's their MRR', 'what platform are they on', 'do they prefer email or phone', 'any latent risks I should know about', 'how was this sold'. Pair with lookup_customer if the user names a customer by name rather than entity_id. " +
-    "Read-only — no approval required. Returns topic-clustered facts ready for the model to quote directly. If no Brain entry exists for the customer, say so plainly — the AM can add facts via the Brain panel.",
+    "Read-only — no approval required. Returns topic-clustered facts ready for the model to quote directly. If no Keeper entry exists for the customer, say so plainly — the AM can add facts via the Keeper panel.",
   input_schema: {
     type: "object",
     properties: {
@@ -50,14 +50,14 @@ export const readCustomerBrainTool: BeaconTool = {
     }
 
     try {
-      // Step 1 — resolve entity_id → customer_id via snapshot. Brain
+      // Step 1 — resolve entity_id → customer_id via snapshot. Keeper
       // facts are keyed on customer_id (Chargebee handle), not entity_id.
       const snap = await readLatestSnapshotV2();
       const customer = snap?.customers?.find((c) => c.entity_id === entityId);
       if (!customer) {
         return {
           ok: true,
-          summary: `Entity ${entityId.slice(0, 8)} not on the active book — no Brain entry available.`,
+          summary: `Entity ${entityId.slice(0, 8)} not on the active book — no Keeper entry available.`,
           data: { entity_id: entityId, found: false },
         };
       }
@@ -65,7 +65,7 @@ export const readCustomerBrainTool: BeaconTool = {
       if (!cbCustomerId) {
         return {
           ok: true,
-          summary: `Entity ${entityId.slice(0, 8)} (${customer.company ?? "?"}) has no Chargebee customer_id — Brain is keyed on Chargebee handle so no entry exists yet.`,
+          summary: `Entity ${entityId.slice(0, 8)} (${customer.company ?? "?"}) has no Chargebee customer_id — Keeper is keyed on Chargebee handle so no entry exists yet.`,
           data: {
             entity_id: entityId,
             bizname: customer.company ?? null,
@@ -74,7 +74,7 @@ export const readCustomerBrainTool: BeaconTool = {
         };
       }
 
-      // Step 2 — load the topic-clustered Brain block.
+      // Step 2 — load the topic-clustered Keeper block.
       const brain = await loadBrainForPrompt(cbCustomerId);
       if (!brain || brain.prompt_block.facts_returned === 0) {
         void logUmbrellaActivity({
@@ -93,7 +93,7 @@ export const readCustomerBrainTool: BeaconTool = {
         });
         return {
           ok: true,
-          summary: `No Brain entry yet for ${customer.company ?? entityId.slice(0, 8)}. AMs can add facts via the Brain panel on the Customer 360 page.`,
+          summary: `No Keeper entry yet for ${customer.company ?? entityId.slice(0, 8)}. AMs can add facts via the Keeper panel on the Customer 360 page.`,
           data: {
             entity_id: entityId,
             customer_id: cbCustomerId,
@@ -106,7 +106,7 @@ export const readCustomerBrainTool: BeaconTool = {
       }
 
       const { prompt_block } = brain;
-      const summary = `Found ${prompt_block.facts_returned} confirmed Brain fact${prompt_block.facts_returned === 1 ? "" : "s"} for ${customer.company ?? entityId.slice(0, 8)} (identity: ${Object.keys(prompt_block.identity).length}, operational: ${Object.keys(prompt_block.operational).length}, behavioral: ${Object.keys(prompt_block.behavioral).length}, concerns: ${Object.keys(prompt_block.concerns).length}, other: ${prompt_block.other.length}).`;
+      const summary = `Found ${prompt_block.facts_returned} confirmed Keeper fact${prompt_block.facts_returned === 1 ? "" : "s"} for ${customer.company ?? entityId.slice(0, 8)} (identity: ${Object.keys(prompt_block.identity).length}, operational: ${Object.keys(prompt_block.operational).length}, behavioral: ${Object.keys(prompt_block.behavioral).length}, concerns: ${Object.keys(prompt_block.concerns).length}, other: ${prompt_block.other.length}).`;
 
       void logUmbrellaActivity({
         email: ctx.amEmail,

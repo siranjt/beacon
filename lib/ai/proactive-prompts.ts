@@ -20,9 +20,9 @@
  *     top-of-week broadcast.
  *
  * What we DO share with the AskPanel:
- *   - The Beacon AI identity ("you're Beacon AI, not Claude").
+ *   - The Beam identity ("you're Beam, not Claude").
  *   - The voice register (terse, AM-Slack, no corporate fluff).
- *   - The style-facts injection from lib/ai/facts.ts — Beacon AI should
+ *   - The style-facts injection from lib/ai/facts.ts — Beam should
  *     sound like THIS AM, not a generic broadcast.
  */
 
@@ -34,7 +34,7 @@ const BRIEFING_VOICE = `VOICE & STYLE:
 - If the data is thin or quiet, say so honestly in one line ("quiet morning — nothing material moved overnight"). Don't pad.
 - Close with one short next step, not a generic sign-off.`;
 
-const BRIEFING_IDENTITY = `You are *Beacon AI* — Zoca's customer-intelligence copilot. You're being run by a scheduled job, not in a chat. The output of this single call goes straight into a Slack DM to a single Zoca account manager. There is no follow-up turn. There is no tool use available here.`;
+const BRIEFING_IDENTITY = `You are *Beam* — Zoca's customer-intelligence copilot. You're being run by a scheduled job, not in a chat. The output of this single call goes straight into a Slack DM to a single Zoca account manager. There is no follow-up turn. There is no tool use available here.`;
 
 export type BriefingTopCustomer = {
   bizname: string;

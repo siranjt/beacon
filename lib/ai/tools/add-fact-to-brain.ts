@@ -1,7 +1,7 @@
 /**
- * add_fact_to_brain — Beacon AI tool. Brain Wave 2a.2.
+ * add_fact_to_brain — Beam tool. Brain Wave 2a.2.
  *
- * Lets AMs grow the Brain by typing facts into Beacon AI conversation:
+ * Lets AMs grow the Keeper by typing facts into Beam conversation:
  *   "save: owner prefers WhatsApp, hates email"
  *   "remember they only respond after 6pm EST"
  *   "the platform is GlossGenius, contract renews September"
@@ -72,7 +72,7 @@ const ALL_CATEGORIES: ReadonlySet<TopicCategory> = new Set<TopicCategory>([
 export const addFactToBrainTool: BeaconTool = {
   name: "add_fact_to_brain",
   description:
-    "Save a confirmed fact about a customer to the Brain. Use when the AM tells you to 'save', 'remember', 'note that', 'add a fact', or otherwise commits a piece of customer knowledge to canonical truth. The Brain is the curated per-customer truth store that Beacon AI grounds on across every scope. " +
+    "Save a confirmed fact about a customer to the Keeper. Use when the AM tells you to 'save', 'remember', 'note that', 'add a fact', or otherwise commits a piece of customer knowledge to canonical truth. The Keeper is the curated per-customer truth store that Beam grounds on across every scope. " +
     "You classify the AM's content into (topic_category, topic_subcategory, field_name, value) using this schema:\n" +
     describeFieldCatalog() +
     "\n\nClassification rules:\n" +
@@ -185,14 +185,14 @@ export const addFactToBrainTool: BeaconTool = {
       if (!customer) {
         return {
           ok: false,
-          error: `Entity ${entityId.slice(0, 8)} not on the active book — can't save Brain fact.`,
+          error: `Entity ${entityId.slice(0, 8)} not on the active book — can't save Keeper fact.`,
         };
       }
       const cbCustomerId = customer.customer_id;
       if (!cbCustomerId) {
         return {
           ok: false,
-          error: `Entity ${entityId.slice(0, 8)} (${customer.company ?? "?"}) has no Chargebee customer_id — Brain is keyed on Chargebee handle.`,
+          error: `Entity ${entityId.slice(0, 8)} (${customer.company ?? "?"}) has no Chargebee customer_id — Keeper is keyed on Chargebee handle.`,
         };
       }
 
@@ -212,7 +212,7 @@ export const addFactToBrainTool: BeaconTool = {
             // Idempotent — fact already known.
             return {
               ok: true,
-              summary: `Brain already has this fact for ${customer.company ?? entityId.slice(0, 8)} (${topicSubcategory}/${fieldNameRaw}). No change.`,
+              summary: `Keeper already has this fact for ${customer.company ?? entityId.slice(0, 8)} (${topicSubcategory}/${fieldNameRaw}). No change.`,
               data: {
                 entity_id: entityId,
                 customer_id: cbCustomerId,
@@ -224,7 +224,7 @@ export const addFactToBrainTool: BeaconTool = {
           if (!force) {
             return {
               ok: false,
-              error: `Conflict: Brain already has ${topicSubcategory}/${fieldNameRaw}="${existingMatch.value}" for ${customer.company ?? entityId.slice(0, 8)}. Resend with force=true to overwrite, or use field_name='other' to keep both.`,
+              error: `Conflict: Keeper already has ${topicSubcategory}/${fieldNameRaw}="${existingMatch.value}" for ${customer.company ?? entityId.slice(0, 8)}. Resend with force=true to overwrite, or use field_name='other' to keep both.`,
             };
           }
         }
@@ -244,7 +244,7 @@ export const addFactToBrainTool: BeaconTool = {
       });
 
       if (!written) {
-        return { ok: false, error: "Failed to write Brain fact" };
+        return { ok: false, error: "Failed to write Keeper fact" };
       }
 
       void logUmbrellaActivity({
@@ -273,7 +273,7 @@ export const addFactToBrainTool: BeaconTool = {
           : `Saved`;
       return {
         ok: true,
-        summary: `${verb} Brain fact for ${customer.company ?? entityId.slice(0, 8)}: ${topicCategory}/${topicSubcategory}/${fieldNameRaw} = "${value.slice(0, 80)}${value.length > 80 ? "…" : ""}"`,
+        summary: `${verb} Keeper fact for ${customer.company ?? entityId.slice(0, 8)}: ${topicCategory}/${topicSubcategory}/${fieldNameRaw} = "${value.slice(0, 80)}${value.length > 80 ? "…" : ""}"`,
         data: {
           entity_id: entityId,
           customer_id: cbCustomerId,

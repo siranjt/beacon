@@ -1,5 +1,5 @@
 /**
- * Beacon AI Failure Inbox — admin view. Phase F-polish-AI Tier 3.
+ * Beam Failure Inbox — admin view. Phase F-polish-AI Tier 3.
  *
  * Lists every `<gap: ...>` marker the model has emitted across the
  * umbrella, grouped by (scope, category). Admins use this to rank
@@ -24,7 +24,7 @@ import { listGapRows, gapRollup, type GapLogRow, type GapRollup } from "@/lib/ai
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Beacon AI gaps · Admin · Beacon · Zoca",
+  title: "Beam gaps · Admin · Beacon · Zoca",
 };
 
 function fmtDate(iso: string): string {
@@ -70,7 +70,7 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
-      <AgentHeader agentName="Admin · Beacon AI gaps" homeHref="/" />
+      <AgentHeader agentName="Admin · Beam gaps" homeHref="/" />
       <PageViewLogger
         agent="umbrella"
         surface="auth"
@@ -89,10 +89,10 @@ export default async function Page() {
               margin: 0,
             }}
           >
-            Beacon AI failure inbox
+            Beam failure inbox
           </h1>
           <p style={{ color: "var(--zoca-text-2)", fontSize: 13, margin: "4px 0 0" }}>
-            Every time Beacon AI tagged itself with a gap. {rows.length} open · sorted newest first.
+            Every time Beam tagged itself with a gap. {rows.length} open · sorted newest first.
           </p>
         </div>
 
@@ -118,7 +118,7 @@ export default async function Page() {
                 fontSize: 14,
               }}
             >
-              No open gaps. 🎉 Either Beacon AI is killing it or nobody asked anything yet.
+              No open gaps. 🎉 Either Beam is killing it or nobody asked anything yet.
             </div>
           ) : (
             <GapTable rows={rows} />

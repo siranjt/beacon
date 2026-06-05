@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SuggestedActions — Beacon AI proactive recommendations strip.
+ * SuggestedActions — Beam proactive recommendations strip.
  * Phase E-9.
  *
  * Renders 2-3 cards above the main content on Customer 360. Each card is
@@ -161,7 +161,7 @@ export default function SuggestedActions({ scope }: Props) {
           color: C.text3,
         }}
       >
-        <Spark /> Beacon AI suggests
+        <Spark /> Beam suggests
       </div>
 
       {loading && <SkeletonRow />}

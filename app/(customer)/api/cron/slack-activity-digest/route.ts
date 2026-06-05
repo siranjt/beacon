@@ -271,20 +271,20 @@ function describeAction(r: ActivityRow): string {
     }
     case "claude_asked": {
       // Internal event_name stays as claude_asked (no schema migration) but
-      // user-facing copy says "Beacon AI" — the assistant brand.
+      // user-facing copy says "Beam" — the assistant brand.
       const bizMeta = metaString(r.metadata, "biz_name");
       const audience = metaString(r.metadata, "audience");
-      if (audience) return `asked Beacon AI about *${audience}*`;
-      if (bizMeta) return `asked Beacon AI about *${bizMeta}*`;
-      return "asked Beacon AI for help";
+      if (audience) return `asked Beam about *${audience}*`;
+      if (bizMeta) return `asked Beam about *${bizMeta}*`;
+      return "asked Beam for help";
     }
     case "suggestion_offered":
-      return "received Beacon AI suggestions";
+      return "received Beam suggestions";
     case "suggestion_acted": {
       const k = metaString(r.metadata, "kind");
       const label = metaString(r.metadata, "label");
-      if (label) return `acted on Beacon AI suggestion: *${label}*`;
-      return k ? `acted on a Beacon AI ${k} suggestion` : "acted on a Beacon AI suggestion";
+      if (label) return `acted on Beam suggestion: *${label}*`;
+      return k ? `acted on a Beam ${k} suggestion` : "acted on a Beam suggestion";
     }
 
     default:

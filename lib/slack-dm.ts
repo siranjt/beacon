@@ -1,5 +1,5 @@
 /**
- * Phase E-17 Wave 3b — Slack DM helper for proactive Beacon AI.
+ * Phase E-17 Wave 3b — Slack DM helper for proactive Beam.
  *
  * The existing `lib/customer/slack.ts` posts via an INCOMING WEBHOOK URL,
  * which is bound to a single channel (the digest channel). That's fine for

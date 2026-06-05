@@ -1,7 +1,7 @@
 /**
- * query_brain — Beacon AI tool. Brain Wave 2a.3.
+ * query_brain — Beam tool. Brain Wave 2a.3.
  *
- * Manager-facing cross-book search over the Brain. Lets you ask things like:
+ * Manager-facing cross-book search over the Keeper. Lets you ask things like:
  *   "Which customers prefer WhatsApp?"
  *   "Show me all customers on GlossGenius."
  *   "Who has a latent risk flagged this month?"
@@ -13,8 +13,8 @@
  * identity (bizname, am_name, entity_id) via the latest snapshot.
  *
  * Manager + admin only. AMs can already see facts for their own
- * customers via read_customer_brain — cross-book search is a leadership
- * concern (handoff planning, pattern discovery, audit).
+ * customers via read_customer_brain — cross-book Keeper search is a
+ * leadership concern (handoff planning, pattern discovery, audit).
  *
  * Read-only, auto-approves.
  */
@@ -42,7 +42,7 @@ function describeCatalog(): string {
 export const queryBrainTool: BeaconTool = {
   name: "query_brain",
   description:
-    "Cross-book search over the Beacon Brain (per-customer confirmed facts). Use when the manager asks a question that spans MULTIPLE customers and needs Brain context — examples:\n" +
+    "Cross-book search over the Keeper (per-customer confirmed facts). Use when the manager asks a question that spans MULTIPLE customers and needs Keeper context — examples:\n" +
     "  - 'Which customers prefer WhatsApp?'\n" +
     "  - 'Show me all customers on GlossGenius'\n" +
     "  - 'Who has a latent risk flagged?'\n" +
@@ -175,7 +175,7 @@ export const queryBrainTool: BeaconTool = {
         });
         return {
           ok: true,
-          summary: `No matching Brain facts for ${filterSummary}.`,
+          summary: `No matching Keeper facts for ${filterSummary}.`,
           data: {
             filter: {
               topic_category: topic_category ?? null,
@@ -261,7 +261,7 @@ export const queryBrainTool: BeaconTool = {
 
       return {
         ok: true,
-        summary: `Found ${total} Brain fact${total === 1 ? "" : "s"} matching ${filterSummary}${pageInfo}.`,
+        summary: `Found ${total} Keeper fact${total === 1 ? "" : "s"} matching ${filterSummary}${pageInfo}.`,
         data: {
           filter: {
             topic_category: topic_category ?? null,

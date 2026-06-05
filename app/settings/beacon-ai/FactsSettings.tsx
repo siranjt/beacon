@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * FactsSettings — Beacon AI memory management UI.
+ * FactsSettings — Beam memory management UI.
  * Phase E-9 · Phase 2.
  */
 
@@ -147,7 +147,7 @@ export default function FactsSettings() {
           letterSpacing: "-0.01em",
         }}
       >
-        What Beacon AI knows about you
+        What Beam knows about you
       </h1>
       <p
         style={{
@@ -159,9 +159,9 @@ export default function FactsSettings() {
           lineHeight: 1.6,
         }}
       >
-        Beacon AI builds a picture of how you work over time — your preferred
+        Beam builds a picture of how you work over time — your preferred
         response style, the customers and AMs you focus on, when you tend to
-        ask things. These facts get woven into every response so Beacon AI
+        ask things. These facts get woven into every response so Beam
         sharpens for you specifically. Add your own with the box below or via
         <code style={kbdInline}>/remember X</code> in the chat. Delete
         anything you don&apos;t want it to apply.
@@ -198,7 +198,7 @@ export default function FactsSettings() {
               marginBottom: 6,
             }}
           >
-            Teach Beacon AI something
+            Teach Beam something
           </label>
           <div style={{ display: "flex", gap: 8 }}>
             <input
@@ -266,7 +266,7 @@ export default function FactsSettings() {
         {loading
           ? "Loading…"
           : facts.length === 0
-          ? "No facts yet — keep using Beacon AI and ones will appear here"
+          ? "No facts yet — keep using Beam and ones will appear here"
           : `${facts.length} fact${facts.length === 1 ? "" : "s"} active`}
       </div>
 

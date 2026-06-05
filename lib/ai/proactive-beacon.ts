@@ -1,5 +1,5 @@
 /**
- * Phase E-17 Wave 3b — Proactive Beacon AI runners.
+ * Phase E-17 Wave 3b — Proactive Beam runners.
  *
  * Shared logic for the two proactive cron routes:
  *   • Monday briefing — top-5 actions for the week, voiced for each AM.

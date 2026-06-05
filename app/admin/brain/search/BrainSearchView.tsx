@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Admin Brain search — filter form + paginated table + CSV download.
+ * Admin Keeper search — filter form + paginated table + CSV download.
  *
  * Pulls from /api/v2/brain/search (JSON) for the table view and
  * /api/v2/brain/search/csv for downloads. Same filter shape; CSV
@@ -287,7 +287,7 @@ export default function BrainSearchView() {
         <section className="rounded-zoca-lg border border-zoca-border bg-zoca-bg-soft p-5">
           {rows.length === 0 ? (
             <div className="text-[13px] text-zoca-text-2 italic">
-              No matching Brain facts. Try broadening the filter — drop a
+              No matching Keeper facts. Try broadening the filter — drop a
               dropdown or change the value substring.
             </div>
           ) : (

@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * ActionCard — inline approval card for a Beacon AI tool_use. Phase E-16 Wave 1.
+ * ActionCard — inline approval card for a Beam tool_use. Phase E-16 Wave 1.
  *
- * Beacon AI proposes a mutation via a `tool_use` content block; we render
+ * Beam proposes a mutation via a `tool_use` content block; we render
  * this card inside the AskPanel transcript instead of plain text. The AM
  * can Approve (POSTs to /api/ai/action/execute) or Discard (PUTs the same
  * endpoint so it's audited). After the choice resolves, the card collapses
@@ -74,7 +74,7 @@ interface Props {
   /**
    * Phase E-17 Wave 3a — optional confidence data parsed from the
    * assistant's `<confidence: NN% — reasons>` marker. When present we render
-   * a ConfidenceBadge at the top of the card so the AM can see Beacon AI's
+   * a ConfidenceBadge at the top of the card so the AM can see Beam's
    * read of the evidence before approving the action.
    */
   confidence?: ConfidenceData | null;
@@ -409,9 +409,9 @@ export default function ActionCard({
             padding: "1px 6px",
             borderRadius: 999,
           }}
-          title="Beacon AI–proposed action"
+          title="Beam–proposed action"
         >
-          Beacon AI proposes
+          Beam proposes
         </span>
       </div>
 

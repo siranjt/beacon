@@ -1,11 +1,11 @@
 /**
- * Beacon AI memory & facts settings. Phase E-9 · Phase 2.
+ * Beam memory & facts settings. Phase E-9 · Phase 2.
  *
- * Shows the user the stable facts Beacon AI has accumulated about them.
+ * Shows the user the stable facts Beam has accumulated about them.
  * They can review, delete (deactivate), or add explicit facts.
  *
  * Two ways facts land here:
- *   1. Beacon AI's daily extraction cron — distills facts from past
+ *   1. Beam's daily extraction cron — distills facts from past
  *      conversations (preference / context / behavior)
  *   2. /remember slash command in the AskPanel — adds with category
  *      "explicit", confidence 1.00
@@ -22,7 +22,7 @@ import FactsSettings from "./FactsSettings";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Beacon AI memory · Settings · Zoca",
+  title: "Beam memory · Settings · Zoca",
 };
 
 export default async function Page() {
@@ -33,7 +33,7 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
-      <AgentHeader agentName="Settings · Beacon AI" homeHref="/" />
+      <AgentHeader agentName="Settings · Beam" homeHref="/" />
       <PageViewLogger
         agent="umbrella"
         surface="launcher"

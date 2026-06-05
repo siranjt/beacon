@@ -90,7 +90,7 @@ export default async function LauncherPage() {
           </p>
         </div>
 
-        {/* Phase E-9 — Beacon AI proactive recommendations strip. Sits
+        {/* Phase E-9 — Beam proactive recommendations strip. Sits
             above the inbox so the user sees "what should I focus on" as
             their first read. */}
         <SuggestedActions scope={{ kind: "inbox" }} />
@@ -182,7 +182,7 @@ export default async function LauncherPage() {
                   borderBottom: "1px dotted var(--zoca-text-3)",
                 }}
               >
-                Admin · Beacon AI gaps
+                Admin · Beam gaps
               </Link>
             </>
           )}

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 /**
- * Phase E-17 Wave 3b — Proactive Beacon AI · Monday morning briefing.
+ * Phase E-17 Wave 3b — Proactive Beam · Monday morning briefing.
  *
  * GET /api/cron/beacon-ai/monday-briefing
  *   → for each AM in AM_EMAILS, picks the top 5 customers to focus on this

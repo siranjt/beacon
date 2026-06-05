@@ -2,10 +2,10 @@
 
 /**
  * ConfidenceBadge — small "NN% confident · N signals" pill rendered next
- * to a Beacon AI recommendation or above an ActionCard.
+ * to a Beam recommendation or above an ActionCard.
  * Phase E-17 Wave 3a, Feature 2.
  *
- * Beacon AI emits `<confidence: NN% — reason1 / reason2>` inline near any
+ * Beam emits `<confidence: NN% — reason1 / reason2>` inline near any
  * non-trivial proposal. AskPanel parses the marker, strips it from the
  * visible prose, and renders this badge instead. The badge's tooltip /
  * popover shows the full reason list when expanded.
@@ -122,7 +122,7 @@ export default function ConfidenceBadge({ data, variant = "inline" }: Props) {
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        title={`Beacon AI confidence: ${data.percent}% — click to see reasoning`}
+        title={`Beam confidence: ${data.percent}% — click to see reasoning`}
         style={{
           display: "inline-flex",
           alignItems: "center",

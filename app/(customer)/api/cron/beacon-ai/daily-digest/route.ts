@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 /**
- * Phase E-17 Wave 3b — Proactive Beacon AI · Daily anomaly digest.
+ * Phase E-17 Wave 3b — Proactive Beam · Daily anomaly digest.
  *
  * GET /api/cron/beacon-ai/daily-digest
  *   → for each AM in AM_EMAILS, compares today's snapshot vs yesterday's

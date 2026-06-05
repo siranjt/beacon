@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * Brain Wave 2c — read-only Brain panel on the Customer 360 page.
+ * Brain Wave 2c — read-only Keeper panel on the Customer 360 page.
  *
  * Shows topic-clustered confirmed facts the AM / bootstrap have saved.
  * Each row is "field_label — value" with a small source pill + relative
- * timestamp. Beacon AI reads from the same data when answering questions
+ * timestamp. Beam reads from the same data when answering questions
  * about this customer; this panel makes that visible.
  *
  * Wave 2c.1 (deferred): inline edit, delete, version-history popover,
  * sunset_at indicator on Concerns rows.
  *
  * Wave 2d (deferred): add-via-panel (manual entry without going through
- * Beacon AI). For v1, AMs add facts by talking to Beacon AI; this panel
+ * Beam). For v1, AMs add facts by talking to Beam; this panel
  * is read-only.
  */
 
@@ -280,7 +280,7 @@ export default function V2BrainPanel({ entityId }: Props) {
       .then((json: FetchResponse) => {
         if (cancelled) return;
         if (!json.ok) {
-          setError(json.error || "Failed to load Brain");
+          setError(json.error || "Failed to load Keeper");
           setData(null);
         } else {
           setData(json);
@@ -301,7 +301,7 @@ export default function V2BrainPanel({ entityId }: Props) {
   return (
     <section
       className="rounded-zoca-lg border border-zoca-border bg-zoca-bg-soft p-4 md:p-5"
-      aria-label="Brain — confirmed facts"
+      aria-label="Keeper — confirmed facts"
     >
       <button
         type="button"
@@ -309,7 +309,7 @@ export default function V2BrainPanel({ entityId }: Props) {
         className="-m-1 mb-2 flex w-full items-baseline justify-between gap-2 rounded-md p-1 text-left hover:bg-zoca-border/20"
       >
         <h3 className="text-[13px] font-semibold uppercase tracking-wider text-zoca-text-2">
-          Brain
+          Keeper
           {data?.facts_count !== undefined && data.facts_count > 0 && (
             <span className="ml-1.5 text-[11px] font-normal normal-case tracking-normal text-zoca-text-2/70">
               · {data.facts_count} confirmed fact
@@ -326,7 +326,7 @@ export default function V2BrainPanel({ entityId }: Props) {
         <>
           {loading && (
             <div className="text-[12px] text-zoca-text-2 italic">
-              Loading Brain…
+              Loading Keeper…
             </div>
           )}
           {error && (
@@ -335,10 +335,10 @@ export default function V2BrainPanel({ entityId }: Props) {
           {!loading && !error && data && data.facts_count === 0 && (
             <div className="text-[12px] text-zoca-text-2 italic">
               {data.reason === "entity_not_in_active_book"
-                ? "Customer not on the active book — no Brain entry."
+                ? "Customer not on the active book — no Keeper entry."
                 : data.reason === "no_chargebee_customer_id"
-                  ? "No Chargebee customer_id — Brain is keyed on Chargebee handle."
-                  : "No facts saved yet. Tell Beacon AI to remember things about this customer — they'll show up here."}
+                  ? "No Chargebee customer_id — Keeper is keyed on Chargebee handle."
+                  : "No facts saved yet. Tell Beam to remember things about this customer — they'll show up here."}
             </div>
           )}
           {/* Wave 1.1 — Currently-managed-by section. Surfaces even when
@@ -396,8 +396,8 @@ export default function V2BrainPanel({ entityId }: Props) {
                 facts={data.grouped.relationship}
               />
               <div className="mt-3 text-[10px] text-zoca-text-2/60">
-                Beacon AI reads from this Brain when answering questions
-                about {data.bizname ?? "this customer"}. Tell Beacon to
+                Beam reads from the Keeper when answering questions
+                about {data.bizname ?? "this customer"}. Tell Beam to
                 remember new facts — they'll appear here after page reload.
               </div>
             </div>

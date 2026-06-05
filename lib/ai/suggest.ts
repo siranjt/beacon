@@ -9,7 +9,7 @@
  *   - inbox                  → "what should I tackle today" actions
  *   - customer-360           → per-customer triage actions
  *   - customer-book          → AM book-level patterns + outreach drafts
- *   - performance-landing    → meta / conceptual asks (Beacon AI knowledge)
+ *   - performance-landing    → meta / conceptual asks (Beam knowledge)
  *   - performance-report     → single-customer performance actions
  *   - escalation-overview    → queue triage + stalled-ticket nudges
  *   - post-payment-book      → verdict-feed summaries + AM-call queue
@@ -72,7 +72,7 @@ export interface SuggestResult {
  * guidance appended on top.
  * ──────────────────────────────────────────────────────────────── */
 
-const BASE_RULES = `You are Beacon AI's proactive recommendation engine. Your job is to read the user's current surface + data context and propose 2-3 specific, high-leverage next actions they could take RIGHT NOW.
+const BASE_RULES = `You are Beam's proactive recommendation engine. Your job is to read the user's current surface + data context and propose 2-3 specific, high-leverage next actions they could take RIGHT NOW.
 
 Output a JSON array of action objects, no preamble, no markdown fences:
 [
@@ -87,7 +87,7 @@ Output a JSON array of action objects, no preamble, no markdown fences:
 
 ACTION KINDS:
 - "ask"     → user clicks, AskPanel opens, prompt is pre-typed for the user to review/edit. Good for "Why is this RED?" or "Compare their billing trajectory."
-- "draft"   → AskPanel opens, prompt is pre-typed AND auto-submitted. Beacon AI starts streaming immediately. Use ONLY for deliverables (emails, slack messages, summaries) that don't need user editing first.
+- "draft"   → AskPanel opens, prompt is pre-typed AND auto-submitted. Beam starts streaming immediately. Use ONLY for deliverables (emails, slack messages, summaries) that don't need user editing first.
 - "navigate" → deep-link to another surface. Only use when navigating helps more than asking.
 
 RULES:

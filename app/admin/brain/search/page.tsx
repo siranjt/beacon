@@ -1,12 +1,12 @@
 /**
- * Beacon Brain — manager admin search page.
+ * Keeper — manager admin search page.
  *
  * Manager + admin only. Filter form (subcategory + field dropdowns,
  * value text input, limit/offset) + paginated table of all matching
- * Brain facts + CSV download. Decouples deep-dive search workflows
+ * Keeper facts + CSV download. Decouples deep-dive search workflows
  * from the chat surface.
  *
- * Parallel surface to the query_brain Beacon AI tool — same underlying
+ * Parallel surface to the query_brain Beam tool — same underlying
  * searchFacts helper. Use this when you'd rather click than chat.
  */
 
@@ -22,7 +22,7 @@ import BrainSearchView from "./BrainSearchView";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Brain search · Admin · Beacon · Zoca",
+  title: "Keeper search · Admin · Beacon · Zoca",
 };
 
 export default async function Page() {
@@ -37,7 +37,7 @@ export default async function Page() {
 
   return (
     <BeaconPageShell>
-      <AgentHeader agentName="Admin · Brain search" homeHref="/" />
+      <AgentHeader agentName="Admin · Keeper search" homeHref="/" />
       <PageViewLogger
         agent="umbrella"
         surface="auth"

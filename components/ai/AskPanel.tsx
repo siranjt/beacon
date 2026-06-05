@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * AskPanel — universal "Ask Beacon AI" copilot (Claude under the hood).
+ * AskPanel — universal "Ask Beam" copilot (Claude under the hood).
  * Phase E-9.
  *
  * Mounted once at the umbrella root layout. Detects scope from
@@ -12,7 +12,7 @@
  *   - Header subtitle says "About this customer" / "About the inbox" / etc.
  *
  * UX:
- *   - Floating "✨ Ask Beacon AI" button bottom-right (hidden when scope is
+ *   - Floating "✨ Ask Beam" button bottom-right (hidden when scope is
  *     "hidden" — auth pages, admin pages)
  *   - Click to open right-edge drawer
  *   - Esc / backdrop click to close
@@ -41,7 +41,7 @@ import {
 import { BeaconMark } from "@/components/BeaconMark";
 // Phase E-12 (E-12.4) — first-login working-style onboarding nudge.
 import StyleOnboarding from "@/components/ai/StyleOnboarding";
-// Phase E-16 Wave 1 — inline approval card for Beacon AI tool_use blocks.
+// Phase E-16 Wave 1 — inline approval card for Beam tool_use blocks.
 import ActionCard, {
   type ActionCardData,
   type ActionCardStatus,
@@ -413,7 +413,7 @@ export default function AskPanel() {
       setDraft("");
 
       // Phase E-9 · Phase 2 — /remember slash command. User types
-      // "/remember they manage Apurvaa's book" and Beacon AI stores it
+      // "/remember they manage Apurvaa's book" and Beam stores it
       // as an explicit fact in beacon_ai_user_facts. The fact is then
       // injected into every future prompt as part of USER PROFILE.
       // We acknowledge inline as a synthetic assistant turn — no LLM
@@ -860,9 +860,9 @@ export default function AskPanel() {
           add_note: "add-note",
           lookup_customer: "lookup",
           read_customer_notes: "read notes",
-          read_customer_brain: "read brain",
-          add_fact_to_brain: "save to brain",
-          query_brain: "search brain",
+          read_customer_brain: "read Keeper",
+          add_fact_to_brain: "save to Keeper",
+          query_brain: "search Keeper",
           get_chargebee_billing: "pull billing",
           get_customer_performance: "pull performance",
           draft_email_to_contact: "draft-email",
@@ -889,7 +889,7 @@ export default function AskPanel() {
             }
           | null;
         const lines: string[] = [];
-        lines.push(`[Beacon ran query_customer_book → ${summary}`);
+        lines.push(`[Beam ran query_customer_book → ${summary}`);
         if (rich) {
           lines.push(`metric: ${rich.metric}`);
           lines.push(`group_by: ${rich.group_by}`);
@@ -913,7 +913,7 @@ export default function AskPanel() {
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_customer_book" && !outcome.ok) {
-        followUp = `[Beacon's query_customer_book proposal was not run — ${outcome.error}.]`;
+        followUp = `[Beam's query_customer_book proposal was not run — ${outcome.error}.]`;
       } else if (action.toolName === "read_customer_notes" && outcome.ok) {
         // F-ai-context chunk 2 — inline the actual note content into the
         // follow-up so the model can quote/summarize. The one-line summary
@@ -932,7 +932,7 @@ export default function AskPanel() {
             }
           | null;
         const lines: string[] = [
-          `[Beacon ran read_customer_notes → ${outcome.summary}`,
+          `[Beam ran read_customer_notes → ${outcome.summary}`,
         ];
         if (rich?.scope === "own-am" && rich.note) {
           lines.push(`Your saved note (updated ${rich.note.updated_at}):`);
@@ -951,9 +951,9 @@ export default function AskPanel() {
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "read_customer_notes" && !outcome.ok) {
-        followUp = `[Beacon's read_customer_notes proposal was not run — ${outcome.error}.]`;
+        followUp = `[Beam's read_customer_notes proposal was not run — ${outcome.error}.]`;
       } else if (action.toolName === "read_customer_brain" && outcome.ok) {
-        // Brain Wave 2a.1 — inline the topic-clustered Brain block so the
+        // Brain Wave 2a.1 — inline the topic-clustered Keeper block so the
         // model can quote specific field values directly in its reply.
         const rich = (outcome.data ?? null) as
           | {
@@ -974,19 +974,19 @@ export default function AskPanel() {
             }
           | null;
         const lines: string[] = [
-          `[Beacon ran read_customer_brain → ${outcome.summary}`,
+          `[Beam ran read_customer_brain → ${outcome.summary}`,
         ];
         if (rich?.brain) {
-          lines.push("Brain data:");
+          lines.push("Keeper data:");
           lines.push(JSON.stringify(rich.brain));
         }
         lines.push("");
         lines.push(
-          "Now answer the user's question using the Brain facts above. The Brain is AUTHORITATIVE — prefer it over inference from raw signals. Quote field values directly (e.g. 'Sarah Chen' not 'owner_name: Sarah Chen'). If the Brain has no entry for this customer, say so plainly without hedging.",
+          "Now answer the user's question using the Keeper facts above. The Keeper is AUTHORITATIVE — prefer it over inference from raw signals. Quote field values directly (e.g. 'Sarah Chen' not 'owner_name: Sarah Chen'). If the Keeper has no entry for this customer, say so plainly without hedging.",
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "read_customer_brain" && !outcome.ok) {
-        followUp = `[Beacon's read_customer_brain proposal was not run — ${outcome.error}.]`;
+        followUp = `[Beam's read_customer_brain proposal was not run — ${outcome.error}.]`;
       } else if (action.toolName === "add_fact_to_brain" && outcome.ok) {
         // Brain Wave 2a.2 — success message. The data payload carries the
         // fact_id + topic + value; the model uses these to confirm to the
@@ -1005,12 +1005,12 @@ export default function AskPanel() {
             }
           | null;
         const lines: string[] = [
-          `[Beacon ran add_fact_to_brain → ${outcome.summary}`,
+          `[Beam ran add_fact_to_brain → ${outcome.summary}`,
         ];
         if (rich) {
           lines.push("");
           if (rich.idempotent) {
-            lines.push("This fact was already in the Brain — no change made.");
+            lines.push("This fact was already in the Keeper — no change made.");
           } else {
             lines.push(
               `Saved to ${rich.topic_category}/${rich.topic_subcategory}/${rich.field_name} as version ${rich.version}.`,
@@ -1026,7 +1026,7 @@ export default function AskPanel() {
         // Conflict case: the executor returns ok=false with the conflict
         // details in the error string. Pass that through so the model can
         // surface the conflict to the AM and offer the force=true option.
-        followUp = `[Beacon's add_fact_to_brain proposal was not run — ${outcome.error}. Tell the AM what the conflict is and ask if they want to overwrite (resend with force=true) or save as 'other' to keep both.]`;
+        followUp = `[Beam's add_fact_to_brain proposal was not run — ${outcome.error}. Tell the AM what the conflict is and ask if they want to overwrite (resend with force=true) or save as 'other' to keep both.]`;
       } else if (action.toolName === "query_brain" && outcome.ok) {
         // Brain Wave 2a.3 — manager cross-book search result. Inline the
         // matched rows so the model can compose a table or narrative.
@@ -1063,7 +1063,7 @@ export default function AskPanel() {
           | null;
         const ROWS_FOR_PROMPT = 20;
         const lines: string[] = [
-          `[Beacon ran query_brain → ${outcome.summary}`,
+          `[Beam ran query_brain → ${outcome.summary}`,
         ];
         if (rich?.rows && rich.rows.length > 0) {
           const pageCount = rich.rows.length;
@@ -1099,7 +1099,7 @@ export default function AskPanel() {
         );
         followUp = lines.join("\n") + "]";
       } else if (action.toolName === "query_brain" && !outcome.ok) {
-        followUp = `[Beacon's query_brain proposal was not run — ${outcome.error}.]`;
+        followUp = `[Beam's query_brain proposal was not run — ${outcome.error}.]`;
       } else if (
         (action.toolName === "get_chargebee_billing" ||
           action.toolName === "get_customer_performance") &&
@@ -1109,7 +1109,7 @@ export default function AskPanel() {
         // can read fields like unpaid_total / current_month clicks / keyword
         // counts directly. Without this it only sees the one-line summary.
         const lines: string[] = [
-          `[Beacon ran ${action.toolName} → ${outcome.summary}`,
+          `[Beam ran ${action.toolName} → ${outcome.summary}`,
         ];
         if (outcome.data) {
           lines.push("Result data:");
@@ -1129,11 +1129,11 @@ export default function AskPanel() {
           action.toolName === "get_customer_performance") &&
         !outcome.ok
       ) {
-        followUp = `[Beacon's ${action.toolName} proposal was not run — ${outcome.error}.]`;
+        followUp = `[Beam's ${action.toolName} proposal was not run — ${outcome.error}.]`;
       } else {
         followUp = outcome.ok
-          ? `[Beacon ran ${verb} on ${action.customerName}: ${outcome.summary}]`
-          : `[Beacon's ${verb} proposal was not run — ${outcome.error}.]`;
+          ? `[Beam ran ${verb} on ${action.customerName}: ${outcome.summary}]`
+          : `[Beam's ${verb} proposal was not run — ${outcome.error}.]`;
       }
       // F-polish-AI Tier 4 — for query_customer_book, lift the synthetic
       // citations out of the tool result and pass them through to the
@@ -1251,7 +1251,7 @@ export default function AskPanel() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label={`Ask Beacon AI about ${audience}`}
+          aria-label={`Ask Beam about ${audience}`}
           style={{
             position: "fixed",
             bottom: 24,
@@ -1276,7 +1276,7 @@ export default function AskPanel() {
               parchment so it shows on the char button background; flame
               colors (ember + gold) stay default — they pop against char. */}
           <BeaconMark size={18} towerFill="#F0E4CC" flicker />
-          Ask Beacon AI
+          Ask Beam
           {turns.length > 0 && (
             <span
               style={{
@@ -1299,7 +1299,7 @@ export default function AskPanel() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Ask Beacon AI"
+          aria-label="Ask Beam"
           onClick={() => {
             if (!streaming) setOpen(false);
           }}
@@ -1353,7 +1353,7 @@ export default function AskPanel() {
                   {/* Same animated flame, default colors — char tower
                       reads well on the parchment drawer surface. */}
                   <BeaconMark size={20} flicker />
-                  Ask Beacon AI
+                  Ask Beam
                 </div>
                 <div
                   style={{
@@ -1372,7 +1372,7 @@ export default function AskPanel() {
                   <span>About {audience}</span>
                   {totalMemory !== null && totalMemory > 0 && (
                     <span
-                      title="Beacon AI remembers your past conversations across all surfaces. Earlier discussions are surfaced into the context on every new question."
+                      title="Beam remembers your past conversations across all surfaces. Earlier discussions are surfaced into the context on every new question."
                       style={{
                         fontFamily: "ui-monospace, monospace",
                         fontSize: 10,
@@ -1391,7 +1391,7 @@ export default function AskPanel() {
               <div style={{ display: "flex", gap: 8 }}>
                 <a
                   href="/settings/beacon-ai"
-                  title="Beacon AI memory + facts settings"
+                  title="Beam memory + facts settings"
                   style={{
                     ...ghostBtn(streaming),
                     textDecoration: "none",
@@ -1466,7 +1466,7 @@ export default function AskPanel() {
                           lineHeight: 1.5,
                         }}
                       >
-                        Beacon AI remembers your past {totalMemory} day
+                        Beam remembers your past {totalMemory} day
                         {totalMemory === 1 ? "" : "s"} of conversations
                         across every surface and will reference them when
                         relevant.
@@ -1639,7 +1639,7 @@ export default function AskPanel() {
                   color: C.text3,
                 }}
               >
-                <span>Beacon AI · grounded in {audience}</span>
+                <span>Beam · grounded in {audience}</span>
                 <button
                   type="submit"
                   disabled={streaming || !draft.trim()}

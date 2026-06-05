@@ -192,7 +192,7 @@ async function loadContextForScope(
 
 export async function POST(req: NextRequest) {
   // Phase E-17.3c — eval harness service-token bypass. The nightly eval
-  // cron hits this endpoint to score Beacon AI quality. It can't carry a
+  // cron hits this endpoint to score Beam quality. It can't carry a
   // user session (it's a server-to-server call), so we accept a shared
   // service token via x-eval-runner-token header. The token is set as the
   // EVAL_RUNNER_TOKEN env var. Bypassed user is identified as a synthetic

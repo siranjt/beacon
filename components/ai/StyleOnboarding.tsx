@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Beacon AI working-style onboarding — Phase E-12 (E-12.4).
+ * Beam working-style onboarding — Phase E-12 (E-12.4).
  *
  * Two surfaces:
  *   1. **Inline card** in the AskPanel — shown only to users with zero
@@ -154,10 +154,10 @@ export default function StyleOnboarding({ compact = false, onComplete }: Props) 
         }}
       >
         <div style={{ fontWeight: 600, marginBottom: 4 }}>
-          ✨ Personalize Beacon AI in 30 seconds
+          ✨ Personalize Beam in 30 seconds
         </div>
         <div style={{ opacity: 0.85, lineHeight: 1.45 }}>
-          Tell Beacon how you like responses — length, format, depth, tone — and it&apos;ll match
+          Tell Beam how you like responses — length, format, depth, tone — and it&apos;ll match
           your style on every answer. You can change these anytime in settings.
         </div>
         <button
@@ -198,7 +198,7 @@ export default function StyleOnboarding({ compact = false, onComplete }: Props) 
         Working style {completed ? "(edit)" : "(set-up)"}
       </div>
       <div style={{ fontSize: 11, color: "#6E5F50", marginBottom: 12, lineHeight: 1.5 }}>
-        Beacon AI applies these defaults to every response. Override individual
+        Beam applies these defaults to every response. Override individual
         answers with <code style={{ background: "rgba(0,0,0,0.05)", padding: "0 4px", borderRadius: 3 }}>/remember</code> in any conversation.
       </div>
 
