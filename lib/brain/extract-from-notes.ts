@@ -234,25 +234,35 @@ function validateCandidate(c: RawCandidate): {
 }
 
 /**
- * Look up the AM email for a given am_name from the latest snapshot.
- * Best-effort — returns null if no match. Used to populate
- * owning_am_email on candidate facts.
+ * Build a name → email lookup for every authorized Zoca user (AM +
+ * manager + admin allowlists). Inverts resolveAmNameForEmail() — the
+ * canonical email→name resolver lives in lib/customer/auth-mapping.ts
+ * and reads from BaseSheet.
  *
- * Snapshot caches name→email via the snapshot's am-mapping data; this
- * helper just exposes the mapping for the extractor.
+ * Used to populate `owning_am_email` on candidate facts. Falls back to
+ * null when the AM who wrote a note isn't in any allowlist (e.g.
+ * offboarded staff).
+ *
+ * The snapshot does NOT carry am_email — that's the bug we're patching.
+ * Older Wave 1.5 backfills used `snapshot.am_email` which doesn't exist;
+ * resolveAmNameForEmail is the right source.
  */
-async function buildAmNameToEmail(): Promise<Map<string, string>> {
+export async function buildAmNameToEmail(): Promise<Map<string, string>> {
+  const { AM_EMAILS, MANAGER_EMAILS, ADMIN_EMAILS } = await import(
+    "../customer/config"
+  );
+  const { resolveAmNameForEmail } = await import(
+    "../customer/auth-mapping"
+  );
   const out = new Map<string, string>();
-  try {
-    const snap = await readLatestSnapshotV2();
-    const customers = snap?.customers ?? [];
-    for (const c of customers) {
-      const am = (c.am_name || "").trim();
-      const email = ((c as { am_email?: string }).am_email || "").trim();
-      if (am && email && !out.has(am)) out.set(am, email);
+  const allEmails = [...AM_EMAILS, ...MANAGER_EMAILS, ...ADMIN_EMAILS];
+  for (const email of allEmails) {
+    try {
+      const name = await resolveAmNameForEmail(email);
+      if (name && !out.has(name)) out.set(name, email);
+    } catch {
+      /* skip — best-effort */
     }
-  } catch {
-    /* ignore */
   }
   return out;
 }
