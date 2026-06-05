@@ -56,9 +56,23 @@ export async function GET(req: NextRequest) {
     since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   }
 
-  const result = await runExtractionSince(since);
+  // Chunking — bypasses Vercel's edge timeout on direct HTTP invocations
+  // when running a manual backfill. Loop curl from the user's terminal
+  // with incrementing skip until entities_attempted is 0.
+  const limitParam = url.searchParams.get("limit_entities");
+  const skipParam = url.searchParams.get("skip_entities");
+  const limit_entities = limitParam ? Math.max(1, Number(limitParam)) : undefined;
+  const skip_entities = skipParam ? Math.max(0, Number(skipParam)) : undefined;
+
+  const result = await runExtractionSince(since, { limit_entities, skip_entities });
   return NextResponse.json(
-    { ok: true, since: since ? since.toISOString() : "all_time", ...result },
+    {
+      ok: true,
+      since: since ? since.toISOString() : "all_time",
+      limit_entities,
+      skip_entities,
+      ...result,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

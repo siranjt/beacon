@@ -511,6 +511,7 @@ export interface RunResult {
 
 export async function runExtractionSince(
   since: Date | null,
+  opts: { limit_entities?: number; skip_entities?: number } = {},
 ): Promise<RunResult> {
   const startedAt = new Date();
   const result: RunResult = {
@@ -536,7 +537,13 @@ export async function runExtractionSince(
   }
   const anthropic = new Anthropic({ apiKey, maxRetries: 3 });
 
-  const entities = await listEntitiesWithNotesSince(since);
+  const allEntities = await listEntitiesWithNotesSince(since);
+  const skip = Math.max(0, opts.skip_entities ?? 0);
+  const limit =
+    typeof opts.limit_entities === "number" && opts.limit_entities > 0
+      ? opts.limit_entities
+      : allEntities.length;
+  const entities = allEntities.slice(skip, skip + limit);
   result.entities_attempted = entities.length;
   if (entities.length === 0) {
     result.finished_at = new Date().toISOString();
