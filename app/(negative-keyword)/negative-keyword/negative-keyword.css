@@ -473,11 +473,24 @@
 
 .nk-table {
   width: 100%;
+  min-width: 1320px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-family: -apple-system, Inter, system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--zoca-text);
 }
+
+.nk-table colgroup col.nk-col-date { width: 64px; }
+.nk-table colgroup col.nk-col-source { width: 90px; }
+.nk-table colgroup col.nk-col-eid { width: 100px; }
+.nk-table colgroup col.nk-col-biz { width: 160px; }
+.nk-table colgroup col.nk-col-am { width: 110px; }
+.nk-table colgroup col.nk-col-cat { width: 110px; }
+.nk-table colgroup col.nk-col-subj { width: 170px; }
+.nk-table colgroup col.nk-col-msg { width: 220px; }
+.nk-table colgroup col.nk-col-anal { width: 260px; }
+.nk-table colgroup col.nk-col-ticket { width: 130px; }
 
 .nk-table thead th {
   text-align: left;
@@ -486,16 +499,17 @@
   letter-spacing: 0.06em;
   font-size: 10px;
   color: var(--zoca-text-3);
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: var(--zoca-bg-tint);
   border-bottom: 1px solid var(--zoca-border);
   white-space: nowrap;
 }
 
 .nk-table tbody td {
-  padding: 14px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--zoca-border);
   vertical-align: top;
+  overflow: hidden;
 }
 
 .nk-table tbody tr:last-child td {
@@ -531,7 +545,6 @@
 }
 
 .nk-subject {
-  max-width: 220px;
   color: var(--zoca-text);
   font-weight: 500;
   line-height: 1.35;
@@ -540,26 +553,27 @@
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  font-size: 12px;
 }
 
 .nk-message {
-  max-width: 280px;
   color: var(--zoca-text-2);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: 12px;
 }
 
 .nk-analysis {
-  max-width: 320px;
   color: var(--zoca-text-2);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: 12px;
 }
 
 .nk-actions-col {

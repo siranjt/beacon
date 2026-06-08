@@ -397,6 +397,18 @@ export default function AlertsTab({
         <div className="surface nk-table-card">
           <div className="nk-table-wrap">
             <table className="nk-table">
+              <colgroup>
+                <col className="nk-col-date" />
+                <col className="nk-col-source" />
+                <col className="nk-col-eid" />
+                <col className="nk-col-biz" />
+                <col className="nk-col-am" />
+                <col className="nk-col-cat" />
+                <col className="nk-col-subj" />
+                <col className="nk-col-msg" />
+                <col className="nk-col-anal" />
+                <col className="nk-col-ticket" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Date</th>
