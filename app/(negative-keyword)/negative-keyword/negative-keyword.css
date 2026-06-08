@@ -1,3 +1,78 @@
+/* -------- Animation keyframes -------- */
+
+@keyframes nk-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nk-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes nk-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes nk-pulse-ember {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 67, 29, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(200, 67, 29, 0); }
+}
+
+@keyframes nk-kpi-count-up {
+  from { transform: scale(0.95); opacity: 0.5; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes nk-success-flash {
+  0% { background: var(--zoca-green-soft); }
+  100% { background: var(--zoca-bg-soft); }
+}
+
+@keyframes nk-fade-slide-out {
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+    max-height: 0;
+    padding: 0;
+    margin: 0;
+  }
+}
+
+@keyframes nk-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes nk-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nk-bounce-in {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.05); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes nk-tab-indicator-slide {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
 /* Negative Keyword Beacon — scoped styles. Phase NK-4.
  *
  * All selectors prefixed with .nk- to avoid leaking into other agents'
@@ -16,6 +91,7 @@
   margin-bottom: 18px;
   padding: 4px 0 14px;
   border-bottom: 1px solid var(--zoca-border);
+  animation: nk-fade-in-up 500ms ease-out both;
 }
 
 .nk-intro-blurb {
@@ -47,6 +123,7 @@
   margin-bottom: 24px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--zoca-border);
+  animation: nk-fade-in-up 500ms ease-out 80ms both;
 }
 
 .nk-tab {
@@ -59,8 +136,18 @@
   color: var(--zoca-text-2);
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: color 120ms ease, border-color 120ms ease;
+  transition: color 180ms ease, border-color 180ms ease, transform 120ms ease;
   margin-bottom: -9px;
+  position: relative;
+}
+
+.nk-tab:hover {
+  transform: translateY(-1px);
+}
+
+.nk-tab.is-active {
+  animation: nk-tab-indicator-slide 220ms ease-out;
+  transform-origin: left;
 }
 
 .nk-tab:hover {
@@ -149,16 +236,30 @@
   border: 1px solid var(--zoca-border);
   border-radius: 14px;
   overflow: hidden;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  animation: nk-fade-in-up 480ms ease-out both;
 }
+
+/* Stagger entrance of the 6 KPI cards in sequence */
+.nk-kpi:nth-child(1) { animation-delay: 120ms; }
+.nk-kpi:nth-child(2) { animation-delay: 180ms; }
+.nk-kpi:nth-child(3) { animation-delay: 240ms; }
+.nk-kpi:nth-child(4) { animation-delay: 300ms; }
+.nk-kpi:nth-child(5) { animation-delay: 360ms; }
+.nk-kpi:nth-child(6) { animation-delay: 420ms; }
 
 .nk-kpi.is-clickable {
   cursor: pointer;
 }
 
 .nk-kpi.is-clickable:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(43, 31, 20, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(43, 31, 20, 0.12);
+}
+
+.nk-kpi-value {
+  animation: nk-kpi-count-up 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: inherit;
 }
 
 .nk-kpi-rule {
@@ -214,6 +315,13 @@
   background: var(--zoca-bg-soft);
   border: 1px solid var(--zoca-border);
   border-radius: 14px;
+  animation: nk-fade-in 700ms ease-out 480ms both;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.nk-chart-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(43, 31, 20, 0.08);
 }
 
 .nk-chart-title {
@@ -269,6 +377,7 @@
   border: 1px solid var(--zoca-border);
   border-radius: 14px;
   margin-bottom: 16px;
+  animation: nk-fade-in-up 480ms ease-out 200ms both;
 }
 
 .nk-filter-line {
@@ -377,12 +486,17 @@
   font-family: -apple-system, Inter, system-ui, sans-serif;
   font-size: 12px;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nk-chip:hover {
   background: var(--zoca-bg-tint);
   color: var(--zoca-text);
+  transform: translateY(-1px);
+}
+
+.nk-chip:active {
+  transform: translateY(0);
 }
 
 .nk-chip.is-active {
@@ -390,6 +504,7 @@
   color: var(--zoca-bg-soft);
   border-color: var(--zoca-pink);
   font-weight: 500;
+  animation: nk-bounce-in 320ms cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 
 .nk-filter-summary {
@@ -465,6 +580,7 @@
   border: 1px solid var(--zoca-border);
   border-radius: 14px;
   overflow: hidden;
+  animation: nk-fade-in-up 480ms ease-out 300ms both;
 }
 
 .nk-table-wrap {
@@ -515,6 +631,22 @@
 .nk-table tbody tr:last-child td {
   border-bottom: none;
 }
+
+.nk-table tbody tr {
+  transition: background 180ms ease, transform 180ms ease;
+  animation: nk-slide-in 350ms ease-out both;
+}
+
+/* Stagger entrance of first 15 visible rows; later rows fade in faster */
+.nk-table tbody tr:nth-child(1) { animation-delay: 380ms; }
+.nk-table tbody tr:nth-child(2) { animation-delay: 420ms; }
+.nk-table tbody tr:nth-child(3) { animation-delay: 460ms; }
+.nk-table tbody tr:nth-child(4) { animation-delay: 500ms; }
+.nk-table tbody tr:nth-child(5) { animation-delay: 540ms; }
+.nk-table tbody tr:nth-child(6) { animation-delay: 580ms; }
+.nk-table tbody tr:nth-child(7) { animation-delay: 620ms; }
+.nk-table tbody tr:nth-child(8) { animation-delay: 660ms; }
+.nk-table tbody tr:nth-child(n+9) { animation-delay: 700ms; }
 
 .nk-table tbody tr:hover {
   background: var(--zoca-bg-tint);
@@ -617,12 +749,19 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
 }
 
 .nk-btn:hover:not(:disabled) {
   background: var(--zoca-bg-tint);
+  transform: translateY(-1px);
+}
+
+.nk-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .nk-btn:disabled {
@@ -639,6 +778,25 @@
 .nk-btn-primary:hover:not(:disabled) {
   background: var(--zoca-pink-bright);
   border-color: var(--zoca-pink-bright);
+  animation: nk-pulse-ember 1.2s ease-in-out;
+  transform: translateY(-1px);
+}
+
+.nk-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.nk-x-btn {
+  transition: color 200ms ease, background 200ms ease, border-color 200ms ease, transform 180ms ease;
+}
+
+.nk-x-btn:hover:not(:disabled) {
+  transform: rotate(90deg);
+}
+
+.nk-refresh:hover:not(:disabled) {
+  background: var(--zoca-bg-tint);
+  transform: translateY(-1px);
 }
 
 .nk-btn-ghost {
