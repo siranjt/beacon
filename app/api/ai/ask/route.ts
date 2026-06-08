@@ -393,7 +393,15 @@ export async function POST(req: NextRequest) {
         // Phase F-polish-AI — miss-payment-overview gets tools so Beacon
         // can draft chase emails / Slack messages and resolve biznames
         // beyond the top-30 sample via lookup_customer.
-        scope.kind === "miss-payment-overview";
+        scope.kind === "miss-payment-overview" ||
+        // Phase NK-Beam — negative-keyword-overview gets tools so Beam
+        // can call read_customer_brain on any flagged customer, draft
+        // outreach via draft_email/draft_slack, and use query_customer_book
+        // or query_brain for cross-book analysis.
+        scope.kind === "negative-keyword-overview" ||
+        // Performance-landing was missing — give it the same tool set so
+        // Beam can lookup customers + draft outreach from there too.
+        scope.kind === "performance-landing";
       const tools = wantsTools ? toAnthropicTools(CUSTOMER_360_TOOLS) : undefined;
       // Phase E-17 Wave 3a — emit the citation lookup at stream start so the
       // client can render `[cite:KEY]` chips in deltas as they arrive. Empty
