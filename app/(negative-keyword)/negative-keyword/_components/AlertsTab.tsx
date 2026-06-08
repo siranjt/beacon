@@ -189,41 +189,6 @@ export default function AlertsTab({
     }
   }
 
-  async function dismiss(alert: AlertItem) {
-    if (!alert.id) return;
-    const reason = window.prompt(
-      `Dismiss this ${alert.risk_category} alert for ${alert.business_name}?\n\nOptional reason:`,
-      "",
-    );
-    if (reason === null) return;
-    setBusyId(alert.id);
-    setRowMessage((m) => ({ ...m, [alert.id!]: "" }));
-    try {
-      const res = await fetch("/negative-keyword/api/dismiss", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alert_id: alert.id, reason }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setRowMessage((m) => ({ ...m, [alert.id!]: "Dismissed" }));
-        onAlertChanged();
-      } else {
-        setRowMessage((m) => ({
-          ...m,
-          [alert.id!]: data.error || "Dismiss failed",
-        }));
-      }
-    } catch (e) {
-      setRowMessage((m) => ({
-        ...m,
-        [alert.id!]: e instanceof Error ? e.message : "Network error",
-      }));
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   function handleCsv() {
     const csv = exportToCsv(alerts);
     const ts = new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-");
@@ -433,33 +398,22 @@ export default function AlertsTab({
                           {a.risk_category}
                         </span>
                       </td>
-                      <td className="nk-message" title={a.message_body ?? undefined}>
-                        {truncate(a.message_body, 160)}
+                      <td title={a.message_body ?? undefined}>
+                        <div className="nk-clamp">{truncate(a.message_body, 160)}</div>
                       </td>
-                      <td className="nk-analysis" title={a.analysis}>
-                        {truncate(a.analysis, 180)}
+                      <td title={a.analysis}>
+                        <div className="nk-clamp">{truncate(a.analysis, 180)}</div>
                       </td>
                       <td className="nk-actions-col">
                         {isOpen ? (
-                          <div className="nk-actions">
-                            <button
-                              type="button"
-                              className="nk-btn nk-btn-primary"
-                              disabled={busy}
-                              onClick={() => void createTicket(a)}
-                            >
-                              {busy ? "…" : "Create"}
-                            </button>
-                            <button
-                              type="button"
-                              className="nk-btn-text"
-                              disabled={busy}
-                              onClick={() => void dismiss(a)}
-                              title="Dismiss this alert"
-                            >
-                              dismiss
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            className="nk-btn nk-btn-primary"
+                            disabled={busy}
+                            onClick={() => void createTicket(a)}
+                          >
+                            {busy ? "…" : "Create"}
+                          </button>
                         ) : a.ticket_id && a.ticket_url ? (
                           <a
                             href={a.ticket_url}
