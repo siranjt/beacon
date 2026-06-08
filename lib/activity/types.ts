@@ -16,7 +16,7 @@
  *      hourly Slack rollup.
  */
 
-export type Agent = "customer" | "performance" | "escalation" | "post-payment" | "miss-payment" | "umbrella";
+export type Agent = "customer" | "performance" | "escalation" | "post-payment" | "miss-payment" | "negative-keyword" | "umbrella";
 
 export const AGENTS: readonly Agent[] = [
   "customer",
@@ -24,6 +24,7 @@ export const AGENTS: readonly Agent[] = [
   "escalation",
   "post-payment",
   "miss-payment",
+  "negative-keyword",
   "umbrella",
 ] as const;
 
@@ -111,6 +112,25 @@ export type MissPaymentEvent =
 export type MissPaymentSurface =
   | "miss_payment_home";
 
+// --- Negative Keyword Beacon ------------------------------------------------
+// Phase NK port. AI-classified negative-signal alerts surfaced as Linear
+// retention-risk tickets. Click instrumentation tracks the operator
+// workflow: which alert categories get triaged, how often AMs create vs
+// dismiss, and which tabs they spend time on.
+export type NegativeKeywordEvent =
+  | "page_view"
+  | "tab_switched"
+  | "filter_changed"
+  | "alert_opened"
+  | "ticket_created"
+  | "ticket_creation_failed"
+  | "alert_dismissed";
+
+export type NegativeKeywordSurface =
+  | "negative_keyword_home"
+  | "negative_keyword_alerts"
+  | "negative_keyword_tickets";
+
 // --- Umbrella (cross-agent infra) -------------------------------------------
 // Auth, launcher, things that don't belong to one specific agent.
 export type UmbrellaEvent =
@@ -143,6 +163,7 @@ export type AnyEvent =
   | EscalationEvent
   | PostPaymentEvent
   | MissPaymentEvent
+  | NegativeKeywordEvent
   | UmbrellaEvent;
 
 export type AnySurface =
@@ -151,6 +172,7 @@ export type AnySurface =
   | EscalationSurface
   | PostPaymentSurface
   | MissPaymentSurface
+  | NegativeKeywordSurface
   | UmbrellaSurface;
 
 /** Validates an arbitrary string against the union of all known event names. */
@@ -169,6 +191,8 @@ export const ALL_EVENT_NAMES: readonly string[] = [
   "verdict_filter_changed", "rerun_clicked", "docx_opened", "rerender_clicked",
   // miss-payment
   "excel_exported", "annotation_saved",
+  // negative-keyword
+  "alert_opened", "ticket_created", "ticket_creation_failed", "alert_dismissed",
   // umbrella
   "sign_in", "sign_in_rejected", "launcher_card_clicked", "sign_out", "api_call",
   "command_palette_opened", "command_palette_select", "claude_asked",
@@ -189,6 +213,8 @@ export const ALL_SURFACES: readonly string[] = [
   "post_payment_dashboard", "post_payment_report",
   // miss-payment
   "miss_payment_home",
+  // negative-keyword
+  "negative_keyword_home", "negative_keyword_alerts", "negative_keyword_tickets",
   // umbrella
   "auth", "launcher",
 ] as const;

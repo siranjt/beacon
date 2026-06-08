@@ -23,7 +23,7 @@ export function isAllowedEmail(email: string | null | undefined): boolean {
 }
 
 /**
- * The four agents under the umbrella. Order here = order in the launcher.
+ * The agents under the umbrella. Order here = order in the launcher.
  *
  * `kind: "internal"` — the agent has been migrated into the umbrella; route
  *                      points to a local path like `/customer`.
@@ -35,7 +35,7 @@ export function isAllowedEmail(email: string | null | undefined): boolean {
  */
 export type AgentKind = "internal" | "external";
 export type Agent = {
-  id: "customer" | "performance" | "escalation" | "post-payment" | "miss-payment";
+  id: "customer" | "performance" | "escalation" | "post-payment" | "miss-payment" | "negative-keyword";
   name: string;
   description: string;
   accent: string;       // Watchfire accent color for the card
@@ -83,6 +83,15 @@ export const AGENTS: Agent[] = [
       "Live unpaid invoices across the book — ACH status, AM ownership, Linear tickets, per-row notes.",
     accent: "#2A4D5C", // Sea Lapis (Finance ops fits the lapis register)
     route: "/miss-payment",
+    kind: "internal",
+  },
+  {
+    id: "negative-keyword",
+    name: "Negative Keyword Beacon",
+    description:
+      "AI-classified churn-risk signals across all 5 comms channels, with one-click Linear ticket creation.",
+    accent: "#2D4843", // Pine — sentinel / watchtower register, distinct from Patina + Sea Lapis
+    route: "/negative-keyword",
     kind: "internal",
   },
 ];

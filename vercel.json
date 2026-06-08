@@ -86,6 +86,10 @@
     {
       "path": "/api/cron/brain/extract-from-notes",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/negative-keyword/refresh",
+      "schedule": "0 */6 * * *"
     }
   ],
   "functions": {

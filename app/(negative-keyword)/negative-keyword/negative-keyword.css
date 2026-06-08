@@ -1,0 +1,548 @@
+/* Negative Keyword Beacon — scoped styles. Phase NK-4.
+ *
+ * All selectors prefixed with .nk- to avoid leaking into other agents'
+ * pages. Colors map to the umbrella's Watchfire palette tokens in
+ * globals.css (no rogue hex values; everything resolvable via brand).
+ */
+
+/* -------- Tab bar -------- */
+
+.nk-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 24px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--zoca-border);
+}
+
+.nk-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 10px 16px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  color: var(--zoca-text-2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+  margin-bottom: -9px;
+}
+
+.nk-tab:hover {
+  color: var(--zoca-text);
+}
+
+.nk-tab.is-active {
+  color: var(--zoca-text);
+  border-bottom-color: var(--zoca-pink); /* Ember */
+  font-weight: 600;
+}
+
+.nk-tab-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--zoca-text-3);
+}
+
+.nk-tab-meta-stamp {
+  font-variant-numeric: tabular-nums;
+}
+
+.nk-refresh {
+  appearance: none;
+  border: 1px solid var(--zoca-border);
+  background: var(--zoca-bg-soft);
+  color: var(--zoca-text);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.nk-refresh:hover:not(:disabled) {
+  background: var(--zoca-bg-tint);
+}
+
+.nk-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* -------- Overview KPIs -------- */
+
+.nk-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.nk-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .nk-kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.nk-kpi {
+  position: relative;
+  padding: 22px 22px 18px;
+  background: var(--zoca-bg-soft);
+  border: 1px solid var(--zoca-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.nk-kpi-rule {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.nk-kpi-label {
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--zoca-text-3);
+  margin-bottom: 8px;
+}
+
+.nk-kpi-value {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--zoca-text);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.nk-kpi-sub {
+  margin-top: 6px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--zoca-text-3);
+}
+
+/* -------- Charts -------- */
+
+.nk-chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .nk-chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nk-chart-card {
+  padding: 18px;
+  background: var(--zoca-bg-soft);
+  border: 1px solid var(--zoca-border);
+  border-radius: 14px;
+}
+
+.nk-chart-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--zoca-text);
+  margin-bottom: 14px;
+}
+
+.nk-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 11px;
+}
+
+.nk-legend-chip {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--zoca-text-2);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.nk-legend-chip:hover {
+  background: var(--zoca-bg-tint);
+}
+
+.nk-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+/* -------- Filter row + chips -------- */
+
+.nk-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+
+.nk-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nk-filter-label {
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--zoca-text-3);
+}
+
+.nk-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.nk-chip {
+  appearance: none;
+  border: 1px solid var(--zoca-border);
+  background: var(--zoca-bg-soft);
+  color: var(--zoca-text-2);
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.nk-chip:hover {
+  background: var(--zoca-bg-tint);
+  color: var(--zoca-text);
+}
+
+.nk-chip.is-active {
+  background: var(--zoca-pink);
+  color: var(--zoca-bg-soft);
+  border-color: var(--zoca-pink);
+  font-weight: 500;
+}
+
+.nk-filter-summary {
+  margin-left: auto;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--zoca-text-3);
+  align-self: flex-end;
+  padding-bottom: 4px;
+}
+
+/* -------- Pills (status / source / category) -------- */
+
+.nk-pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.nk-pill-ember {
+  background: var(--zoca-pink-soft);
+  color: var(--zoca-pink-bright);
+}
+
+.nk-pill-crimson {
+  background: var(--zoca-red-soft);
+  color: var(--zoca-red);
+}
+
+.nk-pill-brass {
+  background: var(--zoca-amber-soft);
+  color: #8C6A1F;
+}
+
+.nk-pill-lapis {
+  background: var(--zoca-lapis-soft);
+  color: var(--zoca-blue-strong);
+}
+
+.nk-pill-patina {
+  background: var(--zoca-green-soft);
+  color: var(--zoca-green-deep);
+}
+
+.nk-pill-smoke {
+  background: var(--zoca-smoke-soft);
+  color: var(--zoca-text-2);
+}
+
+.nk-pill-source {
+  background: var(--zoca-bg-tint);
+  color: var(--zoca-text-2);
+  border: 1px solid var(--zoca-border);
+}
+
+.nk-classifier-mark {
+  margin-left: 6px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 10px;
+  color: var(--zoca-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------- Table -------- */
+
+.nk-table-card {
+  padding: 0;
+  background: var(--zoca-bg-soft);
+  border: 1px solid var(--zoca-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.nk-table-wrap {
+  overflow-x: auto;
+}
+
+.nk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--zoca-text);
+}
+
+.nk-table thead th {
+  text-align: left;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  color: var(--zoca-text-3);
+  padding: 12px 14px;
+  background: var(--zoca-bg-tint);
+  border-bottom: 1px solid var(--zoca-border);
+  white-space: nowrap;
+}
+
+.nk-table tbody td {
+  padding: 14px;
+  border-bottom: 1px solid var(--zoca-border);
+  vertical-align: top;
+}
+
+.nk-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.nk-table tbody tr:hover {
+  background: var(--zoca-bg-tint);
+}
+
+.nk-biz {
+  font-weight: 500;
+  color: var(--zoca-text);
+}
+
+.nk-eid {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--zoca-text-3);
+  margin-top: 2px;
+}
+
+.nk-when {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--zoca-text-2);
+}
+
+.nk-analysis {
+  max-width: 380px;
+  color: var(--zoca-text-2);
+  line-height: 1.4;
+}
+
+.nk-actions-col {
+  min-width: 200px;
+}
+
+.nk-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.nk-btn {
+  appearance: none;
+  border: 1px solid var(--zoca-border);
+  background: var(--zoca-bg-soft);
+  color: var(--zoca-text);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+
+.nk-btn:hover:not(:disabled) {
+  background: var(--zoca-bg-tint);
+}
+
+.nk-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nk-btn-primary {
+  background: var(--zoca-pink);
+  color: var(--zoca-bg-soft);
+  border-color: var(--zoca-pink);
+}
+
+.nk-btn-primary:hover:not(:disabled) {
+  background: var(--zoca-pink-bright);
+  border-color: var(--zoca-pink-bright);
+}
+
+.nk-btn-ghost {
+  background: transparent;
+}
+
+.nk-row-msg {
+  margin-top: 6px;
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--zoca-text-3);
+}
+
+/* -------- Pagination -------- */
+
+.nk-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px;
+  background: var(--zoca-bg-tint);
+  border-top: 1px solid var(--zoca-border);
+}
+
+.nk-pager-stamp {
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--zoca-text-2);
+}
+
+/* -------- Tickets toolbar -------- */
+
+.nk-tickets-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nk-tickets-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nk-tickets-stamp {
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--zoca-text-2);
+}
+
+.nk-tickets-foot {
+  padding: 12px 16px;
+  background: var(--zoca-bg-tint);
+  border-top: 1px solid var(--zoca-border);
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--zoca-text-3);
+}
+
+/* -------- Empty / error / link utilities -------- */
+
+.nk-empty {
+  padding: 36px;
+  text-align: center;
+  background: var(--zoca-bg-soft);
+  border: 1px dashed var(--zoca-border);
+  border-radius: 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--zoca-text-2);
+  line-height: 1.6;
+}
+
+.nk-error {
+  padding: 14px 18px;
+  background: var(--zoca-red-soft);
+  border: 1px solid var(--zoca-red);
+  border-radius: 8px;
+  color: var(--zoca-red);
+  font-family: -apple-system, Inter, system-ui, sans-serif;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.nk-link {
+  color: var(--zoca-pink-bright);
+  text-decoration: underline;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.nk-link:hover {
+  color: var(--zoca-pink);
+}
+
+.nk-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.nk-muted {
+  color: var(--zoca-text-3);
+  font-style: italic;
+}
