@@ -1,20 +1,12 @@
 "use client";
 
 /**
- * Negative Keyword Beacon — 3-tab dashboard. Phase NK-4.1.
+ * Negative Keyword Beacon — 3-tab dashboard. Phase NK-4 (polish rev).
  *
- * Tabs:
- *   - Overview   — KPI cards + 3 charts derived from the alerts list
- *   - Alerts     — paginated table + filters + Create Ticket / Dismiss actions
- *   - Tickets    — read-only list of open Linear retention-risk tickets
- *
- * The dashboard hydrates alerts ONCE on tab=overview/alerts entry; both
- * tabs share the same array (Overview derives charts client-side). The
- * Tickets tab hits a different endpoint and isn't loaded until clicked.
- *
- * Filter state lives in component state, NOT URL params — switching tabs
- * preserves filters in memory, but a hard refresh resets them. Tab
- * choice IS URL-persisted via `?tab=` so refreshes stay on the same tab.
+ * Layout mirrors the original standalone Negative Keyword Alert
+ * dashboard's structure (rich KPI breakdown, AM exposure chart,
+ * full filter row) while staying in Beacon's Watchfire theme +
+ * BeaconPageShell chrome.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -33,12 +25,20 @@ export interface AlertsFilter {
   status: "all" | "open" | "ticketed" | "dismissed";
   source: AlertSource | "";
   category: RiskCategory | "";
+  am: string; // AM name; "" = all
+  search: string; // matches business_name / sender / message_body
+  since: string; // YYYY-MM-DD; "" = no lower bound
+  until: string; // YYYY-MM-DD; "" = no upper bound
 }
 
 const DEFAULT_FILTER: AlertsFilter = {
   status: "open",
   source: "",
   category: "",
+  am: "",
+  search: "",
+  since: "",
+  until: "",
 };
 
 function initialTab(): Tab {
@@ -59,7 +59,6 @@ export default function Dashboard() {
   const [alertsFetchedAt, setAlertsFetchedAt] = useState<string | null>(null);
   const [scope, setScope] = useState<"am" | "all">("all");
 
-  /** Reflect tab state into the URL without reloading. */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const u = new URL(window.location.href);
@@ -68,14 +67,11 @@ export default function Dashboard() {
     window.history.replaceState({}, "", u);
   }, [tab]);
 
-  /** Fetch alerts once on mount + on explicit refresh. Filters are
-   *  applied CLIENT-SIDE on the returned array so we don't hit the
-   *  server every time the user toggles a chip. */
   const fetchAlerts = useCallback(async () => {
     setAlertsLoading(true);
     setAlertsError(null);
     try {
-      const res = await fetch("/negative-keyword/api/alerts?limit=1000", {
+      const res = await fetch("/negative-keyword/api/alerts?limit=2000", {
         cache: "no-store",
       });
       if (!res.ok) {
@@ -97,8 +93,18 @@ export default function Dashboard() {
     void fetchAlerts();
   }, [fetchAlerts]);
 
-  /** Client-side filter pipeline shared by Overview KPIs + Alerts table. */
+  /** Distinct AM names present in the dataset — feeds the AM filter dropdown. */
+  const amOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const a of alerts) {
+      if (a.am_name && a.am_name.trim()) names.add(a.am_name.trim());
+    }
+    return Array.from(names).sort();
+  }, [alerts]);
+
+  /** Apply all client-side filters in one pass. */
   const filteredAlerts = useMemo(() => {
+    const needle = filter.search.trim().toLowerCase();
     return alerts.filter((a) => {
       if (filter.status === "open") {
         if (a.ticket_id || a.dismissed_at) return false;
@@ -109,18 +115,54 @@ export default function Dashboard() {
       }
       if (filter.source && a.source !== filter.source) return false;
       if (filter.category && a.risk_category !== filter.category) return false;
+      if (filter.am && (a.am_name ?? "") !== filter.am) return false;
+
+      if (filter.since || filter.until) {
+        const d = String(a.message_date ?? "").slice(0, 10);
+        if (filter.since && d < filter.since) return false;
+        if (filter.until && d > filter.until) return false;
+      }
+
+      if (needle) {
+        const haystack = [
+          a.business_name,
+          a.am_name,
+          a.sender,
+          a.message_body,
+          a.analysis,
+          a.subject,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(needle)) return false;
+      }
       return true;
     });
   }, [alerts, filter]);
 
   return (
     <div>
+      {/* Description strip — mirrors the old dashboard's intro paragraph */}
+      <div className="nk-intro">
+        <p className="nk-intro-blurb">
+          Which customers are upset, where dissatisfaction was flagged, and which
+          accounts need AM attention — surfaced from negative-keyword monitoring
+          across App Chat, Email, SMS, Phone, and Video.
+        </p>
+        <div className="nk-intro-bullets">
+          <span>✱ Last 14 days</span>
+          <span>✱ Live Metabase data</span>
+          <span>✱ One-click ticket creation</span>
+        </div>
+      </div>
+
       {/* Tab bar */}
       <div className="nk-tabs" role="tablist" aria-label="Negative Keyword Beacon tabs">
         {(
           [
             { id: "overview" as const, label: "Overview" },
-            { id: "alerts" as const, label: "Alerts" },
+            { id: "alerts" as const, label: `All alerts (${alerts.length})` },
             { id: "tickets" as const, label: "Created Tickets" },
           ]
         ).map((t) => (
@@ -139,7 +181,7 @@ export default function Dashboard() {
         <div className="nk-tab-meta">
           {alertsFetchedAt && (
             <span className="nk-tab-meta-stamp">
-              {alerts.length} alerts · {scope === "am" ? "your book" : "all customers"} · refreshed{" "}
+              {scope === "am" ? "your book" : "all customers"} · refreshed{" "}
               {new Date(alertsFetchedAt).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -158,7 +200,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Tab content */}
       {alertsError && (
         <div className="nk-error" role="alert">
           Could not load alerts: {alertsError}
@@ -170,7 +211,6 @@ export default function Dashboard() {
           alerts={alerts}
           loading={alertsLoading}
           onJumpTo={(seed) => {
-            // From an overview chart click, jump into Alerts with that chip preset.
             setFilter((prev) => ({ ...prev, ...seed }));
             setTab("alerts");
           }}
@@ -181,6 +221,7 @@ export default function Dashboard() {
         <AlertsTab
           alerts={filteredAlerts}
           totalAlerts={alerts.length}
+          amOptions={amOptions}
           loading={alertsLoading}
           filter={filter}
           onFilterChange={setFilter}

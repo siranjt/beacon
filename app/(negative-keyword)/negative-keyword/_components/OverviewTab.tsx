@@ -1,20 +1,17 @@
 "use client";
 
 /**
- * Negative Keyword Beacon — Overview tab. Phase NK-4.4.
+ * Negative Keyword Beacon — Overview tab. Phase NK-4 (polish rev).
  *
- * Surfaces:
- *   - 4 KPI cards (open / ticketed / dismissed / AI-classified)
- *   - Donut chart: risk_category distribution (clickable → jump to
- *     Alerts tab pre-filtered to that category)
- *   - Bar chart: source distribution (clickable → jump to Alerts pre-filtered)
- *   - Line chart: alerts/day for the last 14 days
+ * 6 KPI cards (Total / Cancellation / Billing / Lead quality / Technical /
+ * Tickets created) mirror the original standalone dashboard's category
+ * breakdown.
  *
- * Charts derive aggregates client-side from the alerts array passed in.
- * No server round-trip per chart — same data as Alerts tab.
+ * Charts: risk-category donut, source bar chart, daily-volume line,
+ * AM-exposure horizontal bar (top 10 AMs by alert count).
  *
- * Recharts (not Chart.js) for consistency with Miss Payment Beacon and
- * the rest of the umbrella's chart palette work.
+ * All Watchfire palette. Charts derive aggregates from the alerts array
+ * client-side — no extra fetches.
  */
 
 import { useMemo } from "react";
@@ -49,9 +46,6 @@ interface Props {
   onJumpTo: (seed: Partial<AlertsFilter>) => void;
 }
 
-/* Watchfire palette mapping for the categories.
-   Distinct, distinguishable at chart-segment size, all from Beacon's
-   palette (no rogue Tailwind colors). */
 const CATEGORY_COLORS: Record<RiskCategory, string> = {
   Cancellation: "#7C2D12", // Deep Crimson
   Billing: "#D9A441", // Brass
@@ -82,14 +76,29 @@ function KpiCard({
   value,
   sub,
   accent,
+  onClick,
 }: {
   label: string;
   value: number;
   sub?: string;
   accent: string;
+  onClick?: () => void;
 }) {
+  const clickable = !!onClick;
   return (
-    <div className="surface nk-kpi">
+    <div
+      className={`surface nk-kpi ${clickable ? "is-clickable" : ""}`}
+      onClick={onClick}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!clickable) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+    >
       <div className="nk-kpi-rule" style={{ background: accent }} aria-hidden />
       <div className="nk-kpi-label">{label}</div>
       <div className="nk-kpi-value">{value.toLocaleString()}</div>
@@ -112,50 +121,41 @@ const tooltipProps = {
 };
 
 export default function OverviewTab({ alerts, loading, onJumpTo }: Props) {
-  /* KPI counts. Open = no ticket + not dismissed. */
+  /* Counts for the KPI strip. */
   const stats = useMemo(() => {
-    let open = 0;
+    const total = alerts.length;
+    const businesses = new Set(alerts.map((a) => a.entity_id)).size;
+    const byCat: Record<RiskCategory, number> = {
+      Cancellation: 0,
+      Billing: 0,
+      "Lead quality": 0,
+      Technical: 0,
+      Disappointed: 0,
+      Flagged: 0,
+    };
     let ticketed = 0;
-    let dismissed = 0;
-    let ai = 0;
     for (const a of alerts) {
+      byCat[a.risk_category] += 1;
       if (a.ticket_id) ticketed += 1;
-      else if (a.dismissed_at) dismissed += 1;
-      else open += 1;
-      if (a.classifier === "ai") ai += 1;
     }
-    return { open, ticketed, dismissed, ai };
+    const pct = (n: number) =>
+      total === 0 ? "0% of total" : `${((n / total) * 100).toFixed(1)}% of total`;
+    return { total, businesses, byCat, ticketed, pct };
   }, [alerts]);
 
-  /* Category breakdown for the donut. Skip empty categories so the
-     chart doesn't render zero-slice ghosts. */
   const categoryData = useMemo(() => {
-    const counts = new Map<RiskCategory, number>();
-    for (const c of RISK_CATEGORIES) counts.set(c, 0);
-    for (const a of alerts) {
-      counts.set(a.risk_category, (counts.get(a.risk_category) ?? 0) + 1);
-    }
-    return Array.from(counts.entries())
-      .filter(([, v]) => v > 0)
-      .map(([name, value]) => ({ name, value }));
-  }, [alerts]);
+    return RISK_CATEGORIES.map((name) => ({ name, value: stats.byCat[name] }))
+      .filter((d) => d.value > 0);
+  }, [stats]);
 
-  /* Source breakdown for the bar chart. Keeps zero buckets so the
-     viewer sees which channels are quiet vs. loud. */
   const sourceData = useMemo(() => {
     const counts = new Map<AlertSource, number>();
     for (const s of ALERT_SOURCES) counts.set(s, 0);
-    for (const a of alerts) {
-      counts.set(a.source, (counts.get(a.source) ?? 0) + 1);
-    }
+    for (const a of alerts) counts.set(a.source, (counts.get(a.source) ?? 0) + 1);
     return Array.from(counts.entries()).map(([name, value]) => ({ name, value }));
   }, [alerts]);
 
-  /* Last-14-day daily count for the line chart. Pre-populates each day
-     with zero so quiet stretches show as flat-line, not gaps.
-     Postgres DATE → neon driver may return either "YYYY-MM-DD" string
-     OR a full ISO timestamp depending on column metadata; normalize
-     both to the first 10 chars so the key comparison is robust. */
+  /* Last-14-day daily count. */
   const dailyData = useMemo(() => {
     const buckets: Record<string, number> = {};
     const today = new Date();
@@ -163,19 +163,29 @@ export default function OverviewTab({ alerts, loading, onJumpTo }: Props) {
     for (let i = 13; i >= 0; i -= 1) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      buckets[key] = 0;
+      buckets[d.toISOString().slice(0, 10)] = 0;
     }
     for (const a of alerts) {
-      const dateKey = String(a.message_date ?? "").slice(0, 10);
-      if (dateKey in buckets) {
-        buckets[dateKey] += 1;
-      }
+      const k = String(a.message_date ?? "").slice(0, 10);
+      if (k in buckets) buckets[k] += 1;
     }
     return Object.entries(buckets).map(([date, count]) => ({
       date: fmtTime(date),
       count,
     }));
+  }, [alerts]);
+
+  /* Top 10 AMs by alert count — horizontal bar chart. */
+  const amData = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of alerts) {
+      const name = a.am_name?.trim() || "Unknown";
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
   }, [alerts]);
 
   if (loading && alerts.length === 0) {
@@ -184,26 +194,64 @@ export default function OverviewTab({ alerts, loading, onJumpTo }: Props) {
   if (!loading && alerts.length === 0) {
     return (
       <div className="nk-empty">
-        No alerts in the last 14 days. Either nobody&apos;s flagging anything (good)
-        or the cron hasn&apos;t fired yet — check the dev terminal.
+        No alerts in the last 14 days. Either the negative-signal lexicon
+        hasn&apos;t matched anything (a good sign) or the cron hasn&apos;t
+        fired yet — check the dev terminal.
       </div>
     );
   }
 
   return (
     <div className="nk-overview">
-      {/* KPI strip */}
-      <div className="nk-kpi-row">
-        <KpiCard label="Open" value={stats.open} sub="not ticketed or dismissed" accent="#C8431D" />
-        <KpiCard label="Ticketed" value={stats.ticketed} sub="Linear ticket created" accent="#D9A441" />
-        <KpiCard label="Dismissed" value={stats.dismissed} sub="AM marked as noise" accent="#8B7A66" />
-        <KpiCard label="AI-classified" value={stats.ai} sub="vs regex fallback" accent="#2A4D5C" />
+      {/* 6-card KPI strip */}
+      <div className="nk-kpi-row nk-kpi-row-6">
+        <KpiCard
+          label="Total alerts"
+          value={stats.total}
+          sub={`${stats.businesses} unique businesses`}
+          accent="#C8431D"
+        />
+        <KpiCard
+          label="Cancellation"
+          value={stats.byCat.Cancellation}
+          sub={stats.pct(stats.byCat.Cancellation)}
+          accent="#7C2D12"
+          onClick={() => onJumpTo({ category: "Cancellation" })}
+        />
+        <KpiCard
+          label="Billing"
+          value={stats.byCat.Billing}
+          sub="Refund / charge disputes"
+          accent="#D9A441"
+          onClick={() => onJumpTo({ category: "Billing" })}
+        />
+        <KpiCard
+          label="Lead quality"
+          value={stats.byCat["Lead quality"]}
+          sub="No bookings / spam leads"
+          accent="#C8431D"
+          onClick={() => onJumpTo({ category: "Lead quality" })}
+        />
+        <KpiCard
+          label="Technical"
+          value={stats.byCat.Technical}
+          sub="Platform / service issues"
+          accent="#2A4D5C"
+          onClick={() => onJumpTo({ category: "Technical" })}
+        />
+        <KpiCard
+          label="Tickets created"
+          value={stats.ticketed}
+          sub={stats.ticketed === 0 ? "Click Create in table" : "Linear tickets"}
+          accent="#4A7C59"
+          onClick={() => onJumpTo({ status: "ticketed" })}
+        />
       </div>
 
-      {/* Charts: donut + bar (side by side) */}
+      {/* Donut + Source bar */}
       <div className="nk-chart-row">
         <div className="surface nk-chart-card">
-          <div className="nk-chart-title">By risk category</div>
+          <div className="nk-chart-title">Risk category mix</div>
           <div style={{ height: 260 }}>
             <ResponsiveContainer>
               <PieChart>
@@ -256,17 +304,21 @@ export default function OverviewTab({ alerts, loading, onJumpTo }: Props) {
         </div>
 
         <div className="surface nk-chart-card">
-          <div className="nk-chart-title">By source</div>
+          <div className="nk-chart-title">Alerts by source</div>
           <div style={{ height: 260 }}>
             <ResponsiveContainer>
-              <BarChart data={sourceData} margin={{ left: 0, right: 12, top: 4, bottom: 4 }}>
-                <CartesianGrid {...gridStyle} />
-                <XAxis dataKey="name" tick={tickStyle} />
-                <YAxis tick={tickStyle} allowDecimals={false} />
+              <BarChart
+                data={sourceData}
+                layout="vertical"
+                margin={{ left: 40, right: 16, top: 8, bottom: 8 }}
+              >
+                <CartesianGrid {...gridStyle} horizontal={false} />
+                <XAxis type="number" tick={tickStyle} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={tickStyle} width={70} />
                 <Tooltip {...tooltipProps} />
                 <Bar
                   dataKey="value"
-                  radius={[4, 4, 0, 0]}
+                  radius={[0, 4, 4, 0]}
                   onClick={(d: { name?: string }) => {
                     if (d?.name) onJumpTo({ source: d.name as AlertSource });
                   }}
@@ -282,26 +334,61 @@ export default function OverviewTab({ alerts, loading, onJumpTo }: Props) {
         </div>
       </div>
 
-      {/* Daily trend */}
-      <div className="surface nk-chart-card">
-        <div className="nk-chart-title">Alerts per day · last 14 days</div>
-        <div style={{ height: 200 }}>
-          <ResponsiveContainer>
-            <LineChart data={dailyData} margin={{ left: 0, right: 12, top: 4, bottom: 4 }}>
-              <CartesianGrid {...gridStyle} />
-              <XAxis dataKey="date" tick={tickStyle} />
-              <YAxis tick={tickStyle} allowDecimals={false} />
-              <Tooltip {...tooltipProps} />
-              <Line
-                type="monotone"
-                dataKey="count"
-                stroke="#C8431D"
-                strokeWidth={2}
-                dot={{ fill: "#C8431D", r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+      {/* Daily volume + AM exposure */}
+      <div className="nk-chart-row">
+        <div className="surface nk-chart-card">
+          <div className="nk-chart-title">Daily alert volume · 14 days</div>
+          <div style={{ height: 240 }}>
+            <ResponsiveContainer>
+              <LineChart data={dailyData} margin={{ left: 0, right: 12, top: 4, bottom: 4 }}>
+                <CartesianGrid {...gridStyle} />
+                <XAxis dataKey="date" tick={tickStyle} />
+                <YAxis tick={tickStyle} allowDecimals={false} />
+                <Tooltip {...tooltipProps} />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#C8431D"
+                  strokeWidth={2}
+                  dot={{ fill: "#C8431D", r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="surface nk-chart-card">
+          <div className="nk-chart-title">AM exposure · top 10</div>
+          <div style={{ height: 240 }}>
+            <ResponsiveContainer>
+              <BarChart
+                data={amData}
+                layout="vertical"
+                margin={{ left: 40, right: 16, top: 4, bottom: 4 }}
+              >
+                <CartesianGrid {...gridStyle} horizontal={false} />
+                <XAxis type="number" tick={tickStyle} allowDecimals={false} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={tickStyle}
+                  width={100}
+                  interval={0}
+                />
+                <Tooltip {...tooltipProps} />
+                <Bar
+                  dataKey="value"
+                  fill="#C8431D"
+                  radius={[0, 4, 4, 0]}
+                  onClick={(d: { name?: string }) => {
+                    if (d?.name && d.name !== "Unknown") onJumpTo({ am: d.name });
+                  }}
+                  style={{ cursor: "pointer" }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>

@@ -1,15 +1,18 @@
 "use client";
 
 /**
- * Negative Keyword Beacon — Alerts tab. Phase NK-4.3.
+ * Negative Keyword Beacon — Alerts tab. Phase NK-4 (polish rev).
  *
- * The primary surface AMs work from. Listed alerts, filter chips, per-row
- * Create Ticket / Dismiss actions, pagination.
+ * Column layout (matches the standalone repo's original dashboard):
+ *   DATE · SOURCE · ENTITY ID · BUSINESS NAME · AM NAME · CATEGORY ·
+ *   SUBJECT · MESSAGE · ANALYSIS · TICKET
  *
- * Filtering is client-side (Dashboard owns the filter state and passes a
- * pre-filtered slice in). This component just renders + handles row
- * actions. After any row action (ticket created / dismissed), it asks
- * the parent to re-fetch by calling onAlertChanged().
+ * Filter row gained: search input, AM dropdown, From/To date pickers,
+ * and a CSV download button — also from the standalone repo.
+ *
+ * Filtering is client-side. Dashboard owns the AlertsFilter state and
+ * applies the combined filter before passing alerts in. This component
+ * renders + handles row actions + emits filter changes.
  */
 
 import { useMemo, useState } from "react";
@@ -25,6 +28,7 @@ import type { AlertsFilter } from "./Dashboard";
 interface Props {
   alerts: AlertItem[];
   totalAlerts: number;
+  amOptions: string[];
   loading: boolean;
   filter: AlertsFilter;
   onFilterChange: (next: AlertsFilter) => void;
@@ -42,22 +46,35 @@ const CATEGORY_TONE: Record<RiskCategory, string> = {
   Flagged: "nk-pill-smoke",
 };
 
-function fmtDateTime(date: string | null | undefined, time: string | null): string {
+function fmtDate(date: string | null | undefined): string {
   if (!date) return "—";
-  // Postgres DATE may come back as "YYYY-MM-DD" OR as a full ISO timestamp
-  // depending on neon driver type metadata. Same with TIME for the time
-  // column. Normalize both before composing a Date.
   const dateStr = String(date).slice(0, 10);
-  const timeStr = time ? String(time).slice(0, 8) : "00:00:00";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return String(date);
-  const d = new Date(`${dateStr}T${timeStr}`);
+  const d = new Date(`${dateStr}T00:00:00`);
   if (!Number.isFinite(d.getTime())) return dateStr;
-  return d.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function shortEid(eid: string): string {
+  if (!eid) return "—";
+  return `${eid.slice(0, 8)}…`;
+}
+
+function deriveSubject(a: AlertItem): string {
+  if (a.subject && a.subject.trim()) return a.subject.trim();
+  if (a.source !== "Email") return "—";
+  const body = (a.message_body ?? "").trim();
+  if (!body) return "—";
+  const firstLine = body.split(/\n/, 1)[0]?.trim() ?? "";
+  if (!firstLine) return "—";
+  return firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine;
+}
+
+function truncate(s: string | null | undefined, n: number): string {
+  if (!s) return "—";
+  const cleaned = String(s).replace(/\s+/g, " ").trim();
+  if (!cleaned) return "—";
+  return cleaned.length > n ? `${cleaned.slice(0, n)}…` : cleaned;
 }
 
 function statusFor(a: AlertItem): { label: string; tone: string } {
@@ -66,9 +83,70 @@ function statusFor(a: AlertItem): { label: string; tone: string } {
   return { label: "Open", tone: "nk-pill-ember" };
 }
 
+/** Convert visible alerts to CSV. RFC-4180 escape: quote fields that
+ *  contain commas / quotes / newlines, double internal quotes. */
+function exportToCsv(rows: AlertItem[]): string {
+  const headers = [
+    "date",
+    "source",
+    "entity_id",
+    "business_name",
+    "am_name",
+    "owning_am_email",
+    "category",
+    "classifier",
+    "subject",
+    "message",
+    "analysis",
+    "ticket_identifier",
+    "ticket_url",
+  ];
+  const esc = (v: string | null | undefined) => {
+    const s = String(v ?? "");
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const out = [headers.join(",")];
+  for (const a of rows) {
+    out.push(
+      [
+        String(a.message_date ?? "").slice(0, 10),
+        a.source,
+        a.entity_id,
+        a.business_name,
+        a.am_name ?? "",
+        a.owning_am_email,
+        a.risk_category,
+        a.classifier,
+        deriveSubject(a),
+        (a.message_body ?? "").replace(/\s+/g, " ").trim(),
+        a.analysis,
+        a.ticket_identifier ?? "",
+        a.ticket_url ?? "",
+      ]
+        .map(esc)
+        .join(","),
+    );
+  }
+  return out.join("\n");
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export default function AlertsTab({
   alerts,
   totalAlerts,
+  amOptions,
   loading,
   filter,
   onFilterChange,
@@ -129,7 +207,7 @@ export default function AlertsTab({
       `Dismiss this ${alert.risk_category} alert for ${alert.business_name}?\n\nOptional reason:`,
       "",
     );
-    if (reason === null) return; // cancelled
+    if (reason === null) return;
     setBusyId(alert.id);
     setRowMessage((m) => ({ ...m, [alert.id!]: "" }));
     try {
@@ -158,48 +236,140 @@ export default function AlertsTab({
     }
   }
 
+  function handleCsv() {
+    const csv = exportToCsv(alerts);
+    const ts = new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-");
+    downloadCsv(csv, `negative-keyword-alerts-${ts}.csv`);
+  }
+
   return (
     <div className="nk-alerts-tab">
-      {/* Filter row */}
-      <div className="nk-filter-row">
-        <FilterGroup
-          label="Status"
-          value={filter.status}
-          options={[
-            { value: "open", label: "Open" },
-            { value: "ticketed", label: "Ticketed" },
-            { value: "dismissed", label: "Dismissed" },
-            { value: "all", label: "All" },
-          ]}
-          onChange={(v) =>
-            onFilterChange({ ...filter, status: v as AlertsFilter["status"] })
-          }
-        />
-        <FilterGroup
-          label="Source"
-          value={filter.source || ""}
-          options={[
-            { value: "", label: "All sources" },
-            ...ALERT_SOURCES.map((s) => ({ value: s, label: s })),
-          ]}
-          onChange={(v) =>
-            onFilterChange({ ...filter, source: v as AlertSource | "" })
-          }
-        />
-        <FilterGroup
-          label="Category"
-          value={filter.category || ""}
-          options={[
-            { value: "", label: "All categories" },
-            ...RISK_CATEGORIES.map((c) => ({ value: c, label: c })),
-          ]}
-          onChange={(v) =>
-            onFilterChange({ ...filter, category: v as RiskCategory | "" })
-          }
-        />
+      {/* Top filter bar — chips + search + AM + date range */}
+      <div className="nk-filter-bar">
+        <div className="nk-filter-line">
+          <input
+            type="text"
+            value={filter.search}
+            placeholder="Search business, sender, message…"
+            onChange={(e) =>
+              onFilterChange({ ...filter, search: e.target.value })
+            }
+            className="nk-input nk-search"
+          />
 
-        <div className="nk-filter-summary">
-          Showing {alerts.length} of {totalAlerts}
+          <select
+            value={filter.category}
+            onChange={(e) =>
+              onFilterChange({
+                ...filter,
+                category: e.target.value as RiskCategory | "",
+              })
+            }
+            className="nk-input nk-select"
+          >
+            <option value="">All categories</option>
+            {RISK_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filter.am}
+            onChange={(e) => onFilterChange({ ...filter, am: e.target.value })}
+            className="nk-input nk-select"
+          >
+            <option value="">All AMs</option>
+            {amOptions.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filter.source}
+            onChange={(e) =>
+              onFilterChange({
+                ...filter,
+                source: e.target.value as AlertSource | "",
+              })
+            }
+            className="nk-input nk-select"
+          >
+            <option value="">All sources</option>
+            {ALERT_SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          <div className="nk-date-block">
+            <span className="nk-date-label">From</span>
+            <input
+              type="date"
+              value={filter.since}
+              onChange={(e) =>
+                onFilterChange({ ...filter, since: e.target.value })
+              }
+              className="nk-input nk-date"
+            />
+          </div>
+          <div className="nk-date-block">
+            <span className="nk-date-label">To</span>
+            <input
+              type="date"
+              value={filter.until}
+              onChange={(e) =>
+                onFilterChange({ ...filter, until: e.target.value })
+              }
+              className="nk-input nk-date"
+            />
+          </div>
+        </div>
+
+        <div className="nk-filter-line nk-filter-line-2">
+          <div className="nk-filter-chips">
+            <span className="nk-filter-mini-label">Status:</span>
+            {(
+              [
+                ["open", "Open"],
+                ["ticketed", "Ticketed"],
+                ["dismissed", "Dismissed"],
+                ["all", "All"],
+              ] as const
+            ).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                className={`nk-chip ${filter.status === val ? "is-active" : ""}`}
+                onClick={() =>
+                  onFilterChange({
+                    ...filter,
+                    status: val,
+                  })
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="nk-filter-summary">
+            Showing <strong>{alerts.length}</strong> / {totalAlerts}
+          </div>
+
+          <button
+            type="button"
+            className="nk-btn nk-btn-ghost"
+            onClick={handleCsv}
+            disabled={alerts.length === 0}
+            aria-label="Download visible alerts as CSV"
+          >
+            ↓ CSV
+          </button>
         </div>
       </div>
 
@@ -229,14 +399,16 @@ export default function AlertsTab({
             <table className="nk-table">
               <thead>
                 <tr>
-                  <th>Business</th>
-                  <th>AM</th>
+                  <th>Date</th>
                   <th>Source</th>
+                  <th>Entity ID</th>
+                  <th>Business Name</th>
+                  <th>AM Name</th>
                   <th>Category</th>
-                  <th>Status</th>
-                  <th>When</th>
+                  <th>Subject</th>
+                  <th>Message</th>
                   <th>Analysis</th>
-                  <th className="nk-actions-col">Actions</th>
+                  <th className="nk-actions-col">Ticket</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,29 +419,31 @@ export default function AlertsTab({
                   const isOpen = !a.ticket_id && !a.dismissed_at;
                   return (
                     <tr key={a.id ?? `${a.entity_id}-${a.dedup_key}`}>
-                      <td>
-                        <div className="nk-biz">{a.business_name}</div>
-                        <div className="nk-eid">{a.entity_id.slice(0, 8)}</div>
-                      </td>
-                      <td>{a.am_name ?? <span className="nk-muted">unassigned</span>}</td>
+                      <td className="nk-when">{fmtDate(a.message_date)}</td>
                       <td>
                         <span className="nk-pill nk-pill-source">{a.source}</span>
+                      </td>
+                      <td className="nk-mono nk-eid-cell" title={a.entity_id}>
+                        {shortEid(a.entity_id)}
+                      </td>
+                      <td className="nk-biz">{a.business_name}</td>
+                      <td>
+                        {a.am_name ?? <span className="nk-muted">Unknown</span>}
                       </td>
                       <td>
                         <span className={`nk-pill ${CATEGORY_TONE[a.risk_category]}`}>
                           {a.risk_category}
                         </span>
-                        {a.classifier === "ai" ? (
-                          <span className="nk-classifier-mark" title="AI-classified">·AI</span>
-                        ) : (
-                          <span className="nk-classifier-mark" title="Regex fallback">·rgx</span>
-                        )}
                       </td>
-                      <td>
-                        <span className={`nk-pill ${st.tone}`}>{st.label}</span>
+                      <td className="nk-subject" title={a.subject ?? a.message_body ?? undefined}>
+                        {deriveSubject(a)}
                       </td>
-                      <td className="nk-when">{fmtDateTime(a.message_date, a.message_time)}</td>
-                      <td className="nk-analysis">{a.analysis}</td>
+                      <td className="nk-message" title={a.message_body ?? undefined}>
+                        {truncate(a.message_body, 120)}
+                      </td>
+                      <td className="nk-analysis" title={a.analysis}>
+                        {truncate(a.analysis, 140)}
+                      </td>
                       <td className="nk-actions-col">
                         {isOpen ? (
                           <div className="nk-actions">
@@ -279,15 +453,16 @@ export default function AlertsTab({
                               disabled={busy}
                               onClick={() => void createTicket(a)}
                             >
-                              {busy ? "…" : "Create ticket"}
+                              {busy ? "…" : "Create"}
                             </button>
                             <button
                               type="button"
-                              className="nk-btn nk-btn-ghost"
+                              className="nk-btn-text"
                               disabled={busy}
                               onClick={() => void dismiss(a)}
+                              title="Dismiss this alert"
                             >
-                              Dismiss
+                              dismiss
                             </button>
                           </div>
                         ) : a.ticket_id && a.ticket_url ? (
@@ -300,7 +475,14 @@ export default function AlertsTab({
                             {a.ticket_identifier || "Open ticket"}
                           </a>
                         ) : (
-                          <span className="nk-muted">{a.dismissed_reason ?? "—"}</span>
+                          <span className="nk-muted nk-status-strip">
+                            <span className={`nk-pill ${st.tone}`}>{st.label}</span>
+                            {a.dismissed_reason && (
+                              <span className="nk-muted-reason">
+                                {a.dismissed_reason}
+                              </span>
+                            )}
+                          </span>
                         )}
                         {msg && <div className="nk-row-msg">{msg}</div>}
                       </td>
@@ -311,7 +493,6 @@ export default function AlertsTab({
             </table>
           </div>
 
-          {/* Pagination */}
           {pages > 1 && (
             <div className="nk-pager">
               <button
@@ -337,36 +518,6 @@ export default function AlertsTab({
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function FilterGroup({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="nk-filter-group">
-      <div className="nk-filter-label">{label}</div>
-      <div className="nk-filter-chips">
-        {options.map((o) => (
-          <button
-            key={o.value || "_all"}
-            type="button"
-            className={`nk-chip ${value === o.value ? "is-active" : ""}`}
-            onClick={() => onChange(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
