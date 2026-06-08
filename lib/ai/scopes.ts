@@ -18,6 +18,7 @@ export type AiScope =
   | { kind: "post-payment-book" }
   | { kind: "post-payment-customer"; cbCustomerId: string }
   | { kind: "miss-payment-overview" }
+  | { kind: "negative-keyword-overview" }
   | { kind: "hidden" };
 
 /** Stable string key for each scope (used for analytics + storage). */
@@ -89,6 +90,9 @@ export function pathToScope(pathname: string): AiScope {
   // Miss Payment Beacon
   if (pathname.startsWith("/miss-payment")) return { kind: "miss-payment-overview" };
 
+  // Negative Keyword Beacon
+  if (pathname.startsWith("/negative-keyword")) return { kind: "negative-keyword-overview" };
+
   // Umbrella launcher
   if (pathname === "/" || pathname === "") return { kind: "inbox" };
 
@@ -116,6 +120,8 @@ export function scopeLabel(s: AiScope): string {
       return "this post-payment review";
     case "miss-payment-overview":
       return "the missed-invoice book";
+    case "negative-keyword-overview":
+      return "the negative-keyword alerts queue";
     case "hidden":
       return "";
   }
@@ -326,6 +332,29 @@ export function scopeQuickPrompts(
           label: "Auto-debit Off but high balance",
           prompt:
             "Surface invoices where auto-debit is Off and the amount owed is significant. These need manual outreach today.",
+        },
+      ];
+    case "negative-keyword-overview":
+      return [
+        {
+          label: "Highest-risk customers right now",
+          prompt:
+            "Looking at open negative-keyword alerts, which customers are the most urgent retention risks? Top 3 with category + the actual signal.",
+        },
+        {
+          label: "Cancellation patterns this week",
+          prompt:
+            "Across the Cancellation-category alerts, what's the common theme? Are these driven by a specific issue (no leads, billing, technical) I should escalate to product?",
+        },
+        {
+          label: "Which AMs need help?",
+          prompt:
+            "Which AMs have the heaviest open-alert load right now? Are any swamped enough that I should reassign or jump in?",
+        },
+        {
+          label: "What should I create a ticket for?",
+          prompt:
+            "Walk through the open alerts and tell me which ones I should create a retention ticket for today. Prioritize by churn risk.",
         },
       ];
     case "hidden":

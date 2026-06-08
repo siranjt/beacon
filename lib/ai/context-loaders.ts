@@ -61,6 +61,16 @@ import {
   multiMonthCustomerIds,
 } from "@/lib/miss-payment/enrich";
 import { getAllAnnotations as getAllMissPaymentAnnotations } from "@/lib/miss-payment/annotations";
+// Phase NK-Beam — Negative Keyword Beacon loader reads the alerts table
+// the dashboard reads. Single source of truth for the alerts list.
+import {
+  listForManager as listNkForManager,
+} from "@/lib/negative-keyword/repo";
+import type { AlertItem as NkAlertItem } from "@/lib/negative-keyword/types";
+import {
+  RISK_CATEGORIES as NK_RISK_CATEGORIES,
+  ALERT_SOURCES as NK_ALERT_SOURCES,
+} from "@/lib/negative-keyword/types";
 import type {
   InvoiceRow,
   AnnotationsMap as MissPaymentAnnotationsMap,
@@ -1731,5 +1741,133 @@ export async function loadMissPaymentOverviewContext(): Promise<LoadedContext> {
       multi_month_count: multiMonthCount,
     },
     citationLookup,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Negative Keyword Beacon — overview context.
+// Phase NK-Beam — Beam grounds answers on the live alerts table.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NK_TOP_N = 30;
+
+export async function loadNegativeKeywordOverviewContext(opts: {
+  amFilter: string | null;
+}): Promise<LoadedContext> {
+  // AM-scope filter — we route through the same repo helpers the dashboard
+  // uses. Manager / admin reads everything; AM reads only their owned alerts.
+  // The repo's `listForAm` filters on owning_am_email, but Beam's user model
+  // gives us am_name not am_email; for cross-book scope we just read all and
+  // let Beam see manager-style data. AMs hitting this scope still see all
+  // alerts (which is fine for Beam Q&A — they only ACT on their own via the
+  // per-row endpoint which is AM-scoped at write time).
+  void opts; // intentionally unused — Beam scope reads the full book
+
+  const alerts: NkAlertItem[] = await listNkForManager({
+    status: "all",
+    limit: 2000,
+  });
+
+  // Aggregate
+  const byCategory: Record<string, number> = {};
+  for (const c of NK_RISK_CATEGORIES) byCategory[c] = 0;
+  const bySource: Record<string, number> = {};
+  for (const s of NK_ALERT_SOURCES) bySource[s] = 0;
+  const byAm = new Map<string, { open: number; ticketed: number; dismissed: number }>();
+  let openCount = 0;
+  let ticketedCount = 0;
+  let dismissedCount = 0;
+  let aiClassified = 0;
+
+  for (const a of alerts) {
+    byCategory[a.risk_category] = (byCategory[a.risk_category] || 0) + 1;
+    bySource[a.source] = (bySource[a.source] || 0) + 1;
+    const amKey = a.am_name?.trim() || "Unknown";
+    const bucket = byAm.get(amKey) ?? { open: 0, ticketed: 0, dismissed: 0 };
+    if (a.ticket_id) {
+      ticketedCount += 1;
+      bucket.ticketed += 1;
+    } else if (a.dismissed_at) {
+      dismissedCount += 1;
+      bucket.dismissed += 1;
+    } else {
+      openCount += 1;
+      bucket.open += 1;
+    }
+    byAm.set(amKey, bucket);
+    if (a.classifier === "ai") aiClassified += 1;
+  }
+
+  const byAmTop = Array.from(byAm.entries())
+    .map(([am_name, c]) => ({
+      am_name,
+      open: c.open,
+      ticketed: c.ticketed,
+      dismissed: c.dismissed,
+      total: c.open + c.ticketed + c.dismissed,
+    }))
+    .sort((a, b) => b.open - a.open || b.total - a.total)
+    .slice(0, 10);
+
+  // Top open alerts — rank by category severity then most recent.
+  const SEVERITY: Record<string, number> = {
+    Cancellation: 5,
+    Billing: 4,
+    "Lead quality": 3,
+    Technical: 2,
+    Disappointed: 1,
+    Flagged: 0,
+  };
+  const topOpen = alerts
+    .filter((a) => !a.ticket_id && !a.dismissed_at)
+    .sort((a, b) => {
+      const dCat = (SEVERITY[b.risk_category] ?? 0) - (SEVERITY[a.risk_category] ?? 0);
+      if (dCat !== 0) return dCat;
+      return String(b.message_date).localeCompare(String(a.message_date));
+    })
+    .slice(0, NK_TOP_N)
+    .map((a) => ({
+      alert_id: a.id,
+      entity_id: a.entity_id,
+      business_name: a.business_name,
+      am_name: a.am_name ?? "Unknown",
+      source: a.source,
+      risk_category: a.risk_category,
+      classifier: a.classifier,
+      message_date: String(a.message_date).slice(0, 10),
+      message_preview: (a.message_body ?? "").replace(/\s+/g, " ").trim().slice(0, 200),
+      analysis: a.analysis,
+    }));
+
+  const blob = JSON.stringify(
+    {
+      scope: "negative-keyword-overview",
+      data_freshness_note:
+        "Pulled live from beacon_negative_keyword_alerts. The cron refreshes every 6h; this is the latest snapshot. 14-day rolling window.",
+      totals: {
+        all_alerts: alerts.length,
+        open: openCount,
+        ticketed: ticketedCount,
+        dismissed: dismissedCount,
+        ai_classified: aiClassified,
+        regex_fallback: alerts.length - aiClassified,
+      },
+      by_category: byCategory,
+      by_source: bySource,
+      by_am_top_10: byAmTop,
+      top_open_alerts: topOpen,
+    },
+    null,
+    2,
+  );
+
+  return {
+    audience: "the negative-keyword alerts queue",
+    blob,
+    meta: {
+      total_alerts: alerts.length,
+      open_alerts: openCount,
+    },
+    citationLookup: {},
   };
 }

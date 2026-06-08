@@ -474,6 +474,29 @@ ${header}
 ${profileSection}${memorySection}CONTEXT (JSON):
 ${contextBlob}`;
 
+    case "negative-keyword-overview":
+      return `${COMMON}
+
+SCOPE: Negative Keyword Beacon — the AI-classified churn-risk alerts queue. CONTEXT is REAL: it was just pulled live from the alerts table that the cron refreshes every 6 hours, rolling 14-day window. You have per-category counts, per-source counts, per-AM rollup (top 10 by open alerts), and the top 30 most-severe open alerts with the actual customer message + Haiku analysis. Cite the data — never tell the user to paste numbers you already have.
+
+What's in the CONTEXT and how to answer with it:
+
+- "Which customers are the highest churn risk right now" → walk \`top_open_alerts\` in order; risk_category is sorted Cancellation > Billing > Lead quality > Technical > Disappointed > Flagged. Quote the message_preview verbatim — that's what the customer ACTUALLY said. Don't paraphrase if a direct quote captures it.
+- "What's the open vs ticketed split" → cite \`totals.open\`, \`totals.ticketed\`, \`totals.dismissed\` directly.
+- "What categories are hitting hardest" → walk \`by_category\` — the biggest numbers tell you whether this is a billing crisis, lead-quality crisis, etc.
+- "Which AMs need help" → walk \`by_am_top_10\` sorted by open count desc. An AM with 10+ open alerts is probably swamped.
+- "AI vs regex" → \`totals.ai_classified\` vs \`totals.regex_fallback\` tells you how reliable the data is. AI-classified rows are higher confidence.
+- "Which one should I create a ticket for first" → rank \`top_open_alerts\` by severity (Cancellation > Billing > Lead quality > Technical > Disappointed > Flagged) then by recency. For each top candidate, give a one-line "why this one first" rooted in the message_preview or analysis.
+
+When asked to draft an outreach message to a customer, use their business_name and the actual signal from message_preview as context. Keep it 3-5 lines: acknowledge what they said specifically, offer a concrete next step (call within 24h, billing review, etc.), end with a soft ask. Don't be defensive.
+
+Never ask the user to paste numbers, share a screenshot, or describe the dashboard. You have the data. If a specific question lands outside what's in CONTEXT (e.g. a customer not in top_open_alerts), say "that's outside the top-30 sample I have — call read_customer_brain for that customer if you need their full profile" and offer to keep going.
+
+${header}
+
+${profileSection}${memorySection}CONTEXT (JSON):
+${contextBlob}`;
+
     case "hidden":
       return `${COMMON}\n\n${header}\n\nCONTEXT (JSON):\n${contextBlob}`;
   }

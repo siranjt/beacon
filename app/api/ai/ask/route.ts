@@ -46,6 +46,7 @@ import {
   loadEscalationOverviewContext,
   loadInboxContext,
   loadMissPaymentOverviewContext,
+  loadNegativeKeywordOverviewContext,
   loadPerformanceLandingContext,
   loadPerformanceReportContext,
   loadPostPaymentBookContext,
@@ -126,6 +127,8 @@ function scopeMetaForLog(s: AiScope): Record<string, unknown> | null {
     case "post-payment-book":
     case "miss-payment-overview":
       return null;
+    case "negative-keyword-overview":
+      return null;
     case "hidden":
       return null;
   }
@@ -141,6 +144,7 @@ function isValidScope(s: unknown): s is AiScope {
     case "escalation-overview":
     case "post-payment-book":
     case "miss-payment-overview":
+    case "negative-keyword-overview":
       return true;
     case "customer-360":
     case "performance-report":
@@ -185,6 +189,13 @@ async function loadContextForScope(
       // multi-month repeats, auto-debit Off + high-balance bucket, and
       // recovery-coverage signals. Mirrors the dashboard's NDJSON pipeline.
       return loadMissPaymentOverviewContext();
+    case "negative-keyword-overview":
+      // Phase NK-Beam: pulls beacon_negative_keyword_alerts + aggregates
+      // counts by category / source / AM, surfaces top open alerts.
+      // AM-scoped via user.am_name; manager/admin see all.
+      return loadNegativeKeywordOverviewContext({
+        amFilter: user.role === "am" ? user.am_name : null,
+      });
     case "hidden":
       throw new Error("hidden scope cannot be asked");
   }

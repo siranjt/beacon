@@ -33,6 +33,7 @@ import {
   loadEscalationOverviewContext,
   loadInboxContext,
   loadMissPaymentOverviewContext,
+  loadNegativeKeywordOverviewContext,
   loadPerformanceLandingContext,
   loadPerformanceReportContext,
   loadPostPaymentBookContext,
@@ -183,6 +184,15 @@ Good suggestions:
 - ASK about auto-debit Off accounts with large balances
 - DRAFT a chase email or Slack message for a specific high-priority customer the user names`;
 
+    case "negative-keyword-overview":
+      return `SCOPE: User is on the Negative Keyword Beacon — AI-classified churn-risk alerts queue. Each row is a customer message Haiku flagged as a genuine negative signal, with a 2-sentence analysis.
+
+Good suggestions:
+- ASK which customers are the highest churn risk right now (severity-ranked from top_open_alerts)
+- ASK which categories are spiking this week (cancellation surge? billing crisis?)
+- ASK which AMs have the heaviest open-alert load (from by_am_top_10)
+- DRAFT outreach to a specific top-severity customer the user names (use their actual message as context)`;
+
     case "hidden":
       return "";
   }
@@ -260,6 +270,10 @@ async function loadContextFor(
       // Phase F-polish-AI — real loader; proactive suggestions now fire
       // from live unpaid-invoice aggregates instead of a generic blob.
       return loadMissPaymentOverviewContext();
+    case "negative-keyword-overview":
+      return loadNegativeKeywordOverviewContext({
+        amFilter: user.role === "am" ? user.am_name : null,
+      });
     case "hidden":
       return null;
   }
