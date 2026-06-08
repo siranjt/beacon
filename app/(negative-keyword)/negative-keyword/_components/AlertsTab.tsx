@@ -189,6 +189,41 @@ export default function AlertsTab({
     }
   }
 
+  async function dismiss(alert: AlertItem) {
+    if (!alert.id) return;
+    const reason = window.prompt(
+      `Dismiss this ${alert.risk_category} alert for ${alert.business_name}?\n\nOptional reason:`,
+      "",
+    );
+    if (reason === null) return;
+    setBusyId(alert.id);
+    setRowMessage((m) => ({ ...m, [alert.id!]: "" }));
+    try {
+      const res = await fetch("/negative-keyword/api/dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alert_id: alert.id, reason }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setRowMessage((m) => ({ ...m, [alert.id!]: "Dismissed" }));
+        onAlertChanged();
+      } else {
+        setRowMessage((m) => ({
+          ...m,
+          [alert.id!]: data.error || "Dismiss failed",
+        }));
+      }
+    } catch (e) {
+      setRowMessage((m) => ({
+        ...m,
+        [alert.id!]: e instanceof Error ? e.message : "Network error",
+      }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function handleCsv() {
     const csv = exportToCsv(alerts);
     const ts = new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-");
@@ -406,14 +441,26 @@ export default function AlertsTab({
                       </td>
                       <td className="nk-actions-col">
                         {isOpen ? (
-                          <button
-                            type="button"
-                            className="nk-btn nk-btn-primary"
-                            disabled={busy}
-                            onClick={() => void createTicket(a)}
-                          >
-                            {busy ? "…" : "Create"}
-                          </button>
+                          <div className="nk-ticket-actions">
+                            <button
+                              type="button"
+                              className="nk-btn nk-btn-primary"
+                              disabled={busy}
+                              onClick={() => void createTicket(a)}
+                            >
+                              {busy ? "…" : "Create"}
+                            </button>
+                            <button
+                              type="button"
+                              className="nk-x-btn"
+                              disabled={busy}
+                              onClick={() => void dismiss(a)}
+                              aria-label="Dismiss this alert"
+                              title="Dismiss alert"
+                            >
+                              ×
+                            </button>
+                          </div>
                         ) : a.ticket_id && a.ticket_url ? (
                           <a
                             href={a.ticket_url}

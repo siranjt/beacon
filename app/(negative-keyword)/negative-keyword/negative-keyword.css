@@ -652,6 +652,40 @@
   color: var(--zoca-text-3);
 }
 
+.nk-ticket-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nk-x-btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--zoca-text-3);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.nk-x-btn:hover:not(:disabled) {
+  color: var(--zoca-red);
+  background: var(--zoca-red-soft);
+  border-color: var(--zoca-red);
+}
+
+.nk-x-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* -------- Pagination -------- */
 
 .nk-pager {
