@@ -60,16 +60,6 @@ function shortEid(eid: string): string {
   return `${eid.slice(0, 8)}…`;
 }
 
-function deriveSubject(a: AlertItem): string {
-  if (a.subject && a.subject.trim()) return a.subject.trim();
-  if (a.source !== "Email") return "—";
-  const body = (a.message_body ?? "").trim();
-  if (!body) return "—";
-  const firstLine = body.split(/\n/, 1)[0]?.trim() ?? "";
-  if (!firstLine) return "—";
-  return firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine;
-}
-
 function truncate(s: string | null | undefined, n: number): string {
   if (!s) return "—";
   const cleaned = String(s).replace(/\s+/g, " ").trim();
@@ -95,7 +85,6 @@ function exportToCsv(rows: AlertItem[]): string {
     "owning_am_email",
     "category",
     "classifier",
-    "subject",
     "message",
     "analysis",
     "ticket_identifier",
@@ -118,7 +107,6 @@ function exportToCsv(rows: AlertItem[]): string {
         a.owning_am_email,
         a.risk_category,
         a.classifier,
-        deriveSubject(a),
         (a.message_body ?? "").replace(/\s+/g, " ").trim(),
         a.analysis,
         a.ticket_identifier ?? "",
@@ -398,16 +386,15 @@ export default function AlertsTab({
           <div className="nk-table-wrap">
             <table className="nk-table">
               <colgroup>
-                <col className="nk-col-date" />
-                <col className="nk-col-source" />
-                <col className="nk-col-eid" />
-                <col className="nk-col-biz" />
-                <col className="nk-col-am" />
-                <col className="nk-col-cat" />
-                <col className="nk-col-subj" />
-                <col className="nk-col-msg" />
-                <col className="nk-col-anal" />
-                <col className="nk-col-ticket" />
+                <col style={{ width: "70px" }} />
+                <col style={{ width: "90px" }} />
+                <col style={{ width: "110px" }} />
+                <col style={{ width: "180px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "300px" }} />
+                <col style={{ width: "320px" }} />
+                <col style={{ width: "130px" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -417,7 +404,6 @@ export default function AlertsTab({
                   <th>Business Name</th>
                   <th>AM Name</th>
                   <th>Category</th>
-                  <th>Subject</th>
                   <th>Message</th>
                   <th>Analysis</th>
                   <th className="nk-actions-col">Ticket</th>
@@ -447,14 +433,11 @@ export default function AlertsTab({
                           {a.risk_category}
                         </span>
                       </td>
-                      <td className="nk-subject" title={a.subject ?? a.message_body ?? undefined}>
-                        {deriveSubject(a)}
-                      </td>
                       <td className="nk-message" title={a.message_body ?? undefined}>
-                        {truncate(a.message_body, 120)}
+                        {truncate(a.message_body, 160)}
                       </td>
                       <td className="nk-analysis" title={a.analysis}>
-                        {truncate(a.analysis, 140)}
+                        {truncate(a.analysis, 180)}
                       </td>
                       <td className="nk-actions-col">
                         {isOpen ? (
