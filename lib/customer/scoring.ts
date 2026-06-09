@@ -1,6 +1,7 @@
 import {
   SIG_WEIGHTS,
   SIG_WEIGHTS_V2,
+  SAFETY_FLOOR,
   TIER_CUTS,
   WE_SILENT_DAYS,
   CLIENT_SILENT_DAYS,
@@ -237,6 +238,66 @@ export function scoreCustomer(m: CustomerMetrics): CustomerSignals {
 // v2 — Tickets flag
 // ---------------------------------------------------------------------------
 
+/**
+ * SV-9a — Safety-net floor calculator.
+ *
+ * Returns the minimum composite the customer should land at, given which
+ * catastrophic structural signals are firing. Excludes noisy sub-scores
+ * (we_silent / response_drop / usage) that can spike on low-activity
+ * accounts even when the customer is healthy.
+ *
+ * Triggers split into two categories:
+ *   sub_score_triggers (the bug we're fixing — sub-scores fire but composite
+ *     mathematics under-weights them):
+ *       - sig_client_silent >= CLIENT_SILENT_THRESHOLD
+ *       - sig_volume_collapse >= VOLUME_COLLAPSE_THRESHOLD
+ *       - sig_billing >= BILLING_THRESHOLD
+ *   flag_triggers (already handled by the WATCH lane → preserve existing
+ *     YELLOW-only behavior for flag-only customers):
+ *       - flag_performance
+ *       - flag_tickets
+ *
+ * Floor:
+ *   - 0 triggers total                       → 0 (no floor)
+ *   - ≥1 trigger of any kind                 → FLOOR_YELLOW (60)
+ *   - ≥2 triggers AND ≥1 sub-score trigger   → FLOOR_RED (80)
+ *
+ * The sub-score requirement keeps the WATCH lane intact: flag_perf +
+ * flag_tickets alone (with low sub-scores) stays at YELLOW, matching the
+ * existing convention. Pearls Dry Bar (client_silent=100 + vol_collapse=100
+ * + flag_perf) → 3 triggers, 2 of which are sub-scores → RED. ISH Salon
+ * and Spa (billing=70 + flag_tickets) → 2 triggers, 1 sub-score → RED.
+ */
+export function computeSafetyFloor(args: {
+  sig_client_silent: number;
+  sig_volume_collapse: number;
+  sig_billing: number;
+  flag_performance: boolean;
+  flag_tickets: boolean;
+}): { floor: number; triggers: string[] } {
+  const subScoreTriggers: string[] = [];
+  const flagTriggers: string[] = [];
+
+  if (args.sig_client_silent >= SAFETY_FLOOR.CLIENT_SILENT_THRESHOLD) {
+    subScoreTriggers.push("client_silent");
+  }
+  if (args.sig_volume_collapse >= SAFETY_FLOOR.VOLUME_COLLAPSE_THRESHOLD) {
+    subScoreTriggers.push("vol_collapse");
+  }
+  if (args.sig_billing >= SAFETY_FLOOR.BILLING_THRESHOLD) {
+    subScoreTriggers.push("billing");
+  }
+  if (args.flag_performance) flagTriggers.push("flag_perf");
+  if (args.flag_tickets) flagTriggers.push("flag_tickets");
+
+  const triggers = [...subScoreTriggers, ...flagTriggers];
+  if (triggers.length === 0) return { floor: 0, triggers };
+  if (triggers.length >= 2 && subScoreTriggers.length >= 1) {
+    return { floor: SAFETY_FLOOR.FLOOR_RED, triggers };
+  }
+  return { floor: SAFETY_FLOOR.FLOOR_YELLOW, triggers };
+}
+
 export function computeTicketsFlag(
   entityId: string,
   openTickets30d: number,
@@ -315,7 +376,7 @@ export function composeHybridSignals(args: {
     };
   }
 
-  let composite = Math.round(
+  const compositeWeightedRaw = Math.round(
     SIG_WEIGHTS_V2.weSilent * commsSignals.sig_we_silent +
       SIG_WEIGHTS_V2.clientSilent * commsSignals.sig_client_silent +
       SIG_WEIGHTS_V2.responseDrop * commsSignals.sig_response_drop +
@@ -326,12 +387,32 @@ export function composeHybridSignals(args: {
 
   // Phase E-19.3 — perspective adjustment from Haiku sentiment + substance.
   const perspectiveAdj = computePerspectiveAdjustment(perspective);
-  composite = Math.max(0, Math.min(100, composite + perspectiveAdj.delta));
+  let composite = Math.max(
+    0,
+    Math.min(100, compositeWeightedRaw + perspectiveAdj.delta),
+  );
 
   // Modifier flags
   const flagPerformance = !!(performance && performance.flag);
   const flagTickets = !!(tickets && tickets.flag);
   const flagCount = (flagPerformance ? 1 : 0) + (flagTickets ? 1 : 0);
+
+  // SV-9a — Safety-net floor. The weighted-sum composite can sit at GREEN
+  // tier even when individual sub-scores are pegged at 100 (e.g. Pearls Dry
+  // Bar on 2026-06-09 had client_silent=100 + vol_collapse=100 + flag:perf,
+  // composite=26 → GREEN, while the shadow-verdict LLM correctly called
+  // RED). The safety floor lifts composite to YELLOW (60) or RED (80) when
+  // structural signals fire, regardless of the weighted result.
+  const { floor, triggers: safetyTriggers } = computeSafetyFloor({
+    sig_client_silent: commsSignals.sig_client_silent,
+    sig_volume_collapse: commsSignals.sig_volume_collapse,
+    sig_billing: billingScore,
+    flag_performance: flagPerformance,
+    flag_tickets: flagTickets,
+  });
+  if (floor > composite) {
+    composite = floor;
+  }
 
   // Determine tier — same internal model as v1, with WATCH lane awareness
   let tier: Tier;
@@ -378,6 +459,15 @@ export function composeHybridSignals(args: {
       // Escalating tone is the single most important fact — surface it first.
       finalReason = `Tone is escalating. ${reasonOneLine}`;
     }
+  }
+
+  // SV-9a — annotate when safety-floor moved the composite. Forensics first,
+  // not a noise tag: store the raw weighted sum + the triggers that fired so
+  // we can audit why a customer landed RED via floor vs via weighted sum.
+  if (floor > compositeWeightedRaw + perspectiveAdj.delta && safetyTriggers.length > 0) {
+    notes.push(
+      `safety_floor: weighted=${compositeWeightedRaw} floor=${floor} triggers=${safetyTriggers.join("+")}`,
+    );
   }
 
   return {

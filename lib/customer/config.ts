@@ -67,6 +67,37 @@ export const TIER_CUTS = {
   low:    15,
 } as const;
 
+// ---------------------------------------------------------------------------
+// SV-9a — Safety-net floor on the V2 composite.
+//
+// Background: the weighted-sum composite can fall well below TIER_CUTS.medium
+// even when individual sub-scores are pegged at 100. Pearls Dry Bar (2026-06-09)
+// had sig_client_silent=100, sig_volume_collapse=100, flag_performance=true,
+// composite=26 → GREEN. The shadow-verdict LLM caught it; the engine missed it.
+//
+// Fix: after the weighted sum is computed, if ≥1 catastrophic structural
+// signal fires we apply a MIN floor of YELLOW (60) or RED (80) to the composite.
+// The original weighted sum is preserved in `composite_weighted_raw` notes for
+// forensics; the tier-determination uses MAX(weighted, floor).
+//
+// Triggers chosen to be non-noisy on low-traffic accounts:
+//   - we exclude sig_we_silent / sig_response_drop (these can spike on
+//     accounts with no traffic at all, where there's nothing to drop from)
+//   - we exclude sig_usage (Mixpanel coverage gaps cause false positives)
+//
+// See [[shadow-verdict-day1-finding]] for the day-1 evidence that motivated
+// this floor.
+// ---------------------------------------------------------------------------
+export const SAFETY_FLOOR = {
+  // Sub-score thresholds at which each individual signal "counts" toward the floor.
+  CLIENT_SILENT_THRESHOLD: 80,
+  VOLUME_COLLAPSE_THRESHOLD: 80,
+  BILLING_THRESHOLD: 60,
+  // Floor levels.
+  FLOOR_YELLOW: 60, // 1 trigger fires
+  FLOOR_RED: 80,    // ≥2 triggers fire
+} as const;
+
 export type Tier = "HIGH" | "MEDIUM" | "LOW" | "HEALTHY";
 export const TIER_ORDER: Tier[] = ["HIGH", "MEDIUM", "LOW", "HEALTHY"];
 

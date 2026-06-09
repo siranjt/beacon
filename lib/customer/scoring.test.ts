@@ -495,3 +495,172 @@ describe("composeHybridSignals — full sub-signal pass-through", () => {
     expect(s.sig_billing).toBe(20);
   });
 });
+
+// ---------------------------------------------------------------------------
+// SV-9a — Safety-net floor tests. The Pearls Dry Bar bug (composite=26 despite
+// client_silent=100 + vol_collapse=100 + flag_performance=true) drove this.
+// ---------------------------------------------------------------------------
+
+import { computeSafetyFloor } from "./scoring";
+import { SAFETY_FLOOR } from "./config";
+
+describe("computeSafetyFloor — Pearls Dry Bar bug class", () => {
+  it("0 triggers → no floor", () => {
+    const r = computeSafetyFloor({
+      sig_client_silent: 50,
+      sig_volume_collapse: 30,
+      sig_billing: 20,
+      flag_performance: false,
+      flag_tickets: false,
+    });
+    expect(r.floor).toBe(0);
+    expect(r.triggers).toEqual([]);
+  });
+
+  it("1 trigger (client_silent=80) → YELLOW floor", () => {
+    const r = computeSafetyFloor({
+      sig_client_silent: 80,
+      sig_volume_collapse: 30,
+      sig_billing: 20,
+      flag_performance: false,
+      flag_tickets: false,
+    });
+    expect(r.floor).toBe(SAFETY_FLOOR.FLOOR_YELLOW);
+    expect(r.triggers).toEqual(["client_silent"]);
+  });
+
+  it("Pearls Dry Bar (client_silent=100 + vol_collapse=100 + flag_perf) → RED floor", () => {
+    const r = computeSafetyFloor({
+      sig_client_silent: 100,
+      sig_volume_collapse: 100,
+      sig_billing: 0,
+      flag_performance: true,
+      flag_tickets: false,
+    });
+    expect(r.floor).toBe(SAFETY_FLOOR.FLOOR_RED);
+    expect(r.triggers).toContain("client_silent");
+    expect(r.triggers).toContain("vol_collapse");
+    expect(r.triggers).toContain("flag_perf");
+  });
+
+  it("ISH Salon and Spa (billing=70 + flag_tickets) → RED floor (sub-score + flag)", () => {
+    const r = computeSafetyFloor({
+      sig_client_silent: 30,
+      sig_volume_collapse: 20,
+      sig_billing: 70,
+      flag_performance: false,
+      flag_tickets: true,
+    });
+    expect(r.floor).toBe(SAFETY_FLOOR.FLOOR_RED);
+    expect(r.triggers).toContain("billing");
+    expect(r.triggers).toContain("flag_tickets");
+  });
+
+  it("flag_perf + flag_tickets alone (no sub-scores) → YELLOW only (WATCH lane preserved)", () => {
+    // Pre-SV-9a, the WATCH lane lifts HEALTHY + 2 flags to YELLOW. The safety
+    // floor must NOT escalate this to RED — that's a different signal class
+    // (modifier-flag concern, not catastrophic sub-score firing).
+    const r = computeSafetyFloor({
+      sig_client_silent: 30,
+      sig_volume_collapse: 20,
+      sig_billing: 20,
+      flag_performance: true,
+      flag_tickets: true,
+    });
+    expect(r.floor).toBe(SAFETY_FLOOR.FLOOR_YELLOW);
+    expect(r.triggers).toContain("flag_perf");
+    expect(r.triggers).toContain("flag_tickets");
+  });
+
+  it("noisy sub-scores (we_silent / response_drop / usage) do NOT trigger floor", () => {
+    // Hair Inc class — silent customer, no real activity to drop from. The
+    // engine's sig_response_drop / sig_we_silent / sig_usage can spike as
+    // noise. Safety floor must ignore those to avoid over-promoting healthy
+    // long-tail customers. Only client_silent counts here.
+    const r = computeSafetyFloor({
+      sig_client_silent: 90,
+      sig_volume_collapse: 30, // below threshold
+      sig_billing: 0,
+      flag_performance: false,
+      flag_tickets: false,
+    });
+    // Only 1 trigger (client_silent), so YELLOW floor, not RED.
+    expect(r.floor).toBe(SAFETY_FLOOR.FLOOR_YELLOW);
+    expect(r.triggers).toEqual(["client_silent"]);
+  });
+
+  it("threshold boundaries: client_silent=79 does NOT trigger; 80 does", () => {
+    const justUnder = computeSafetyFloor({
+      sig_client_silent: 79,
+      sig_volume_collapse: 30,
+      sig_billing: 20,
+      flag_performance: false,
+      flag_tickets: false,
+    });
+    expect(justUnder.floor).toBe(0);
+
+    const atThreshold = computeSafetyFloor({
+      sig_client_silent: 80,
+      sig_volume_collapse: 30,
+      sig_billing: 20,
+      flag_performance: false,
+      flag_tickets: false,
+    });
+    expect(atThreshold.floor).toBe(SAFETY_FLOOR.FLOOR_YELLOW);
+  });
+});
+
+describe("composeHybridSignals — safety floor wires into composite", () => {
+  it("Pearls Dry Bar pattern lifts composite from <30 to >=80 RED", () => {
+    const stub = commsSignalsStub({
+      sig_we_silent: 0,
+      sig_client_silent: 100,
+      sig_response_drop: 0,
+      sig_volume_collapse: 100,
+    });
+    const perfStub = {
+      flag: true,
+      flag_reason: "test",
+      profile_clicks_drop_pct: -91,
+    } as unknown as Parameters<typeof composeHybridSignals>[0]["performance"];
+
+    const s = composeHybridSignals({
+      commsSignals: stub,
+      usageScore: 0,
+      billingScore: 0,
+      performance: perfStub,
+      tickets: null,
+      commsMetrics: cleanCommsMetrics(),
+      mixpanelHasData: true,
+      preLaunch: false,
+    });
+    // Without the safety floor, the weighted sum is 0.15*100 + 0.08*100 = 23.
+    // With the safety floor (3 triggers → FLOOR_RED=80), composite must be >= 80.
+    expect(s.composite).toBeGreaterThanOrEqual(SAFETY_FLOOR.FLOOR_RED);
+    expect(s.tier).toBe("HIGH");
+    expect(s.stoplight).toBe("RED");
+    expect(s.notes).toMatch(/safety_floor:/);
+  });
+
+  it("healthy customer (0 triggers) is NOT promoted by safety net", () => {
+    const stub = commsSignalsStub({
+      sig_we_silent: 20,
+      sig_client_silent: 30,
+      sig_response_drop: 10,
+      sig_volume_collapse: 20,
+    });
+    const s = composeHybridSignals({
+      commsSignals: stub,
+      usageScore: 20,
+      billingScore: 10,
+      performance: null,
+      tickets: null,
+      commsMetrics: cleanCommsMetrics(),
+      mixpanelHasData: true,
+      preLaunch: false,
+    });
+    // No triggers fire → no floor lift → composite stays low → tier GREEN.
+    expect(s.stoplight).toBe("GREEN");
+    expect(s.notes).not.toMatch(/safety_floor:/);
+  });
+});
