@@ -183,6 +183,8 @@ export default function ShadowVerdictView() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ShadowVerdictRow | null>(null);
   const [history, setHistory] = useState<EntityHistory | null>(null);
+  const [refreshing, setRefreshing] = useState<null | "compose" | "shadow" | "done">(null);
+  const [refreshSummary, setRefreshSummary] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -209,6 +211,60 @@ export default function ShadowVerdictView() {
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  const runRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing("compose");
+    setRefreshSummary(null);
+    setError(null);
+    try {
+      // The server runs compose THEN shadow in sequence — we don't fire
+      // them as two separate requests because the edge proxy will cut us
+      // off mid-stream. Single POST, server orchestrates, ~80-180s.
+      const res = await fetch("/api/admin/shadow-verdict/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      setRefreshing("shadow");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          shadow?: { errors?: unknown[] };
+        };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as {
+        ok: boolean;
+        compose?: { ok: boolean; elapsed_ms: number; error?: string };
+        shadow?: {
+          processed: number;
+          upserted: number;
+          agreement_count: number;
+          disagreement_count: number;
+          elapsed_ms: number;
+        };
+      };
+      const composeMsg = body.compose?.ok
+        ? `Compose ${(body.compose.elapsed_ms / 1000).toFixed(1)}s`
+        : body.compose
+          ? `Compose failed (${body.compose.error ?? "unknown"})`
+          : "Compose skipped";
+      const sv = body.shadow;
+      const shadowMsg = sv
+        ? `Shadow ${sv.processed} processed, ${sv.agreement_count}/${sv.processed} agree, ${(sv.elapsed_ms / 1000).toFixed(0)}s`
+        : "";
+      setRefreshSummary([composeMsg, shadowMsg].filter(Boolean).join(" · "));
+      setRefreshing("done");
+      // Reload all the page data (summary + verdicts).
+      await loadAll();
+      // Drop the "done" badge after a beat so the UI returns to normal.
+      setTimeout(() => setRefreshing(null), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setRefreshing(null);
+    }
+  }, [refreshing, loadAll]);
 
   const onRowClick = useCallback(async (row: ShadowVerdictRow) => {
     setSelected(row);
@@ -240,22 +296,87 @@ export default function ShadowVerdictView() {
             time, then decide whether to augment, replace, or drop.
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-          <label style={{ fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "#7a715f" }}>
-            Date
-          </label>
-          <input
-            type="date"
-            value={date}
-            max={today}
-            onChange={(e) => setDate(e.target.value)}
-            style={{
-              padding: "6px 8px",
-              borderRadius: 8,
-              border: "1px solid rgba(45,72,67,0.2)",
-              background: "rgba(252,246,232,0.7)",
-            }}
-          />
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+            <label
+              style={{
+                fontSize: 11,
+                letterSpacing: 0.6,
+                textTransform: "uppercase",
+                color: "#7a715f",
+              }}
+            >
+              Re-run
+            </label>
+            <button
+              type="button"
+              onClick={() => void runRefresh()}
+              disabled={refreshing !== null && refreshing !== "done"}
+              title="Re-compose engine tiers, then re-run the shadow verdict. ~90-180s."
+              style={{
+                padding: "6px 14px",
+                borderRadius: 999,
+                border:
+                  refreshing === "done"
+                    ? "1px solid rgba(73,153,100,0.55)"
+                    : "1px solid #a85a1a",
+                background:
+                  refreshing === null
+                    ? "rgba(168, 90, 26, 0.10)"
+                    : refreshing === "done"
+                      ? "rgba(73,153,100,0.16)"
+                      : "rgba(168, 90, 26, 0.20)",
+                color:
+                  refreshing === "done" ? "#1f4d2f" : "#7a3a0d",
+                fontSize: 12,
+                cursor:
+                  refreshing && refreshing !== "done" ? "wait" : "pointer",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                fontWeight: 600,
+                minWidth: 168,
+              }}
+            >
+              {refreshing === "compose"
+                ? "Recomposing engine…"
+                : refreshing === "shadow"
+                  ? "Running shadow…"
+                  : refreshing === "done"
+                    ? "✓ Done"
+                    : "↻ Recompose + re-run"}
+            </button>
+            {refreshSummary ? (
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#7a715f",
+                  maxWidth: 240,
+                  marginTop: 2,
+                  lineHeight: 1.3,
+                }}
+                title={refreshSummary}
+              >
+                {refreshSummary}
+              </div>
+            ) : null}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <label style={{ fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: "#7a715f" }}>
+              Date
+            </label>
+            <input
+              type="date"
+              value={date}
+              max={today}
+              onChange={(e) => setDate(e.target.value)}
+              style={{
+                padding: "6px 8px",
+                borderRadius: 8,
+                border: "1px solid rgba(45,72,67,0.2)",
+                background: "rgba(252,246,232,0.7)",
+              }}
+            />
+          </div>
         </div>
       </header>
 
