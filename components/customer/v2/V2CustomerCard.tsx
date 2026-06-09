@@ -26,6 +26,7 @@ import { useCompareSelection } from "@/lib/customer/hooks/use-compare-selection"
 // Phase E-15.4 — pin / snooze chrome extracted for file-size hygiene.
 import { PinButton, SnoozeMenu, SnoozedBanner } from "./V2CardChrome";
 import CallOutcomeControls from "./CallOutcomeControls";
+import V2TierFeedback from "./V2TierFeedback";
 // Phase E-15.4b — chip pile extracted.
 import {
   FlagChip,
@@ -1184,6 +1185,14 @@ function V2CustomerCardInner({
                     window.dispatchEvent(new CustomEvent("beacon:snapshot:invalidate"));
                   }
                 }}
+              />
+              {/* SV-5 — AM tier accuracy feedback (✓ / ✗). One vote per
+                  (entity, AM, calendar day). Captures whether the tier
+                  Beacon shows feels right in the field, feeding the
+                  shadow-verdict comparison. */}
+              <V2TierFeedback
+                entityId={customer.entity_id}
+                stoplight={s.stoplight}
               />
             </div>
           )}

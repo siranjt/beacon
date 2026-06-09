@@ -90,6 +90,10 @@
     {
       "path": "/api/cron/negative-keyword/refresh",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/shadow-verdict/run",
+      "schedule": "30 23 * * *"
     }
   ],
   "functions": {
@@ -164,6 +168,10 @@
     "app/(customer)/api/cron/beacon-ai/daily-digest/route.ts": {
       "memory": 1024,
       "maxDuration": 120
+    },
+    "app/(customer)/api/cron/shadow-verdict/run/route.ts": {
+      "memory": 2048,
+      "maxDuration": 800
     },
     "app/(customer)/api/cron/beacon-ai/eval-nightly/route.ts": {
       "memory": 1024,
