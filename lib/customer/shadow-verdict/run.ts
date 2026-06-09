@@ -176,11 +176,18 @@ async function classifyEntity(
       return { ok: false, error: `missing deterministic stoplight (got ${String(deterministic_tier)})` };
     }
 
+    // v2: surface the plan + billing + tenure fields in the prompt header
+    // so the LLM weighs operational silence correctly against billing
+    // health and product type (automation-led plans need less human comms).
     const userPrompt = buildUserPrompt({
       bizname: customer.company ?? customer.entity_id.slice(0, 8),
       am_name: customer.am_name,
       deterministic_tier,
       deterministic_composite,
+      mrr: customer.mrr_basesheet || null,
+      plan_amount: customer.plan_amount ?? null,
+      auto_collection: customer.auto_collection ?? null,
+      customer_since: customer.activated_at ?? customer.ob_date ?? null,
       context_blob: ctx.blob.slice(0, 30_000), // hard cap to keep tokens bounded
     });
 
