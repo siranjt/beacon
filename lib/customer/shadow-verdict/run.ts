@@ -166,10 +166,14 @@ async function classifyEntity(
       return { ok: false, error: "empty context blob" };
     }
 
-    const deterministic_tier = customer.signals_v2?.tier as Tier;
+    // The deterministic stoplight (RED/YELLOW/GREEN) is what AMs see and
+    // what the LLM second opinion should be measured against — NOT the
+    // engagement-tier field `signals_v2.tier` (HIGH/MEDIUM/LOW), which is
+    // a different axis.
+    const deterministic_tier = customer.signals_v2?.stoplight as Tier;
     const deterministic_composite = customer.signals_v2?.composite ?? 0;
     if (!isTier(deterministic_tier)) {
-      return { ok: false, error: `missing deterministic tier (got ${String(deterministic_tier)})` };
+      return { ok: false, error: `missing deterministic stoplight (got ${String(deterministic_tier)})` };
     }
 
     const userPrompt = buildUserPrompt({
