@@ -10,8 +10,13 @@
 import type { Channel, CommsMessage } from "./types";
 
 const PUBLIC = {
+  // BS-2 (2026-06-10): Lean BaseSheet (e9005a5c) + supplement (385231ff).
+  // Escalation reads churn_potential_status (from supplement) and identity
+  // fields (from lean CSV). loadBaseSheetRows below fetches and merges both.
   baseSheet:
-    "https://metabase.zoca.ai/public/question/87763e8c-8084-442e-891a-df1b11e81b47.csv",
+    "https://metabase.zoca.ai/public/question/e9005a5c-4b5c-405d-af35-a69063c996e5.csv",
+  baseSheetSupplement:
+    "https://metabase.zoca.ai/public/question/385231ff-4bc9-4b5d-a300-3b16a0fab7be.csv",
   appChat:
     "https://metabase.zoca.ai/public/question/10a52e37-04fa-4422-b840-803b66e033bf.csv",
   email:
@@ -253,8 +258,39 @@ export interface BaseSheetRow {
 }
 
 export async function fetchBaseSheet(): Promise<BaseSheetRow[]> {
-  const rows = await fetchCsv(PUBLIC.baseSheet);
-  return rows as unknown as BaseSheetRow[];
+  // BS-2 (2026-06-10): Fetch lean BaseSheet + supplement in parallel and
+  // merge churn_potential_status + open_tickets_30d onto each row by
+  // entity_id. The lean CSV uses `mrr` instead of `total_monthly_revenue`;
+  // alias here so downstream consumers (enrichment.ts) don't change.
+  // Supplement soft-fails: outage just means churn_potential_status goes
+  // empty, which existing string comparisons handle gracefully.
+  const [baseRows, suppRows] = await Promise.all([
+    fetchCsv(PUBLIC.baseSheet),
+    fetchCsv(PUBLIC.baseSheetSupplement).catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[escalation/fetchBaseSheet] supplement fetch failed: ${msg}`);
+      return [] as Record<string, string>[];
+    }),
+  ]);
+  const supp = new Map<string, Record<string, string>>();
+  for (const r of suppRows) {
+    const eid = (r["entity_id"] || "").trim();
+    if (eid) supp.set(eid, r);
+  }
+  return baseRows.map((r) => {
+    const eid = (r["entity_id"] || "").trim();
+    const s = supp.get(eid);
+    return {
+      ...r,
+      // Alias new lean column → legacy field consumers read.
+      total_monthly_revenue: r["total_monthly_revenue"] || r["mrr"] || "",
+      // Merge supplement fields. Fall back to whatever's on the base row
+      // (in case a future rev brings these back inline).
+      churn_potential_flag:   r["churn_potential_flag"]   || s?.["churn_potential_flag"]   || "",
+      churn_potential_status: r["churn_potential_status"] || s?.["churn_potential_status"] || "",
+      open_tickets_30d:       r["open_tickets_30d"]       || s?.["open_tickets_30d"]       || "0",
+    } as unknown as BaseSheetRow;
+  });
 }
 
 export async function findBaseSheetRow(opts: {

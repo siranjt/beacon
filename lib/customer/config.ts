@@ -2,14 +2,21 @@
 // These UUIDs come from Zoca's Metabase and are stable.
 
 export const METABASE_ENDPOINTS = {
-  baseSheet: "https://metabase.zoca.ai/public/question/87763e8c-8084-442e-891a-df1b11e81b47.csv",
-  chat:      "https://metabase.zoca.ai/public/question/10a52e37-04fa-4422-b840-803b66e033bf.csv",
-  email:     "https://metabase.zoca.ai/public/question/7a5aa1f6-9205-4e83-be51-3e585aa0f4a8.csv",
-  phone:     "https://metabase.zoca.ai/public/question/60797a27-c546-450d-b00b-a51b7e490143.csv",
-  video:     "https://metabase.zoca.ai/public/question/d95d9354-7c84-4a57-8af5-e700580c6ecb.csv",
-  sms:       "https://metabase.zoca.ai/public/question/bbaad2fb-5f9d-4249-af59-c7812851437c.csv",
+  // BS-1 (2026-06-10): swapped from the legacy 87763e8c question to the new
+  // optimized e9005a5c question. The legacy CSV embedded churn-potential +
+  // open-tickets columns inline; the new CSV is lean (identity + AM mapping
+  // + contact + payment only). The dropped fields are now pulled from the
+  // `baseSheetSupplement` URL below and merged onto each BaseSheetRow at
+  // parse time (lib/customer/metabase.ts:fetchBaseSheet).
+  baseSheet:            "https://metabase.zoca.ai/public/question/e9005a5c-4b5c-405d-af35-a69063c996e5.csv",
+  baseSheetSupplement:  "https://metabase.zoca.ai/public/question/385231ff-4bc9-4b5d-a300-3b16a0fab7be.csv",
+  chat:                 "https://metabase.zoca.ai/public/question/10a52e37-04fa-4422-b840-803b66e033bf.csv",
+  email:                "https://metabase.zoca.ai/public/question/7a5aa1f6-9205-4e83-be51-3e585aa0f4a8.csv",
+  phone:                "https://metabase.zoca.ai/public/question/60797a27-c546-450d-b00b-a51b7e490143.csv",
+  video:                "https://metabase.zoca.ai/public/question/d95d9354-7c84-4a57-8af5-e700580c6ecb.csv",
+  sms:                  "https://metabase.zoca.ai/public/question/bbaad2fb-5f9d-4249-af59-c7812851437c.csv",
   // Phase 31.v2 — Metabase tickets CSV (active Linear + closed in last 30d)
-  tickets:   "https://metabase.zoca.ai/public/question/a80bac40-c055-4867-a778-9ee1f29053ca.csv",
+  tickets:              "https://metabase.zoca.ai/public/question/a80bac40-c055-4867-a778-9ee1f29053ca.csv",
 } as const;
 
 // Phase 31.v2 — tickets enrichment constants (restored after Phase 33.A overwrite)

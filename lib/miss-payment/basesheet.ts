@@ -17,9 +17,12 @@
 import "server-only";
 import Papa from "papaparse";
 
+// BS-2 (2026-06-10): Migrated to the lean BaseSheet CSV (e9005a5c). This module
+// only reads identity/contact fields (entity_id, bizname, am_name, app_email,
+// phone_number) — all present in the new CSV. No supplement fetch needed here.
 const BASE_SHEET_URL =
   process.env.METABASE_BASESHEET_URL ||
-  "https://metabase.zoca.ai/public/question/87763e8c-8084-442e-891a-df1b11e81b47.csv";
+  "https://metabase.zoca.ai/public/question/e9005a5c-4b5c-405d-af35-a69063c996e5.csv";
 
 let cache: { rows: any[]; ts: number } | null = null;
 const TTL_MS = 10 * 60 * 1000;

@@ -10,7 +10,9 @@ import { parse } from "csv-parse";
 import { Readable } from "node:stream";
 
 const SOURCES = {
-  basesheet: "https://metabase.zoca.ai/public/question/87763e8c-8084-442e-891a-df1b11e81b47.csv",
+  // BS-2 (2026-06-10): Lean BaseSheet (e9005a5c). Post-Payment validator only
+  // needs entity_id mapping per customer_id — present in the new CSV.
+  basesheet: "https://metabase.zoca.ai/public/question/e9005a5c-4b5c-405d-af35-a69063c996e5.csv",
   comms_app_chat: "https://metabase.zoca.ai/public/question/10a52e37-04fa-4422-b840-803b66e033bf.csv",
   comms_email: "https://metabase.zoca.ai/public/question/7a5aa1f6-9205-4e83-be51-3e585aa0f4a8.csv",
   comms_phone_calls: "https://metabase.zoca.ai/public/question/60797a27-c546-450d-b00b-a51b7e490143.csv",

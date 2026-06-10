@@ -40,6 +40,48 @@ export function normalizeBizName(s: string): string {
  * - byEntityId:        Zoca entity_id → row
  * - byBizName:         normalized bizname → row (only for UNAMBIGUOUS names)
  */
+/**
+ * Supplement-CSV row shape (385231ff question).
+ * Provides the 3 fields the new lean BaseSheet (e9005a5c) doesn't carry:
+ * churn_potential_flag, churn_potential_status, open_tickets_30d.
+ */
+type SupplementRow = {
+  entity_id: string;
+  churn_potential_flag: string;
+  churn_potential_status: string;
+  open_tickets_30d: string;
+};
+
+/**
+ * BS-2 (2026-06-10): Fetch the BaseSheet supplement CSV. Soft-fails to an
+ * empty index so a supplement outage doesn't take Stage A down — the
+ * affected fields will just go empty on the merged row.
+ */
+async function fetchBaseSheetSupplement(): Promise<Record<string, SupplementRow>> {
+  try {
+    const csv = await fetchCsvText(METABASE_ENDPOINTS.baseSheetSupplement);
+    const raw = parseRows<Record<string, string>>(csv);
+    const out: Record<string, SupplementRow> = {};
+    for (const r of raw) {
+      const eid = (r["entity_id"] || "").trim();
+      if (!eid) continue;
+      out[eid] = {
+        entity_id: eid,
+        churn_potential_flag: r["churn_potential_flag"] || "",
+        churn_potential_status: r["churn_potential_status"] || "",
+        open_tickets_30d: r["open_tickets_30d"] || "0",
+      };
+    }
+    return out;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(
+      `[fetchBaseSheetSupplement] failed — proceeding with empty supplement: ${msg}`,
+    );
+    return {};
+  }
+}
+
 export async function fetchBaseSheet(): Promise<{
   rows: BaseSheetRow[];
   byCustomerId: Record<string, BaseSheetRow>;
@@ -47,25 +89,43 @@ export async function fetchBaseSheet(): Promise<{
   byEntityId: Record<string, BaseSheetRow>;
   byBizName: Record<string, BaseSheetRow>;
 }> {
-  const csv = await fetchCsvText(METABASE_ENDPOINTS.baseSheet);
+  // BS-2 (2026-06-10): Fetch lean BaseSheet (e9005a5c) + supplement (385231ff)
+  // in parallel, then merge on entity_id. The lean CSV ships `mrr` instead of
+  // `total_monthly_revenue`; alias here so downstream code (refresh.ts:
+  // `mrr_basesheet: bs?.total_monthly_revenue || ""`) stays untouched.
+  const [csv, supplementByEntity] = await Promise.all([
+    fetchCsvText(METABASE_ENDPOINTS.baseSheet),
+    fetchBaseSheetSupplement(),
+  ]);
   const raw = parseRows<Record<string, string>>(csv);
-  const rows: BaseSheetRow[] = raw.map((r) => ({
-    entity_id: (r["entity_id"] || "").trim(),
-    customer_id: (r["customer_id"] || "").trim(),
-    bizname: r["bizname"] || "",
-    am_name: r["am_name"] || "",
-    ae_name: r["ae_name"] || "",
-    sp_name: r["sp_name"] || "",
-    app_email: r["app_email"] || "",
-    phone_number: r["phone_number"] || "",
-    total_monthly_revenue: r["total_monthly_revenue"] || "",
-    chrone_zoca_status: r["chrone_zoca_status"] || "",
-    churn_potential_flag: r["churn_potential_flag"] || "",
-    churn_potential_status: r["churn_potential_status"] || "",
-    ob_date: r["ob_date"] || "",
-    open_tickets_30d: r["open_tickets_30d"] || "0",
-    unresolved_issues_last_30_days: r["unresolved_issues_last_30_days"] || "0",
-  }));
+  const rows: BaseSheetRow[] = raw.map((r) => {
+    const eid = (r["entity_id"] || "").trim();
+    const supp = supplementByEntity[eid];
+    return {
+      entity_id: eid,
+      customer_id: (r["customer_id"] || "").trim(),
+      bizname: r["bizname"] || "",
+      am_name: r["am_name"] || "",
+      ae_name: r["ae_name"] || "",
+      sp_name: r["sp_name"] || "",
+      app_email: r["app_email"] || "",
+      phone_number: r["phone_number"] || "",
+      // BS-2: lean CSV uses `mrr`; alias to legacy `total_monthly_revenue`
+      // so downstream consumers don't have to change.
+      total_monthly_revenue: r["total_monthly_revenue"] || r["mrr"] || "",
+      chrone_zoca_status: r["chrone_zoca_status"] || "",
+      // BS-2: supplement fields. Fall back to lean CSV's own value (in case
+      // a future rev brings these back inline) before going empty.
+      churn_potential_flag: r["churn_potential_flag"] || supp?.churn_potential_flag || "",
+      churn_potential_status: r["churn_potential_status"] || supp?.churn_potential_status || "",
+      ob_date: r["ob_date"] || "",
+      open_tickets_30d: r["open_tickets_30d"] || supp?.open_tickets_30d || "0",
+      // unresolved_issues_last_30_days is not in the new lean CSV nor the
+      // supplement (the cx.open_issues source went stale on 2026-01-14).
+      // Default to "0" so existing downstream readers keep working.
+      unresolved_issues_last_30_days: r["unresolved_issues_last_30_days"] || "0",
+    };
+  });
   const byCustomerId: Record<string, BaseSheetRow> = {};
   const byCustomerIdMulti: Record<string, BaseSheetRow[]> = {};
   const byEntityId: Record<string, BaseSheetRow> = {};
