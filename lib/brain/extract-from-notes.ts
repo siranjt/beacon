@@ -135,7 +135,7 @@ RULES — read carefully, this is grounded extraction not generation:
       • "Business permanently closed" → \`identity/business_profile/other\` (NOT assignment).
       • "Customer is a Chrone client, migrating Monday" → \`operational/integration/integration_notes\` (platform move).
       • "Owner sold the business to her sister" → \`identity/owner_info/other\` (customer-side ownership change).
-      • "AM changed from Apurvaa to Taanya, account inherited mid-renewal" → \`identity/assignment/transition_history\` (Zoca-side AM handoff).
+      • "AM changed from Hubern to Sudha, account inherited mid-renewal" → \`identity/assignment/transition_history\` (Zoca-side AM handoff).
       • "SP unreachable, profile access stuck with previous owner" → \`concerns/latent_risk/risk_description\` (operational blocker).
       • "Refunded last month, churn ticket created" → \`operational/renewal/renewal_risk_level\` value "Churned" or "Churning".
 

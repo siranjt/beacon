@@ -397,7 +397,7 @@ What counts as a fact (in priority order):
   Watch for: "skip the explanation", "show me the trade-offs", "tl;dr first then details".
 
 - **context** — Who/what they CARE about.
-  Examples: "Often asks about Sudha's book." "Focuses on RED customers." "Manages the Apurvaa pod."
+  Examples: "Often asks about Sudha's book." "Focuses on RED customers." "Manages Pod 4."
 
 - **behavior** — When/how they USE Beacon.
   Examples: "Asks Beacon mostly in mornings." "Frequently drafts outreach emails through Beacon." "Uses Beacon to triage inbox first thing."

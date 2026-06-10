@@ -10,8 +10,7 @@
  *   - "Open my planner →" button linking to /v2?am={amName}
  *
  * Edge cases:
- *   - AMs with zero customers (e.g. Taanya Solanki, incoming) are skipped
- *     entirely — no digest sent.
+ *   - AMs with zero customers are skipped entirely — no digest sent.
  *   - AMs with no RED and no YELLOW get a brief "All clear today" message.
  *   - Snoozed customers (Phase 19) are filtered out if that module is
  *     present; the import is wrapped in a try/catch so this works before
@@ -34,6 +33,8 @@ import { postSlack, slackConfigured, type SlackBlock } from "./slack";
  * but this map is the authoritative AM→Pod resolution for the digest
  * header.
  */
+// AM-1 (2026-06-10): Removed Apurvaa (departed). Fixed Taanya → Tanya
+// (BaseSheet uses single-a spelling).
 const POD_MAP: Record<string, string> = {
   "Sudha Goutami": "Pod 1",
   "Kanak sharma": "Pod 1",
@@ -41,10 +42,9 @@ const POD_MAP: Record<string, string> = {
   "Sakshi Mamgain": "Pod 2",
   "Bikash Mishra": "Pod 3",
   "Anu Srivastava": "Pod 3",
-  "Apurvaa Biswas": "Pod 4",
   "Atharv Y": "Pod 4",
   "Shruti Sinha": "Pod 4",
-  "Taanya Solanki": "Pod 4",
+  "Tanya Solanki": "Pod 4",
   "Siddhi Shetty": "Pod 5",
   "Kripali Suri": "Pod 5",
   "Nikita Singh": "Floating",

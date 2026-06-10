@@ -227,31 +227,33 @@ export const BILLING_YELLOW_OVERRIDE = 40;
 // ---------------------------------------------------------------------------
 // v2 — Pods (per AM Transition Toolkit, hardcoded May 2026)
 // ---------------------------------------------------------------------------
+// AM-1 (2026-06-10): Removed Apurvaa Biswas + Santhosh V (no longer at Zoca).
+// Promoted "Tanya Solanki" from INCOMING_AMS to ACTIVE_AMS (she has accounts
+// now). Fixed spelling: BaseSheet has "Tanya Solanki" (single-a) — the
+// previous "Taanya Solanki" entries were creating a phantom dropdown profile.
 export const POD_MAP: Record<string, string> = {
   "Kanak sharma":   "Pod 1",
   "Sudha Goutami":  "Pod 1",
-  "Santhosh V":     "Pod 1",
   "Hubern C":       "Pod 2",
   "Sakshi Mamgain": "Pod 2",
   "Bikash Mishra":  "Pod 3",
   "Anu Srivastava": "Pod 3",
-  "Apurvaa Biswas": "Pod 4",
   "Atharv Y":       "Pod 4",
   "Shruti Sinha":   "Pod 4",
-  "Taanya Solanki": "Pod 4",
+  "Tanya Solanki":  "Pod 4",
   "Siddhi Shetty":  "Pod 5",
   "Kripali Suri":   "Pod 5",
   "Nikita Singh":   "Floating",
 };
 
-// Active AM list (May 2026)
+// Active AM list (June 2026)
 export const ACTIVE_AMS = [
   "Sudha Goutami", "Sakshi Mamgain", "Hubern C", "Bikash Mishra", "Anu Srivastava",
-  "Kanak sharma", "Atharv Y", "Santhosh V", "Shruti Sinha", "Apurvaa Biswas",
-  "Siddhi Shetty", "Nikita Singh", "Kripali Suri",
+  "Kanak sharma", "Atharv Y", "Shruti Sinha",
+  "Siddhi Shetty", "Nikita Singh", "Kripali Suri", "Tanya Solanki",
 ] as const;
 
-export const INCOMING_AMS = ["Taanya Solanki"] as const;
+export const INCOMING_AMS: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Phase E-17 Wave 3b — Slack user-id map for proactive Beacon AI DMs.
@@ -333,18 +335,18 @@ export const MANAGER_EMAILS: string[] = [
   "shakti.s@zoca.com",
 ];
 
-// AM — locked to their own book only. Phase 33.B.1: Siddhi removed (promoted
-// to Manager). Net: 12 AMs.
+// AM — locked to their own book only.
+//   Phase 33.B.1: Siddhi removed (promoted to Manager).
+//   AM-1 (2026-06-10): Apurvaa + Santhosh removed (no longer at Zoca).
+// Net: 10 AMs.
 export const AM_EMAILS: string[] = [
   "anu.s@zoca.com",
-  "apurvaa.b@zoca.com",
   "atharv.y@zoca.com",
   "bikash.m@zoca.com",
   "hubern.c@zoca.com",
   "kanak.s@zoca.com",
   "nikita.s@zoca.com",
   "sakshi.m@zoca.com",
-  "santhosh.v@zoca.com",
   "shruti.s@zoca.com",
   "sudha.g@zoca.com",
   "tanya.s@zoca.com",

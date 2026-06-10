@@ -82,7 +82,7 @@ function matchAmByEmailLocalPart(email: string): string | null {
       return am;
     }
     // Also try first-name-only or last-name-only token match — guards
-    // against single-token email locals ("apurvaa@zoca.ai" → "Apurvaa Biswas").
+    // against single-token email locals ("hubern@zoca.ai" → "Hubern C").
     const amTokens = amLower.split(/\s+/).filter(Boolean);
     for (const tok of amTokens) {
       if (candidates.has(tok)) return am;

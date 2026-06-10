@@ -75,7 +75,7 @@ export const lookupCustomerTool: BeaconTool = {
       query: {
         type: "string",
         description:
-          "Plain-English search query. Examples: 'Acme Salon in Pune', 'skin and tonic', 'RED customer with billing dispute that Apurvaa manages'. We match against bizname (substring), entity_id (prefix), and Chargebee customer_id. Keep it short — the noisier the query, the worse the match.",
+          "Plain-English search query. Examples: 'Acme Salon in Pune', 'skin and tonic', 'RED customer with billing dispute that Sudha manages'. We match against bizname (substring), entity_id (prefix), and Chargebee customer_id. Keep it short — the noisier the query, the worse the match.",
         minLength: 2,
         maxLength: MAX_QUERY_LEN,
       },

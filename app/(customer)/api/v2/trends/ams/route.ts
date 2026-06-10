@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/v2/trends/ams?days=14&ams=Sudha+Goutami,Apurvaa+Biswas
+ * GET /api/v2/trends/ams?days=14&ams=Sudha+Goutami,Hubern+C
  *   → bundled per-AM book trend in a single SQL pass.
  *
  * Phase 33.B — admin + manager only (cross-AM rollup).
