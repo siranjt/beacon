@@ -158,6 +158,13 @@ export const readCustomerBrainTool: BeaconTool = {
             question,
             facts_returned: facts.length,
             facts,
+            // Roadmap-v2-4 — provenance scaffolding for the cite-chip "why"
+            // trace. Client side `askWithToolResult` lifts these into the
+            // continuation request's extra_citations so chips render the
+            // matched_via badges + rerank bar inline.
+            candidate_pool_size: result.candidate_pool_size,
+            retrieval_timing: result.timing,
+            retrieval_ran: result.ran,
           },
         };
       }

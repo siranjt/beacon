@@ -54,6 +54,7 @@ import ConfidenceBadge, {
 import {
   CITATION_PATTERN_SOURCE,
   CONFIDENCE_PATTERN_SOURCE,
+  buildBrainProvenanceCitations,
   type CitationEntry,
   type CitationLookup,
 } from "@/lib/ai/citations";
@@ -117,6 +118,24 @@ interface Turn {
    * `[cite:KEY]` markers when rendering this turn's content.
    */
   citationLookup?: CitationLookup;
+}
+
+/**
+ * Roadmap-v2-1 — derive the displayed confidence tier from a parsed
+ * `<confidence: NN%>` marker. MUST mirror ConfidenceBadge.tierFor() so
+ * the persisted tier matches what the AM actually saw on the bubble.
+ *   high   = percent >= 80
+ *   medium = percent >= 55
+ *   low    = percent <  55
+ * Returns null when no marker was parsed (no badge would have rendered).
+ */
+function tierForPercent(
+  c: ConfidenceData | null,
+): "high" | "medium" | "low" | null {
+  if (!c || !Number.isFinite(c.percent)) return null;
+  if (c.percent >= 80) return "high";
+  if (c.percent >= 55) return "medium";
+  return "low";
 }
 
 const MAX_HISTORY_TURNS = 6;
@@ -955,6 +974,10 @@ export default function AskPanel() {
       } else if (action.toolName === "read_customer_brain" && outcome.ok) {
         // Brain Wave 2a.1 — inline the topic-clustered Keeper block so the
         // model can quote specific field values directly in its reply.
+        // Roadmap-v2-4 — hybrid-mode payloads carry per-fact provenance
+        // (matched_via / rrf_score / relevance_score) + candidate_pool_size.
+        // Lift those into synthetic `fact:<fact_id>` citations so cite chips
+        // expand to the "why" trace card on click.
         const rich = (outcome.data ?? null) as
           | {
               entity_id?: string;
@@ -962,6 +985,21 @@ export default function AskPanel() {
               bizname?: string | null;
               found?: boolean;
               facts_returned?: number;
+              retrieval_mode?: "hybrid" | string;
+              question?: string;
+              candidate_pool_size?: number;
+              facts?: Array<{
+                fact_id: string;
+                topic_category?: string | null;
+                topic_subcategory?: string | null;
+                field_name?: string | null;
+                value: string;
+                matched_via: Array<"embedding" | "keyword">;
+                rrf_score: number;
+                relevance_score: number | null;
+                confirmed_at?: string | null;
+                source_type?: string | null;
+              }>;
               brain?: {
                 identity: Record<string, string>;
                 operational: Record<string, string>;
@@ -976,15 +1014,46 @@ export default function AskPanel() {
         const lines: string[] = [
           `[Beam ran read_customer_brain → ${outcome.summary}`,
         ];
-        if (rich?.brain) {
+        if (rich?.retrieval_mode === "hybrid" && Array.isArray(rich.facts)) {
+          lines.push("Keeper facts (ranked):");
+          lines.push(JSON.stringify(rich.facts));
+          lines.push("");
+          lines.push(
+            "Now answer the user's question using the ranked Keeper facts above. Quote each fact value directly. When you cite a fact in prose, add a chip immediately after the value in this exact pattern: `[cite:fact:<fact_id>]` — use the fact_id from the row you're quoting. The chip expands to a 'why' trace showing how the retrieval found it.",
+          );
+        } else if (rich?.brain) {
           lines.push("Keeper data:");
           lines.push(JSON.stringify(rich.brain));
+          lines.push("");
+          lines.push(
+            "Now answer the user's question using the Keeper facts above. The Keeper is AUTHORITATIVE — prefer it over inference from raw signals. Quote field values directly (e.g. 'Sarah Chen' not 'owner_name: Sarah Chen'). If the Keeper has no entry for this customer, say so plainly without hedging.",
+          );
+        } else {
+          lines.push("");
+          lines.push(
+            "The Keeper has no entry for this customer. Say so plainly — the AM can add facts via the Keeper panel on the Customer 360 page.",
+          );
         }
-        lines.push("");
-        lines.push(
-          "Now answer the user's question using the Keeper facts above. The Keeper is AUTHORITATIVE — prefer it over inference from raw signals. Quote field values directly (e.g. 'Sarah Chen' not 'owner_name: Sarah Chen'). If the Keeper has no entry for this customer, say so plainly without hedging.",
-        );
         followUp = lines.join("\n") + "]";
+        // Lift provenance into extraCitations so the cite chips render the
+        // "why" trace (matched_via badges, RRF score, rerank bar).
+        if (
+          rich?.retrieval_mode === "hybrid" &&
+          Array.isArray(rich.facts) &&
+          rich.facts.length > 0
+        ) {
+          const provenanceLookup = buildBrainProvenanceCitations({
+            facts: rich.facts,
+            candidatePoolSize:
+              typeof rich.candidate_pool_size === "number"
+                ? rich.candidate_pool_size
+                : rich.facts.length,
+            query: rich.question ?? null,
+          });
+          // Stash on outcome.data for the unified extraCitations harvest
+          // below; harmless if untouched downstream.
+          (outcome.data as Record<string, unknown>).citations = provenanceLookup;
+        }
       } else if (action.toolName === "read_customer_brain" && !outcome.ok) {
         followUp = `[Beam's read_customer_brain proposal was not run — ${outcome.error}.]`;
       } else if (action.toolName === "add_fact_to_brain" && outcome.ok) {
@@ -1038,9 +1107,16 @@ export default function AskPanel() {
         //   - Drop fact_id / source_type / confirmed_at — not needed
         //     for the answer (the panel UI surfaces these when the AM
         //     opens a customer detail)
+        //
+        // Roadmap-v2-4 — KEEP fact_id in the model's view (only) so it
+        // can emit `[cite:fact:<fact_id>]` chips. The chip popover renders
+        // the hybrid retrieval "why" trace for hybrid-mode rows.
         const rich = (outcome.data ?? null) as
           | {
               filter?: Record<string, string | null>;
+              retrieval_mode?: "hybrid" | "structured";
+              retrieval_query?: string | null;
+              candidate_pool_size?: number;
               rows?: Array<{
                 fact_id: string;
                 customer_id: string;
@@ -1053,6 +1129,9 @@ export default function AskPanel() {
                 value: string;
                 source_type: string;
                 confirmed_at: string | null;
+                matched_via?: Array<"embedding" | "keyword"> | null;
+                rrf_score?: number | null;
+                relevance_score?: number | null;
               }>;
               row_count?: number;
               total?: number;
@@ -1070,6 +1149,9 @@ export default function AskPanel() {
           const total = rich.total ?? pageCount;
           const offset = rich.offset ?? 0;
           const trimmed = rich.rows.slice(0, ROWS_FOR_PROMPT).map((r) => ({
+            // Roadmap-v2-4 — fact_id retained so the model can emit
+            // `[cite:fact:<fact_id>]` chips that expand to the "why" trace.
+            fact_id: r.fact_id,
             bizname: r.bizname,
             am_name: r.am_name,
             entity_id: r.entity_id,
@@ -1094,10 +1176,51 @@ export default function AskPanel() {
           }
         }
         lines.push("");
+        const citePrefix =
+          rich?.retrieval_mode === "hybrid"
+            ? "When you quote a value cell, append `[cite:fact:<fact_id>]` immediately after — the chip expands to a 'why' trace (matched_via, RRF, rerank). "
+            : "";
         lines.push(
-          "Compose the answer as a short markdown table (bizname | am_name | value) when there are 3+ rows; use prose when there are 1-2. Don't drop the AM name from each row — that's load-bearing for handoff decisions. If the result was a single page of a larger set, surface the total count and tell the user they can ask for the next page. If no rows, say so plainly and suggest a different filter.",
+          `${citePrefix}Compose the answer as a short markdown table (bizname | am_name | value) when there are 3+ rows; use prose when there are 1-2. Don't drop the AM name from each row — that's load-bearing for handoff decisions. If the result was a single page of a larger set, surface the total count and tell the user they can ask for the next page. If no rows, say so plainly and suggest a different filter.`,
         );
         followUp = lines.join("\n") + "]";
+        // Lift hybrid-mode provenance into extraCitations.
+        if (
+          rich?.retrieval_mode === "hybrid" &&
+          Array.isArray(rich.rows) &&
+          rich.rows.length > 0
+        ) {
+          const provFacts = rich.rows
+            .filter(
+              (r) =>
+                Array.isArray(r.matched_via) &&
+                typeof r.rrf_score === "number",
+            )
+            .map((r) => ({
+              fact_id: r.fact_id,
+              topic_category: r.topic_category,
+              topic_subcategory: r.topic_subcategory,
+              field_name: r.field_name,
+              value: r.value,
+              matched_via: r.matched_via as Array<"embedding" | "keyword">,
+              rrf_score: r.rrf_score as number,
+              relevance_score: r.relevance_score ?? null,
+              confirmed_at: r.confirmed_at,
+              source_type: r.source_type,
+            }));
+          if (provFacts.length > 0) {
+            const provenanceLookup = buildBrainProvenanceCitations({
+              facts: provFacts,
+              candidatePoolSize:
+                typeof rich.candidate_pool_size === "number"
+                  ? rich.candidate_pool_size
+                  : provFacts.length,
+              query: rich.retrieval_query ?? null,
+            });
+            (outcome.data as Record<string, unknown>).citations =
+              provenanceLookup;
+          }
+        }
       } else if (action.toolName === "query_brain" && !outcome.ok) {
         followUp = `[Beam's query_brain proposal was not run — ${outcome.error}.]`;
       } else if (
@@ -1140,9 +1263,18 @@ export default function AskPanel() {
       // continuation request. The server merges them into the SSE
       // citationLookup frame so the model's table cells render with real
       // popovers.
+      //
+      // Roadmap-v2-4 — same lift-out path now covers read_customer_brain +
+      // query_brain when run in hybrid mode. The branches above stash the
+      // provenance lookup under `outcome.data.citations` for that purpose.
       let extraCitations: Record<string, unknown> | undefined;
+      const TOOLS_WITH_EXTRA_CITATIONS = new Set([
+        "query_customer_book",
+        "read_customer_brain",
+        "query_brain",
+      ]);
       if (
-        action.toolName === "query_customer_book" &&
+        TOOLS_WITH_EXTRA_CITATIONS.has(action.toolName) &&
         outcome.ok &&
         outcome.data &&
         typeof outcome.data === "object" &&
@@ -1191,11 +1323,23 @@ export default function AskPanel() {
         return next;
       });
 
+      // Roadmap-v2-1 — capture the displayed confidence tier on every
+      // vote so /admin/beacon-ai-calibration can plot per-tier hit rate.
+      // Parse straight off `turn.content` (server is the source of truth
+      // for what the AM saw) and map the percent to a high/medium/low
+      // bucket using the same thresholds as ConfidenceBadge.
+      const parsed = parseAssistantContent(turn.content);
+      const confidenceTier = tierForPercent(parsed.confidence);
+
       try {
         const res = await fetch("/api/ai/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ turn_id: turn.turnId, signal }),
+          body: JSON.stringify({
+            turn_id: turn.turnId,
+            signal,
+            confidence_tier: confidenceTier,
+          }),
         });
         if (!res.ok) {
           const body = await res

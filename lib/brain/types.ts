@@ -65,6 +65,14 @@ export type TopicSubcategory =
   // Wave 1.1 — competitive / switching context. Where did they come
   // from, what could pull them away.
   | "competitive_context"
+  // Wave 1.2 — rebook cadence. How often does this customer's end-clients
+  // rebook (the structural rhythm of their book). Sits alongside seasonal,
+  // which is about external timing pressure.
+  | "cadence"
+  // Wave 1.2 — sentiment / NPS-equivalent signals. Latest "would they
+  // recommend us" read, lightweight and timestamped. Distinct from
+  // relationship/advocacy (which holds the strategic advocacy posture).
+  | "sentiment"
   // concerns
   | "latent_risk"
   | "next_call_agenda"
@@ -392,6 +400,24 @@ export const FIELD_CATALOG: Record<
       "churn_attempt_history",
     ],
   },
+  // Wave 1.2 — rebook cadence. rebook_window_weeks is numeric-shaped
+  // (see NUMERIC_FIELDS) so manager queries can do "rebook_window_weeks <= 6".
+  // last_rebook_at is date-shaped text (YYYY-MM-DD).
+  cadence: {
+    category: "behavioral",
+    named_fields: ["rebook_window_weeks", "last_rebook_at"],
+  },
+  // Wave 1.2 — NPS-equivalent sentiment. Lightweight timestamped read on
+  // "would they recommend us". signal_substance captures the qualitative
+  // evidence (e.g. an AM-call quote) behind the categorical signal.
+  sentiment: {
+    category: "behavioral",
+    named_fields: [
+      "nps_equivalent_signal",
+      "last_signal_at",
+      "signal_substance",
+    ],
+  },
   // concerns
   latent_risk: {
     category: "concerns",
@@ -456,6 +482,9 @@ export type DerivedAssignmentField = (typeof DERIVED_ASSIGNMENT_FIELDS)[number];
 export const NUMERIC_FIELDS: ReadonlySet<string> = new Set([
   "staff_count",
   "location_count",
+  // Wave 1.2 — behavioral/cadence. Values like "6", "8", "12" weeks. Manager
+  // queries: "rebook_window_weeks <= 6" → high-frequency rebookers.
+  "rebook_window_weeks",
 ]);
 
 /** Parse the leading integer from free text. Returns null if no integer found. */

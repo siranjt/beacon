@@ -205,6 +205,16 @@ export default async function LauncherPage() {
                 Admin · Keeper reject rate
               </Link>
               <Link
+                href="/admin/beacon-ai-calibration"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Beam calibration
+              </Link>
+              <Link
                 href="/admin/shadow-verdict"
                 style={{
                   color: "var(--zoca-text-2)",
@@ -213,6 +223,16 @@ export default async function LauncherPage() {
                 }}
               >
                 Admin · Shadow verdict
+              </Link>
+              <Link
+                href="/admin/brain/rerank-compare"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Keeper rerank compare
               </Link>
             </>
           )}

@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CitationEntry } from "@/lib/ai/citations";
+import type { CitationEntry, CitationProvenance } from "@/lib/ai/citations";
 
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -44,6 +44,9 @@ const CATEGORY_LABEL: Record<string, string> = {
   comm: "Comm",
   usage: "Usage",
   count: "Count",
+  // Phase G + Roadmap-v2-4
+  kb: "Knowledge",
+  fact: "Keeper fact",
 };
 
 interface Props {
@@ -252,6 +255,12 @@ export default function CitationChip({ citationKey, entry }: Props) {
               ))}
             </span>
           )}
+          {/* Roadmap-v2-4 — hybrid-retrieval "why" trace. Renders the
+              matched_via badges + RRF score + rerank bar + pool position.
+              Skipped for non-Keeper chips (provenance is undefined). */}
+          {entry.provenance && (
+            <ProvenanceTrace data={entry.provenance} />
+          )}
           <span
             style={{
               display: "block",
@@ -265,6 +274,257 @@ export default function CitationChip({ citationKey, entry }: Props) {
           >
             {citationKey}
           </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * ProvenanceTrace — Roadmap-v2-4
+ *
+ * Inline card surfaced beneath the citation popover's value when the entry
+ * carries Wave-1 hybrid-retrieval provenance. Renders:
+ *   - matched_via badges ("embedding 🔵 keyword 🟢")
+ *   - RRF score (3-decimal)
+ *   - Voyage rerank score with a 0-1 bar visualization (or "skipped" when
+ *     the rerank stage soft-failed)
+ *   - rank + candidate pool size ("3rd of 47 candidates")
+ *   - the query that drove the retrieval, when available
+ *
+ * Transition tokens stay light (120ms ease, matches the rest of the chip);
+ * reduced-motion users get the same static layout because there are no
+ * keyframes here.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const MATCHED_VIA_COLOR: Record<"embedding" | "keyword", string> = {
+  embedding: C.lapis,
+  keyword: C.patina,
+};
+
+function ordinalSuffix(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return "th";
+  switch (n % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
+/**
+ * Exported for unit testing — pure derivation of the trace card's display
+ * strings from a CitationProvenance payload. Keeps the rendering code free
+ * of branching logic that's tricky to assert against.
+ */
+export function formatProvenanceTrace(p: CitationProvenance): {
+  poolLabel: string;
+  rrfLabel: string;
+  rerankLabel: string;
+  rerankPct: number | null;
+  matchedVia: Array<"embedding" | "keyword">;
+} {
+  const rank = Math.max(1, Math.floor(p.rank || 1));
+  const pool = Math.max(rank, Math.floor(p.candidate_pool_size || 0));
+  const poolLabel =
+    pool > 0
+      ? `${rank}${ordinalSuffix(rank)} of ${pool} candidate${pool === 1 ? "" : "s"}`
+      : `${rank}${ordinalSuffix(rank)} ranked`;
+  const rrfLabel = Number.isFinite(p.rrf_score)
+    ? p.rrf_score.toFixed(3)
+    : "—";
+  let rerankLabel = "skipped";
+  let rerankPct: number | null = null;
+  if (typeof p.rerank_score === "number" && Number.isFinite(p.rerank_score)) {
+    const clamped = Math.max(0, Math.min(1, p.rerank_score));
+    rerankLabel = clamped.toFixed(3);
+    rerankPct = Math.round(clamped * 100);
+  }
+  return {
+    poolLabel,
+    rrfLabel,
+    rerankLabel,
+    rerankPct,
+    matchedVia:
+      Array.isArray(p.matched_via) && p.matched_via.length > 0
+        ? p.matched_via
+        : [],
+  };
+}
+
+function ProvenanceTrace({ data }: { data: CitationProvenance }) {
+  const fmt = formatProvenanceTrace(data);
+  return (
+    <span
+      data-testid="citation-provenance-trace"
+      style={{
+        display: "block",
+        marginTop: 8,
+        paddingTop: 8,
+        borderTop: `1px dashed ${C.border}`,
+      }}
+    >
+      <span
+        style={{
+          display: "block",
+          fontSize: 9,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: C.text3,
+          fontFamily: "ui-monospace, monospace",
+          marginBottom: 4,
+        }}
+      >
+        Why this was surfaced
+      </span>
+      {/* matched_via badges */}
+      <span
+        style={{
+          display: "flex",
+          gap: 4,
+          flexWrap: "wrap",
+          marginBottom: 6,
+        }}
+      >
+        {fmt.matchedVia.length === 0 && (
+          <span
+            style={{
+              fontSize: 10,
+              color: C.text3,
+              fontStyle: "italic",
+              fontFamily: SANS,
+            }}
+          >
+            no signal data
+          </span>
+        )}
+        {fmt.matchedVia.map((m) => (
+          <span
+            key={m}
+            data-testid={`matched-via-${m}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "1px 6px",
+              fontSize: 10,
+              fontFamily: SANS,
+              color: MATCHED_VIA_COLOR[m],
+              background: `${MATCHED_VIA_COLOR[m]}1A`,
+              border: `1px solid ${MATCHED_VIA_COLOR[m]}66`,
+              borderRadius: 999,
+              fontWeight: 500,
+              lineHeight: 1.2,
+              transition: "background 120ms ease, border-color 120ms ease",
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: MATCHED_VIA_COLOR[m],
+                display: "inline-block",
+              }}
+            />
+            {m}
+          </span>
+        ))}
+      </span>
+      {/* RRF + rerank rows */}
+      <span
+        style={{
+          display: "grid",
+          gridTemplateColumns: "70px 1fr",
+          gap: "2px 6px",
+          fontSize: 11,
+          fontFamily: SANS,
+          color: C.text2,
+          lineHeight: 1.4,
+        }}
+      >
+        <span
+          style={{
+            color: C.text3,
+            fontFamily: "ui-monospace, monospace",
+          }}
+        >
+          RRF
+        </span>
+        <span data-testid="provenance-rrf">{fmt.rrfLabel}</span>
+        <span
+          style={{
+            color: C.text3,
+            fontFamily: "ui-monospace, monospace",
+          }}
+        >
+          Rerank
+        </span>
+        <span
+          data-testid="provenance-rerank"
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          {fmt.rerankPct !== null ? (
+            <>
+              <span
+                aria-hidden
+                style={{
+                  display: "inline-block",
+                  width: 70,
+                  height: 4,
+                  background: `${C.border}80`,
+                  borderRadius: 2,
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                <span
+                  style={{
+                    display: "block",
+                    height: "100%",
+                    width: `${fmt.rerankPct}%`,
+                    background: C.ember,
+                    transition: "width 200ms ease",
+                  }}
+                />
+              </span>
+              <span>{fmt.rerankLabel}</span>
+            </>
+          ) : (
+            <span style={{ color: C.text3, fontStyle: "italic" }}>
+              {fmt.rerankLabel}
+            </span>
+          )}
+        </span>
+        <span
+          style={{
+            color: C.text3,
+            fontFamily: "ui-monospace, monospace",
+          }}
+        >
+          Pool
+        </span>
+        <span data-testid="provenance-pool">{fmt.poolLabel}</span>
+      </span>
+      {data.query && (
+        <span
+          style={{
+            display: "block",
+            marginTop: 6,
+            fontSize: 10,
+            fontFamily: SANS,
+            color: C.text3,
+            fontStyle: "italic",
+            wordBreak: "break-word",
+          }}
+        >
+          query: &ldquo;{data.query}&rdquo;
         </span>
       )}
     </span>

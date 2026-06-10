@@ -94,6 +94,12 @@ export interface HybridRetrievalResult {
     keyword: boolean;
     rerank: boolean;
   };
+  /**
+   * Roadmap-v2-4 — total unique candidates after the RRF merge, BEFORE
+   * the rerank pass trimmed to topK. Used by the cite-chip "why" trace to
+   * render "3rd of 47 candidates" style provenance to the AM.
+   */
+  candidate_pool_size: number;
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -371,6 +377,83 @@ async function applyRerank(
 }
 
 /* ────────────────────────────────────────────────────────────────────────
+ * Staged helper — used by the A/B rerank harness
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export interface StagedRetrievalOptions extends FactRetrievalFilters {
+  /** How many candidates each retrieval stage pulls before merge. Default 50. */
+  candidatesPerStage?: number;
+}
+
+export interface StagedRetrievalResult {
+  /** Post-RRF candidates (sorted by rrf_score desc). */
+  candidates: MergeEntry[];
+  /** Per-stage timing in ms. */
+  timing: {
+    embedding_ms: number;
+    keyword_ms: number;
+  };
+  /** Whether each retrieval stage actually returned hits. */
+  ran: {
+    embedding: boolean;
+    keyword: boolean;
+  };
+}
+
+/**
+ * Run the hybrid pipeline up through RRF merge but stop BEFORE rerank.
+ * Returns the candidate set so callers can run rerank zero, one, or many
+ * times against the same candidates (e.g., the A/B harness reranks once
+ * with rerank-2.5-lite and once with rerank-2.5 full).
+ *
+ * retrieveFactsHybrid composes this with applyRerank — keeping a single
+ * source of truth for the staged behavior.
+ */
+export async function retrieveHybridStaged(
+  query: string,
+  options: StagedRetrievalOptions = {},
+): Promise<StagedRetrievalResult> {
+  const candidatesPerStage = options.candidatesPerStage ?? 50;
+
+  const filters: FactRetrievalFilters = {
+    customer_id: options.customer_id,
+    topic_category: options.topic_category,
+    topic_subcategory: options.topic_subcategory,
+    field_name: options.field_name,
+    value_numeric_gte: options.value_numeric_gte,
+    value_numeric_lte: options.value_numeric_lte,
+  };
+
+  if (!query || !query.trim()) {
+    return {
+      candidates: [],
+      timing: { embedding_ms: 0, keyword_ms: 0 },
+      ran: { embedding: false, keyword: false },
+    };
+  }
+
+  const tEmb0 = Date.now();
+  const tKw0 = Date.now();
+  const [embeddingHits, keywordHits] = await Promise.all([
+    searchByEmbedding(query, filters, candidatesPerStage),
+    searchByKeyword(query, filters, candidatesPerStage),
+  ]);
+  const embedding_ms = Date.now() - tEmb0;
+  const keyword_ms = Date.now() - tKw0;
+
+  const merged = mergeRRF(embeddingHits, keywordHits);
+
+  return {
+    candidates: merged,
+    timing: { embedding_ms, keyword_ms },
+    ran: {
+      embedding: embeddingHits.length > 0,
+      keyword: keywordHits.length > 0,
+    },
+  };
+}
+
+/* ────────────────────────────────────────────────────────────────────────
  * Top-level orchestrator
  * ──────────────────────────────────────────────────────────────────────── */
 
@@ -382,48 +465,37 @@ async function applyRerank(
  * Empty query → empty result. We don't fall back to "all confirmed facts"
  * here; that path stays in loadBrainForPrompt for the no-question case
  * (e.g., initial Customer 360 panel load).
+ *
+ * Composes retrieveHybridStaged() (stages 1+2) with applyRerank (stage 3).
  */
 export async function retrieveFactsHybrid(
   query: string,
   options: HybridRetrievalOptions = {},
 ): Promise<HybridRetrievalResult> {
-  const candidatesPerStage = options.candidatesPerStage ?? 50;
   const topK = options.topK ?? 5;
   const skipRerank = options.skipRerank ?? false;
 
-  const filters: FactRetrievalFilters = {
+  const t0 = Date.now();
+  const staged = await retrieveHybridStaged(query, {
     customer_id: options.customer_id,
     topic_category: options.topic_category,
     topic_subcategory: options.topic_subcategory,
     field_name: options.field_name,
     value_numeric_gte: options.value_numeric_gte,
     value_numeric_lte: options.value_numeric_lte,
-  };
+    candidatesPerStage: options.candidatesPerStage,
+  });
 
-  const t0 = Date.now();
   if (!query || !query.trim()) {
     return {
       facts: [],
       timing: { embedding_ms: 0, keyword_ms: 0, rerank_ms: 0, total_ms: 0 },
       ran: { embedding: false, keyword: false, rerank: false },
+      candidate_pool_size: 0,
     };
   }
 
-  // Stage 1 — run embedding + keyword in parallel.
-  const tEmb0 = Date.now();
-  const tKw0 = Date.now();
-  const [embeddingHits, keywordHits] = await Promise.all([
-    searchByEmbedding(query, filters, candidatesPerStage),
-    searchByKeyword(query, filters, candidatesPerStage),
-  ]);
-  const embedding_ms = Date.now() - tEmb0;
-  const keyword_ms = Date.now() - tKw0;
-
-  const ranEmbedding = embeddingHits.length > 0;
-  const ranKeyword = keywordHits.length > 0;
-
-  // Stage 2 — RRF merge.
-  const merged = mergeRRF(embeddingHits, keywordHits);
+  const merged = staged.candidates;
 
   // Stage 3 — rerank (optional).
   const tRerank0 = Date.now();
@@ -446,15 +518,16 @@ export async function retrieveFactsHybrid(
   return {
     facts: scored,
     timing: {
-      embedding_ms,
-      keyword_ms,
+      embedding_ms: staged.timing.embedding_ms,
+      keyword_ms: staged.timing.keyword_ms,
       rerank_ms,
       total_ms: Date.now() - t0,
     },
     ran: {
-      embedding: ranEmbedding,
-      keyword: ranKeyword,
+      embedding: staged.ran.embedding,
+      keyword: staged.ran.keyword,
       rerank: ranRerank,
     },
+    candidate_pool_size: merged.length,
   };
 }

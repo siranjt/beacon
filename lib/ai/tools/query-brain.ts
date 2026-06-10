@@ -163,6 +163,18 @@ export const queryBrainTool: BeaconTool = {
       let retrievalMode: "hybrid" | "structured";
       let timing_ms: Record<string, number> | undefined;
       let stages_ran: Record<string, boolean> | undefined;
+      // Roadmap-v2-4 — per-fact provenance for the cite-chip "why" trace.
+      // Populated in hybrid mode; left null in structured mode (no
+      // semantic/keyword ranking to expose).
+      let provenanceByFactId: Map<
+        string,
+        {
+          matched_via: Array<"embedding" | "keyword">;
+          rrf_score: number;
+          rerank_score: number | null;
+        }
+      > | null = null;
+      let candidatePoolSize = 0;
 
       if (naturalQuery) {
         const result = await retrieveFactsHybrid(naturalQuery, {
@@ -179,6 +191,17 @@ export const queryBrainTool: BeaconTool = {
         retrievalMode = "hybrid";
         timing_ms = result.timing as unknown as Record<string, number>;
         stages_ran = result.ran as unknown as Record<string, boolean>;
+        provenanceByFactId = new Map(
+          result.facts.map((s) => [
+            s.fact.fact_id,
+            {
+              matched_via: s.matched_via,
+              rrf_score: s.rrf_score,
+              rerank_score: s.rerank_score,
+            },
+          ]),
+        );
+        candidatePoolSize = result.candidate_pool_size;
       } else {
         const out = await searchFacts({
           topic_category,
@@ -262,6 +285,7 @@ export const queryBrainTool: BeaconTool = {
 
       const rows = facts.map((f) => {
         const join = byCustomerId.get(f.customer_id);
+        const prov = provenanceByFactId?.get(f.fact_id) ?? null;
         return {
           fact_id: f.fact_id,
           customer_id: f.customer_id,
@@ -274,6 +298,11 @@ export const queryBrainTool: BeaconTool = {
           value: f.value,
           source_type: f.source_type,
           confirmed_at: f.confirmed_at,
+          // Roadmap-v2-4 — hybrid-mode provenance for cite-chip "why" trace.
+          // Null on structured-mode rows (no ranking pipeline ran).
+          matched_via: prov?.matched_via ?? null,
+          rrf_score: prov?.rrf_score ?? null,
+          relevance_score: prov?.rerank_score ?? null,
         };
       });
 
@@ -338,6 +367,10 @@ export const queryBrainTool: BeaconTool = {
           limit,
           has_more:
             retrievalMode === "structured" && total > offset + rows.length,
+          // Roadmap-v2-4 — provenance scaffolding so the client can build
+          // the cite-chip "why" trace for hybrid-mode rows.
+          candidate_pool_size: candidatePoolSize,
+          retrieval_query: naturalQuery ?? null,
         },
       };
     } catch (e) {

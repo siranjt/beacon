@@ -32,6 +32,15 @@ type Body = {
   turn_id?: unknown;
   signal?: unknown;
   reason?: unknown;
+  /**
+   * Roadmap-v2-1 — Beam confidence calibration. The displayed tier on the
+   * assistant turn at thumbs-click time. Derived client-side from the
+   * `<confidence: NN%>` marker parsed out of the assistant content (mirrors
+   * components/ai/ConfidenceBadge tierFor: ≥80 high, ≥55 medium, else low).
+   * `null` when the turn had no confidence marker (older turns + scopes
+   * where Beam didn't emit one). Persisted on `beacon_ai_feedback.confidence_tier`.
+   */
+  confidence_tier?: unknown;
 };
 
 export async function POST(req: NextRequest) {
@@ -55,6 +64,14 @@ export async function POST(req: NextRequest) {
   const signal = body.signal === "up" || body.signal === "down" ? body.signal : null;
   const reason =
     typeof body.reason === "string" ? body.reason.trim().slice(0, 500) : null;
+  // Roadmap-v2-1 — normalize the displayed tier; anything outside the
+  // allowed set falls back to null (treated as "no tier reported").
+  const confidenceTier: "high" | "medium" | "low" | null =
+    body.confidence_tier === "high" ||
+    body.confidence_tier === "medium" ||
+    body.confidence_tier === "low"
+      ? body.confidence_tier
+      : null;
 
   if (!turnId || !signal) {
     return NextResponse.json(
@@ -111,9 +128,11 @@ export async function POST(req: NextRequest) {
        WHERE turn_id = ${turnId} AND signal = ${opposite}
     `;
     // Idempotent insert: if same signal already recorded, do nothing.
+    // confidence_tier is captured here so the calibration page can
+    // aggregate hit rate per tier (Roadmap-v2-1).
     const inserted = await sql`
-      INSERT INTO beacon_ai_feedback (email, turn_id, signal, reason)
-      VALUES (${email}, ${turnId}, ${signal}, ${reason})
+      INSERT INTO beacon_ai_feedback (email, turn_id, signal, reason, confidence_tier)
+      VALUES (${email}, ${turnId}, ${signal}, ${reason}, ${confidenceTier})
       ON CONFLICT (turn_id, signal) DO NOTHING
       RETURNING id
     `;

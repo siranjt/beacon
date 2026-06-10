@@ -51,7 +51,40 @@ export type CitationCategory =
   // Phase G — Beacon AI Knowledge Base. KB chips link to a doc in
   // beacon_ai_docs. id = the doc's slug. The popover shows title +
   // section + excerpt; clicking opens /admin/knowledge/<doc_id>.
-  | "kb";
+  | "kb"
+  // Roadmap-v2-4 — Keeper fact citation. id = "<fact_id>" or
+  // "<fact_id>:<entity_id>" when scope needs disambiguation. The chip
+  // popover surfaces the fact's topic/field/value plus the hybrid
+  // retrieval "why" trace (matched_via / RRF / rerank) when provenance
+  // is attached.
+  | "fact";
+
+/**
+ * Roadmap-v2-4 — "why" trace for citation chips backed by hybrid Keeper
+ * retrieval. When present, the chip's popover renders an inline trace card
+ * showing which retrieval stages surfaced this fact (embedding / keyword),
+ * the merged RRF score, the Voyage rerank relevance, and the fact's
+ * position in the candidate pool.
+ *
+ * Only Keeper-backed chips (read_customer_brain / query_brain hybrid mode)
+ * carry this. Chips sourced from snapshot rows, KB docs, or other
+ * non-Keeper paths leave it undefined → the popover falls back to the
+ * existing "source" line without the rerank UI.
+ */
+export interface CitationProvenance {
+  /** Which retrieval stages surfaced this fact. */
+  matched_via: Array<"embedding" | "keyword">;
+  /** Sum of reciprocal ranks across signals from the RRF merge. */
+  rrf_score: number;
+  /** Voyage rerank-2.5-lite relevance score, 0-1. Null when rerank skipped/failed. */
+  rerank_score: number | null;
+  /** 1-indexed position in the final ranked output (1 = top). */
+  rank: number;
+  /** Number of candidates considered after the RRF merge. */
+  candidate_pool_size: number;
+  /** Optional original question that drove the retrieval. */
+  query?: string | null;
+}
 
 export interface CitationEntry {
   /** Short human label shown at the top of the popover. */
@@ -62,6 +95,12 @@ export interface CitationEntry {
   raw?: Record<string, string | number | null>;
   /** Category tag — used for chip color hint + popover heading. */
   category: CitationCategory;
+  /**
+   * Optional Wave-1 hybrid-retrieval provenance. Drives the inline trace
+   * card in CitationChip. Backwards-compatible: older response payloads
+   * without this field still render the original popover untouched.
+   */
+  provenance?: CitationProvenance;
 }
 
 export type CitationLookup = Record<string, CitationEntry>;
@@ -131,6 +170,66 @@ export function buildKnowledgeCitations(
       },
     };
   }
+  return out;
+}
+
+/**
+ * Roadmap-v2-4 — Build a citation lookup for Keeper facts surfaced by the
+ * Wave-1 hybrid retrieval pipeline. Each fact becomes a `fact:<fact_id>`
+ * entry carrying provenance — matched_via badges, RRF score, rerank score,
+ * rank, candidate pool size. The chip popover renders this as an inline
+ * trace card so the AM can see WHY a fact was surfaced.
+ *
+ * Call this from the client after a `read_customer_brain` (hybrid) or
+ * `query_brain` (hybrid) tool execution, and pass the resulting lookup as
+ * `extra_citations` on the continuation `ask` request — same plumbing as
+ * `query_customer_book` Tier 4.
+ */
+export function buildBrainProvenanceCitations(args: {
+  facts: Array<{
+    fact_id: string;
+    topic_category?: string | null;
+    topic_subcategory?: string | null;
+    field_name?: string | null;
+    value: string;
+    matched_via: Array<"embedding" | "keyword">;
+    rrf_score: number;
+    /** Voyage rerank-2.5-lite score, 0-1. May be null when rerank skipped. */
+    relevance_score: number | null;
+    confirmed_at?: string | null;
+    source_type?: string | null;
+  }>;
+  candidatePoolSize: number;
+  query?: string | null;
+}): CitationLookup {
+  const out: CitationLookup = {};
+  const { facts, candidatePoolSize, query } = args;
+  facts.forEach((f, idx) => {
+    if (!f.fact_id) return;
+    const subPath = f.topic_subcategory
+      ? `${f.topic_category ?? "fact"}/${f.topic_subcategory}${f.field_name ? `/${f.field_name}` : ""}`
+      : "Keeper fact";
+    out[makeCitationKey("fact", f.fact_id)] = {
+      category: "fact",
+      label: subPath,
+      value: f.value,
+      raw: {
+        topic_category: f.topic_category ?? null,
+        topic_subcategory: f.topic_subcategory ?? null,
+        field_name: f.field_name ?? null,
+        source_type: f.source_type ?? null,
+        confirmed_at: f.confirmed_at ?? null,
+      },
+      provenance: {
+        matched_via: f.matched_via,
+        rrf_score: f.rrf_score,
+        rerank_score: f.relevance_score,
+        rank: idx + 1,
+        candidate_pool_size: candidatePoolSize,
+        query: query ?? null,
+      },
+    };
+  });
   return out;
 }
 
