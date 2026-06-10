@@ -12,6 +12,10 @@
 
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { enrichWithCallOutcomes } from "@/lib/customer/call-outcomes";
+// Wave-3 — short-TTL in-memory cache for heavy per-scope context blobs.
+// Wraps loaders so consecutive Beam turns about the same customer don't
+// re-hit Metabase / Chargebee / Postgres for the same data.
+import { getCachedContext, makeCacheKey } from "@/lib/ai/context-cache";
 import { fetchEntityReportData } from "@/lib/report/fetchers";
 import {
   fetchAllTickets,
@@ -388,7 +392,24 @@ export async function loadInboxContext(opts: {
 /** ──────────────────────────────────────────────────────────────
  * customer-360 / customer detail — full per-customer data
  * ────────────────────────────────────────────────────────────── */
-export async function loadCustomer360Context(entityId: string): Promise<LoadedContext> {
+/**
+ * Public entry — wraps the heavy implementation with a TTL cache keyed on
+ * entity_id. Consecutive Beam turns about the same customer return from
+ * cache; the Refresh button path can pass `{ bypassCache: true }` to
+ * force-recompute.
+ */
+export async function loadCustomer360Context(
+  entityId: string,
+  opts: { bypassCache?: boolean } = {},
+): Promise<LoadedContext> {
+  return getCachedContext(
+    makeCacheKey("customer-360", { entity_id: entityId }),
+    () => _loadCustomer360ContextImpl(entityId),
+    { bypassCache: opts.bypassCache },
+  );
+}
+
+async function _loadCustomer360ContextImpl(entityId: string): Promise<LoadedContext> {
   const snap = await readLatestSnapshotV2().catch(() => null);
   const sc = findInSnapshot(snap, entityId);
 
@@ -601,6 +622,17 @@ export async function loadCustomer360Context(entityId: string): Promise<LoadedCo
  * customer-book — aggregate over the AM's book (or whole org)
  * ────────────────────────────────────────────────────────────── */
 export async function loadCustomerBookContext(opts: {
+  amFilter: string | null;
+  bypassCache?: boolean;
+}): Promise<LoadedContext> {
+  return getCachedContext(
+    makeCacheKey("customer-book", { am: opts.amFilter ?? "ALL" }),
+    () => _loadCustomerBookContextImpl({ amFilter: opts.amFilter }),
+    { bypassCache: opts.bypassCache },
+  );
+}
+
+async function _loadCustomerBookContextImpl(opts: {
   amFilter: string | null;
 }): Promise<LoadedContext> {
   const snap = await readLatestSnapshotV2().catch(() => null);
@@ -1223,7 +1255,17 @@ export async function loadEscalationOverviewContext(): Promise<LoadedContext> {
 /** ──────────────────────────────────────────────────────────────
  * post-payment-book — recent verdicts list
  * ────────────────────────────────────────────────────────────── */
-export async function loadPostPaymentBookContext(): Promise<LoadedContext> {
+export async function loadPostPaymentBookContext(
+  opts: { bypassCache?: boolean } = {},
+): Promise<LoadedContext> {
+  return getCachedContext(
+    makeCacheKey("post-payment-book", {}),
+    () => _loadPostPaymentBookContextImpl(),
+    { bypassCache: opts.bypassCache },
+  );
+}
+
+async function _loadPostPaymentBookContextImpl(): Promise<LoadedContext> {
   const customers = await listCustomersSinceFloor().catch(() => []);
   const slice = customers.slice(0, POSTPAYMENT_TOP_N);
 

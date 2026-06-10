@@ -1761,6 +1761,23 @@ export async function runStageAAndStore(snapshotDate?: string): Promise<{
     console.warn(`[stage-a G3] diff against yesterday failed: ${msg}`);
   }
 
+  // Wave-3 — bust the Beam context cache once new snapshot data has
+  // landed. The 5-min TTL is the safety net; explicit invalidation here
+  // ensures the next Beam invocation sees fresh data immediately instead
+  // of waiting out the TTL.
+  try {
+    const { invalidateBeamContextCaches } = await import(
+      "@/lib/ai/context-cache"
+    );
+    const dropped = invalidateBeamContextCaches();
+    if (dropped > 0) {
+      console.log(`[stage-a] invalidated ${dropped} Beam context cache entries after refresh`);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[stage-a] beam cache invalidation failed: ${msg}`);
+  }
+
   return { durationMs, errors, rowCount: data.activeEntityIds.length, newEntityIds };
 }
 
