@@ -195,6 +195,16 @@ export default async function LauncherPage() {
                 Admin · Keeper validate
               </Link>
               <Link
+                href="/admin/brain/reject-rate"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Keeper reject rate
+              </Link>
+              <Link
                 href="/admin/shadow-verdict"
                 style={{
                   color: "var(--zoca-text-2)",

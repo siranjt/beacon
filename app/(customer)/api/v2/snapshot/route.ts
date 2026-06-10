@@ -15,6 +15,7 @@ import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { getLocationRecordIdMap } from "@/lib/customer/hubspot-locations";
 import { getHealthCardMap } from "@/lib/customer/health-card";
 import { getActiveCallOutcomes, applyOutcomeOverride } from "@/lib/customer/call-outcomes";
+import { getLatestShadowVerdictMap } from "@/lib/customer/shadow-verdict/repo";
 import { getApiUser, requireRole } from "@/lib/customer/api-auth";
 
 export const runtime = "nodejs";
@@ -72,6 +73,32 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       console.warn(
         "[snapshot] Health card enrichment skipped:",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+
+    // SV-10 — latest LLM shadow verdict per entity. Enriched here so the
+    // V2CustomerCard's "AI says" chip can render directly off the snapshot
+    // payload without a per-card fetch. Bounded by current customer count
+    // (~900 rows), so a single DISTINCT ON query is cheap. Soft-fails when
+    // the shadow_verdict table isn't yet present or the query errors.
+    try {
+      const svMap = await getLatestShadowVerdictMap();
+      if (svMap.size > 0 && Array.isArray(snap.customers)) {
+        for (const c of snap.customers) {
+          const v = svMap.get(c.entity_id);
+          if (v) {
+            c.shadow_verdict = {
+              tier: v.tier,
+              run_date: v.run_date,
+              primary_driver: v.primary_driver,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(
+        "[snapshot] Shadow verdict enrichment skipped:",
         e instanceof Error ? e.message : String(e),
       );
     }

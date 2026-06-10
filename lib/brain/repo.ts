@@ -983,3 +983,225 @@ export async function reclassifyCandidateFact(
     confirmed_by_email: by_email,
   });
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Wave 1.5 quality check — Haiku-extracted candidate reject-rate stats.
+ *
+ * The product question: are the Haiku extractions any good, or is the
+ * prompt too aggressive? Measured by reject rate. Rule of thumb: if more
+ * than 30 % of triaged candidates get rejected, the prompt needs
+ * tightening.
+ *
+ * Approach
+ * --------
+ * For each fact written by the Haiku extractor (source_type
+ * 'beacon_ai_extracted', identified by the 'create' row on the version
+ * log), we find the LATEST change_reason on the same fact. The latest
+ * change_reason encodes the AM's verdict:
+ *
+ *     change_reason       outcome
+ *     ------------------  --------------------
+ *     create   (only row) pending  (untriaged)
+ *     confirm             confirmed
+ *     refine              edit_confirmed
+ *     reject              rejected
+ *     reclassify          reclassified  (synthesized — see note below)
+ *
+ * NOTE on reclassification — `reclassifyCandidateFact` actually emits
+ * `change_reason='reject'` on the original fact + a brand-new 'create'
+ * row on the destination fact. There is no `reclassify` enum value in
+ * ChangeReason. Reclassified candidates therefore look like rejects in
+ * the version log on the SOURCE row. We keep them in the rejected
+ * bucket here (it's the most honest reading: the Haiku put the fact in
+ * the wrong slot). If the team wants to split them out later, the
+ * source_ref of the new 'create' row points at the original — we can
+ * left-join on that to bucket separately.
+ *
+ * reject_rate = rejected / (confirmed + edit_confirmed + rejected)
+ *
+ *   - excludes still-pending candidates (they haven't been triaged yet)
+ *   - reclassified counts as rejected per the note above
+ *
+ * Window
+ * ------
+ * The window applies to the ORIGINAL 'create' timestamp on the version
+ * log. A candidate created 6 days ago and rejected today still belongs
+ * to the 7d window — what we care about is the cohort of extractions
+ * from that period, regardless of when triage happened.
+ *
+ * Pass `windowDays: undefined` (or omit) for the all-time view.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export interface CandidateOutcomeStats {
+  total: number;
+  confirmed: number;
+  rejected: number;
+  edit_confirmed: number;
+  reclassified: number;
+  pending: number;
+  /** rejected / (confirmed + edit_confirmed + rejected). 0 if no triaged. */
+  reject_rate: number;
+}
+
+export interface CandidateOutcomeStatsByAm extends CandidateOutcomeStats {
+  owning_am_email: string;
+}
+
+/**
+ * Per-fact latest-change CTE. Used by both helpers.
+ *
+ *   - `creates`: every Haiku-extracted fact's initial 'create' version row
+ *                (one row per fact). Captures the window via `changed_at`.
+ *   - `latest`:  the most recent version row per fact_id. Its change_reason
+ *                is the verdict; tied creates are mapped to 'pending'.
+ *
+ * Reclassified is currently always 0 (no reclassify ChangeReason); the
+ * column is kept for future expansion if we add the enum value.
+ */
+export async function getCandidateOutcomeStats(opts: {
+  windowDays?: number;
+  amEmail?: string;
+} = {}): Promise<CandidateOutcomeStats> {
+  const sql = getSql();
+  const empty: CandidateOutcomeStats = {
+    total: 0,
+    confirmed: 0,
+    rejected: 0,
+    edit_confirmed: 0,
+    reclassified: 0,
+    pending: 0,
+    reject_rate: 0,
+  };
+  if (!sql) return empty;
+
+  const windowDays =
+    typeof opts.windowDays === "number" && Number.isFinite(opts.windowDays)
+      ? Math.max(1, Math.floor(opts.windowDays))
+      : null;
+  const amEmail = opts.amEmail ?? null;
+
+  try {
+    const rows = (await sql`
+      WITH creates AS (
+        SELECT v.fact_id, v.changed_at AS created_at, f.owning_am_email
+        FROM beacon_brain_fact_versions v
+        JOIN beacon_brain_facts f ON f.fact_id = v.fact_id
+        WHERE v.change_reason = 'create'
+          AND v.source_type = 'beacon_ai_extracted'
+          AND (${windowDays}::int IS NULL
+               OR v.changed_at >= NOW() - (${windowDays} || ' days')::interval)
+          AND (${amEmail}::text IS NULL OR f.owning_am_email = ${amEmail})
+      ),
+      latest AS (
+        -- Take the latest AM TRIAGE row only (confirm | refine | reject).
+        -- 'edit' rows can be emitted by the Haiku cron when it re-extracts
+        -- the same tuple with a new value — that's not an AM verdict and
+        -- shouldn't bucket as triaged. Facts with zero triage rows fall
+        -- out of this join and land as 'pending' in the LEFT JOIN below.
+        SELECT DISTINCT ON (v.fact_id)
+          v.fact_id, v.change_reason
+        FROM beacon_brain_fact_versions v
+        JOIN creates c ON c.fact_id = v.fact_id
+        WHERE v.change_reason IN ('confirm', 'refine', 'reject')
+        ORDER BY v.fact_id, v.version DESC
+      )
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE l.change_reason = 'confirm')::int AS confirmed,
+        COUNT(*) FILTER (WHERE l.change_reason = 'reject')::int AS rejected,
+        COUNT(*) FILTER (WHERE l.change_reason = 'refine')::int AS edit_confirmed,
+        0::int AS reclassified,
+        COUNT(*) FILTER (WHERE l.change_reason IS NULL)::int AS pending
+      FROM creates c
+      LEFT JOIN latest l ON l.fact_id = c.fact_id
+    `) as Array<{
+      total: number;
+      confirmed: number;
+      rejected: number;
+      edit_confirmed: number;
+      reclassified: number;
+      pending: number;
+    }>;
+
+    const r = rows[0] ?? empty;
+    const triaged = r.confirmed + r.edit_confirmed + r.rejected;
+    const reject_rate = triaged > 0 ? r.rejected / triaged : 0;
+    return { ...r, reject_rate };
+  } catch (err) {
+    console.error("[brain] getCandidateOutcomeStats failed", err);
+    return empty;
+  }
+}
+
+/**
+ * Same outcome bucketing as getCandidateOutcomeStats, grouped by
+ * owning_am_email. Rows with no AM (system-owned) bucket under '__none__'.
+ */
+export async function getCandidateOutcomeStatsByAm(opts: {
+  windowDays?: number;
+} = {}): Promise<CandidateOutcomeStatsByAm[]> {
+  const sql = getSql();
+  if (!sql) return [];
+
+  const windowDays =
+    typeof opts.windowDays === "number" && Number.isFinite(opts.windowDays)
+      ? Math.max(1, Math.floor(opts.windowDays))
+      : null;
+
+  try {
+    const rows = (await sql`
+      WITH creates AS (
+        SELECT v.fact_id, v.changed_at AS created_at,
+               COALESCE(f.owning_am_email, '__none__') AS owning_am_email
+        FROM beacon_brain_fact_versions v
+        JOIN beacon_brain_facts f ON f.fact_id = v.fact_id
+        WHERE v.change_reason = 'create'
+          AND v.source_type = 'beacon_ai_extracted'
+          AND (${windowDays}::int IS NULL
+               OR v.changed_at >= NOW() - (${windowDays} || ' days')::interval)
+      ),
+      latest AS (
+        -- Take the latest AM TRIAGE row only (confirm | refine | reject).
+        -- 'edit' rows can be emitted by the Haiku cron when it re-extracts
+        -- the same tuple with a new value — that's not an AM verdict and
+        -- shouldn't bucket as triaged. Facts with zero triage rows fall
+        -- out of this join and land as 'pending' in the LEFT JOIN below.
+        SELECT DISTINCT ON (v.fact_id)
+          v.fact_id, v.change_reason
+        FROM beacon_brain_fact_versions v
+        JOIN creates c ON c.fact_id = v.fact_id
+        WHERE v.change_reason IN ('confirm', 'refine', 'reject')
+        ORDER BY v.fact_id, v.version DESC
+      )
+      SELECT
+        c.owning_am_email,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE l.change_reason = 'confirm')::int AS confirmed,
+        COUNT(*) FILTER (WHERE l.change_reason = 'reject')::int AS rejected,
+        COUNT(*) FILTER (WHERE l.change_reason = 'refine')::int AS edit_confirmed,
+        0::int AS reclassified,
+        COUNT(*) FILTER (WHERE l.change_reason IS NULL)::int AS pending
+      FROM creates c
+      LEFT JOIN latest l ON l.fact_id = c.fact_id
+      GROUP BY c.owning_am_email
+      ORDER BY total DESC
+    `) as Array<{
+      owning_am_email: string;
+      total: number;
+      confirmed: number;
+      rejected: number;
+      edit_confirmed: number;
+      reclassified: number;
+      pending: number;
+    }>;
+
+    return rows.map((r) => {
+      const triaged = r.confirmed + r.edit_confirmed + r.rejected;
+      const reject_rate = triaged > 0 ? r.rejected / triaged : 0;
+      return { ...r, reject_rate };
+    });
+  } catch (err) {
+    console.error("[brain] getCandidateOutcomeStatsByAm failed", err);
+    return [];
+  }
+}

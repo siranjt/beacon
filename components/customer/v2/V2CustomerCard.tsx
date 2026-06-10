@@ -27,6 +27,8 @@ import { useCompareSelection } from "@/lib/customer/hooks/use-compare-selection"
 import { PinButton, SnoozeMenu, SnoozedBanner } from "./V2CardChrome";
 import CallOutcomeControls from "./CallOutcomeControls";
 import V2TierFeedback from "./V2TierFeedback";
+// SV-10 — Shadow Verdict chip (renders nothing when customer.shadow_verdict is null).
+import V2ShadowVerdictChip from "./V2ShadowVerdictChip";
 // Phase E-15.4b — chip pile extracted.
 import {
   FlagChip,
@@ -552,6 +554,16 @@ function V2CustomerCardInner({
             >
               ↗ Open detail
             </a>
+          {/* SV-10 — Shadow Verdict chip. Surfaces the latest LLM tier next
+              to the engine's stoplight so AMs see Beacon AI's call at a
+              glance. Renders nothing when no SV row exists for this entity
+              (early shadow window, LLM run failed, or table not populated). */}
+          {customer.shadow_verdict && (
+            <V2ShadowVerdictChip
+              shadowVerdict={customer.shadow_verdict}
+              engineStoplight={s.stoplight}
+            />
+          )}
           {/* Phase E-11 — signal-freshness chip. Tells AMs "this customer just
               joined, their signals haven't caught up — empty stats are by design,
               not a problem with the customer". Renders alongside / instead of
@@ -1634,6 +1646,8 @@ const V2CustomerCard = memo(V2CustomerCardInner, (prev, next) => {
     prev.customer.signals_v2.composite === next.customer.signals_v2.composite &&
     prev.customer.signals_v2.stoplight === next.customer.signals_v2.stoplight &&
     prev.customer.performance?.flag === next.customer.performance?.flag &&
+    // SV-10 — re-render when the LLM shadow verdict flips tier between snapshots.
+    prev.customer.shadow_verdict?.tier === next.customer.shadow_verdict?.tier &&
     prev.trend === next.trend &&
     prev.recentlyContacted === next.recentlyContacted &&
     prev.isPinned === next.isPinned &&

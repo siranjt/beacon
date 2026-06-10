@@ -410,6 +410,19 @@ export type ScoredCustomerV2 = ScoredCustomer & {
     initiator_pattern: "mostly_us" | "mostly_them" | "balanced";
     response_latency_hours: number | null;
   } | null;
+  /**
+   * SV-10 — latest LLM shadow verdict for this entity. Enriched at read
+   * time in /api/v2/snapshot from beacon_shadow_verdict (one row per
+   * entity, most recent run_date). Absent when no SV row exists for the
+   * entity yet (early days of the shadow window, or LLM run failed).
+   * When present, V2CustomerCard renders a small "AI says" chip so AMs
+   * can see the LLM's tier alongside the engine's stoplight.
+   */
+  shadow_verdict?: {
+    tier: "RED" | "YELLOW" | "GREEN";
+    run_date: string;          // YYYY-MM-DD
+    primary_driver?: "billing" | "comms" | "performance" | "tickets" | "sentiment" | "mixed";
+  };
 };
 
 export type AmTierRow = {

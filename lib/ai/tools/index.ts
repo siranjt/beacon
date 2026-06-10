@@ -52,6 +52,7 @@ import { addFactToBrainTool } from "./add-fact-to-brain";
 import { queryBrainTool } from "./query-brain";
 import { getChargebeeBillingTool } from "./get-chargebee-billing";
 import { getCustomerPerformanceTool } from "./get-customer-performance";
+import { getFullCustomerViewTool } from "./get-full-customer-view";
 
 /**
  * The execution context passed to every tool's `execute()` handler. Filled
@@ -153,6 +154,12 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   // (GBP click trend, keyword rankings, leads, reviews). Mirrors the
   // zoca-performance-report data layer.
   getCustomerPerformanceTool,
+  // Cross-scope synthesis — bundles Keeper + comms perspective +
+  // performance summary + escalations + notes into one parallel
+  // fan-out so "tell me everything about X" lands in a single
+  // tool call instead of 4-5 chained read_* hops. Reachable from
+  // customer-360 and customer-book scopes.
+  getFullCustomerViewTool,
 ];
 
 /** Alias for callers that prefer the umbrella naming. */
@@ -201,4 +208,5 @@ export {
   queryBrainTool,
   getChargebeeBillingTool,
   getCustomerPerformanceTool,
+  getFullCustomerViewTool,
 };

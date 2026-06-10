@@ -5,10 +5,19 @@
 import "server-only";
 import { getSql } from "@/lib/customer/postgres";
 import type {
+  PrimaryDriver,
   ShadowVerdictRow,
   Tier,
   TierFeedbackRow,
 } from "./types";
+
+/** Slim shape surfaced on V2CustomerCard (SV-10). The full ShadowVerdictRow is
+ *  ~25 fields; we only need three for the in-card "AI says" chip. */
+export interface LatestShadowVerdict {
+  tier: Tier;
+  run_date: string;            // YYYY-MM-DD
+  primary_driver: PrimaryDriver;
+}
 
 /** Idempotent UPSERT on (run_date, entity_id). Re-running for the same
  *  day overwrites the prior row (latest LLM judgment wins). */
@@ -278,4 +287,45 @@ export async function getFeedbackAggregates(days: number = 28): Promise<{
     accuracy_pct: total === 0 ? 0 : Math.round((accurate / total) * 100),
     by_tier,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SV-10 — surface latest LLM verdict on V2CustomerCard
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Map of entity_id → latest shadow verdict (one row per entity, the most
+ * recent `run_date`). Used by /api/v2/snapshot to enrich each customer with
+ * its current SV tier so the V2CustomerCard can render the "AI says" chip
+ * without a per-card fetch.
+ *
+ * The query uses DISTINCT ON to pick the most recent run per entity in a
+ * single round-trip.
+ */
+export async function getLatestShadowVerdictMap(): Promise<Map<string, LatestShadowVerdict>> {
+  const map = new Map<string, LatestShadowVerdict>();
+  const sql = getSql();
+  if (!sql) return map;
+  const rows = (await sql`
+    SELECT DISTINCT ON (entity_id)
+      entity_id,
+      llm_tier,
+      llm_primary_driver,
+      run_date::text AS run_date
+    FROM beacon_shadow_verdict
+    ORDER BY entity_id, run_date DESC
+  `) as Array<{
+    entity_id: string;
+    llm_tier: Tier;
+    llm_primary_driver: PrimaryDriver;
+    run_date: string;
+  }>;
+  for (const r of rows) {
+    map.set(r.entity_id, {
+      tier: r.llm_tier,
+      run_date: r.run_date,
+      primary_driver: r.llm_primary_driver,
+    });
+  }
+  return map;
 }
