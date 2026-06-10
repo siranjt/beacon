@@ -1490,6 +1490,269 @@
   .half--keeper:hover {
     box-shadow: 0 22px 60px rgba(26, 47, 74, 0.14);
   }
+
+  /* ============================================================
+     v3 — Wave timeline strip (animated dots filling sequentially)
+     ============================================================ */
+  .wave-timeline {
+    position: relative;
+    margin: 38px auto 44px;
+    max-width: 920px;
+    padding: 24px 32px 56px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .wave-timeline__track {
+    position: absolute;
+    top: 50%; left: 32px; right: 32px;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(200, 67, 29, 0.18), rgba(217, 164, 65, 0.18), rgba(200, 67, 29, 0.18));
+    transform: translateY(-50%);
+    overflow: hidden;
+  }
+  .wave-timeline__track::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    background: linear-gradient(90deg, var(--ember), var(--brass), var(--ember));
+    background-size: 200% 200%;
+    animation: wave-track-flow 3.6s linear infinite;
+    transition: width 2s var(--ease-apple);
+  }
+  .wave-timeline.in-view .wave-timeline__track::after { width: 100%; }
+  @keyframes wave-track-flow {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+  .wave-timeline__dot {
+    position: relative;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid rgba(200, 67, 29, 0.3);
+    z-index: 1;
+    transform: scale(0);
+    transition: transform 560ms var(--ease-out-back), border-color 560ms var(--ease-apple), background 560ms var(--ease-apple);
+  }
+  .wave-timeline.in-view .wave-timeline__dot { transform: scale(1); }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="1"] { transition-delay: 200ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="2"] { transition-delay: 380ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="3"] { transition-delay: 560ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="4"] { transition-delay: 740ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="5"] { transition-delay: 920ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="6"] { transition-delay: 1100ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="7"] { transition-delay: 1280ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="8"] { transition-delay: 1460ms; }
+  .wave-timeline.in-view .wave-timeline__dot {
+    background: var(--ember);
+    border-color: var(--ember);
+    box-shadow: 0 0 12px rgba(200, 67, 29, 0.35);
+  }
+  .wave-timeline__dot--flame {
+    animation: wave-flame-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes wave-flame-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(200, 67, 29, 0.35); }
+    50%      { box-shadow: 0 0 22px rgba(200, 67, 29, 0.65); }
+  }
+  .wave-timeline__lbl {
+    position: absolute;
+    top: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--gray-700);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 600ms var(--ease-apple);
+  }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="1"] .wave-timeline__lbl { opacity: 1; transition-delay: 400ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="2"] .wave-timeline__lbl { opacity: 1; transition-delay: 580ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="3"] .wave-timeline__lbl { opacity: 1; transition-delay: 760ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="4"] .wave-timeline__lbl { opacity: 1; transition-delay: 940ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="5"] .wave-timeline__lbl { opacity: 1; transition-delay: 1120ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="6"] .wave-timeline__lbl { opacity: 1; transition-delay: 1300ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="7"] .wave-timeline__lbl { opacity: 1; transition-delay: 1480ms; }
+  .wave-timeline.in-view .wave-timeline__dot[data-dot="8"] .wave-timeline__lbl { opacity: 1; transition-delay: 1660ms; }
+  @media (max-width: 760px) {
+    .wave-timeline { flex-wrap: wrap; gap: 16px; padding: 16px; }
+    .wave-timeline__track { display: none; }
+    .wave-timeline__lbl { position: static; transform: none; margin-left: 8px; opacity: 1 !important; }
+    .wave-timeline__dot { display: inline-flex; align-items: center; width: auto; height: auto; border-radius: 999px; padding: 4px 10px 4px 4px; }
+  }
+
+  /* ============================================================
+     v3 — 8-card grid for the expanded just-shipped section
+     ============================================================ */
+  .shipped-grid--eight {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 1024px) { .shipped-grid--eight { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 580px)  { .shipped-grid--eight { grid-template-columns: 1fr; } }
+
+  .shipped-grid--eight .shipped-card { padding: 22px 20px 22px; }
+  .shipped-grid--eight .shipped-card__icon { width: 44px; height: 44px; font-size: 20px; margin-bottom: 12px; }
+  .shipped-grid--eight .shipped-card__title { font-size: 17px; margin: 0 0 8px; line-height: 1.25; }
+  .shipped-grid--eight .shipped-card__body { font-size: 13px; line-height: 1.5; }
+  .shipped-grid--eight .shipped-ribbon { top: 12px; right: 12px; font-size: 9px; padding: 3px 8px; letter-spacing: 0.12em; }
+
+  /* Stagger across 8 cards */
+  .shipped-grid--eight.in-view > *:nth-child(1) { transition-delay: 80ms; }
+  .shipped-grid--eight.in-view > *:nth-child(2) { transition-delay: 160ms; }
+  .shipped-grid--eight.in-view > *:nth-child(3) { transition-delay: 240ms; }
+  .shipped-grid--eight.in-view > *:nth-child(4) { transition-delay: 320ms; }
+  .shipped-grid--eight.in-view > *:nth-child(5) { transition-delay: 400ms; }
+  .shipped-grid--eight.in-view > *:nth-child(6) { transition-delay: 480ms; }
+  .shipped-grid--eight.in-view > *:nth-child(7) { transition-delay: 560ms; }
+  .shipped-grid--eight.in-view > *:nth-child(8) { transition-delay: 640ms; }
+
+  /* ============================================================
+     v3 — 3D tilt cards (subtle perspective lift on hover)
+     ============================================================ */
+  .tilt-card {
+    transform-style: preserve-3d;
+    perspective: 800px;
+    will-change: transform;
+    transition: transform 360ms var(--ease-out-back), box-shadow 360ms var(--ease-apple);
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .tilt-card:hover {
+      transform: perspective(800px) rotateX(-1.5deg) rotateY(2deg) translateY(-4px);
+    }
+  }
+
+  /* ============================================================
+     v3 — Hero title typewriter (light, character-stagger reveal)
+     ============================================================ */
+  body.page-loading h1.hero-title { opacity: 0; }
+  h1.hero-title {
+    animation: hero-title-in 1.4s var(--ease-out-back) 200ms forwards;
+  }
+  @keyframes hero-title-in {
+    0%   { opacity: 0; transform: translateY(14px) scale(0.97); letter-spacing: -0.05em; }
+    60%  { opacity: 1; transform: translateY(0)   scale(1.01); letter-spacing: -0.025em; }
+    100% { opacity: 1; transform: translateY(0)   scale(1.0);  letter-spacing: -0.035em; }
+  }
+
+  /* ============================================================
+     v3 — Hero subhead character-stagger reveal
+     ============================================================ */
+  h2.hero-sub {
+    overflow: hidden;
+  }
+  h2.hero-sub.is-revealed .char {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  h2.hero-sub .char {
+    display: inline-block;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: transform 600ms var(--ease-out-back), opacity 600ms var(--ease-apple);
+  }
+
+  /* ============================================================
+     v3 — Cursor-anchored glow halo in dark sections
+     ============================================================ */
+  .section--dark,
+  .section--lapis,
+  .section--final {
+    --mx: 50%;
+    --my: 50%;
+  }
+  .section--dark::before,
+  .section--lapis::before,
+  .section--final::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(420px circle at var(--mx) var(--my), rgba(217, 164, 65, 0.10), transparent 70%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 500ms var(--ease-apple);
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .section--dark:hover::before,
+    .section--lapis:hover::before,
+    .section--final:hover::before {
+      opacity: 1;
+    }
+  }
+
+  /* ============================================================
+     v3 — Counter spring on land
+     ============================================================ */
+  .counter__num.is-landed {
+    animation: counter-spring 700ms var(--ease-out-back);
+  }
+  @keyframes counter-spring {
+    0%   { transform: scale(0.9); }
+    60%  { transform: scale(1.08); }
+    100% { transform: scale(1.0); }
+  }
+
+  /* ============================================================
+     v3 — Sparkle dust under hero (faint slow drift)
+     ============================================================ */
+  .section--hero {
+    position: relative;
+    overflow: hidden;
+  }
+  .section--hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(1.5px 1.5px at 18% 36%, rgba(200, 67, 29, 0.45), transparent 50%),
+      radial-gradient(1px   1px   at 78% 22%, rgba(217, 164, 65, 0.40), transparent 50%),
+      radial-gradient(1.8px 1.8px at 38% 78%, rgba(200, 67, 29, 0.30), transparent 50%),
+      radial-gradient(1.2px 1.2px at 88% 62%, rgba(217, 164, 65, 0.30), transparent 50%),
+      radial-gradient(1.4px 1.4px at 55% 92%, rgba(251, 191, 36, 0.30), transparent 50%);
+    pointer-events: none;
+    animation: hero-sparkle-drift 28s ease-in-out infinite;
+    opacity: 0.85;
+  }
+  @keyframes hero-sparkle-drift {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    50%      { transform: translate3d(6px, -10px, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .section--hero::after { animation: none; }
+  }
+
+  /* Headline reveals slightly more dramatic */
+  h2.headline[data-animate] {
+    transition: opacity 800ms var(--ease-apple), transform 800ms var(--ease-out-back);
+  }
+
+  /* ============================================================
+     v3 — More refined card shadow on hover (depth)
+     ============================================================ */
+  .shipped-card:hover {
+    box-shadow:
+      0 28px 60px rgba(200, 67, 29, 0.12),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  .shipped-card--keeper:hover {
+    box-shadow:
+      0 28px 60px rgba(26, 47, 74, 0.14),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  .shipped-card--brass:hover {
+    box-shadow:
+      0 28px 60px rgba(217, 164, 65, 0.18),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  .shipped-card--voyage:hover {
+    box-shadow:
+      0 28px 60px rgba(107, 79, 187, 0.16),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+  }
 </style>
 </head>
 <body class="page-loading">
@@ -1519,7 +1782,7 @@
     </a>
     <div class="topnav__right">
       <span>Beam &nbsp;+&nbsp; Keeper</span>
-      <span class="topnav__ver"><span class="topnav__pulse"></span>Live</span>
+      <span class="topnav__ver"><span class="topnav__pulse"></span>8 wins · live</span>
     </div>
   </div>
 </nav>
@@ -1545,9 +1808,13 @@
       <span class="hero-tag">Wave 1 · Hybrid retrieval</span>
       <span class="hero-tag">Wave 2 · Conflict resolution</span>
       <span class="hero-tag">Wave 3 · Caching</span>
-      <span class="hero-tag hero-tag--fresh">SV-10 · Shadow Verdict surfaced</span>
+      <span class="hero-tag hero-tag--fresh">SV-10 · Shadow Verdict</span>
       <span class="hero-tag hero-tag--keeper hero-tag--fresh">Keeper panel polished</span>
       <span class="hero-tag hero-tag--fresh">Cross-scope synthesis</span>
+      <span class="hero-tag hero-tag--fresh">Confidence calibration</span>
+      <span class="hero-tag hero-tag--keeper hero-tag--fresh">Taxonomy v2 · cadence + sentiment</span>
+      <span class="hero-tag hero-tag--fresh">Rerank A/B harness</span>
+      <span class="hero-tag hero-tag--fresh">Cite-chip "why" trace</span>
     </div>
   </div>
 </section>
@@ -1971,54 +2238,101 @@
 <div class="divider"></div>
 
 <!-- ============================================================ -->
-<!-- 11. JUST SHIPPED (today)                                     -->
+<!-- 11. JUST SHIPPED — 8 wins in one session                     -->
 <!-- ============================================================ -->
 <section class="section section--parchment">
   <div class="container container--wide">
     <p class="kicker kicker--brass" data-animate style="text-align:center;">
-      <span class="ship-dot"></span> Just shipped
+      <span class="ship-dot"></span> Today's drop · 8 wins in one session
     </p>
-    <h2 class="headline" data-animate>Today's drop.</h2>
-    <p class="subhead" data-animate>Four polish + intelligence wins landed in one go — surfacing what was running in the shadows, sharpening the panel AMs see, and giving Beam a single tool for holistic questions.</p>
+    <h2 class="headline" data-animate>Eight wins. One push.</h2>
+    <p class="subhead" data-animate>The three waves that lifted Beam + Keeper's foundation, plus five polish wins that closed the visible roadmap. All typecheck-clean, lint-clean, 92 tests passing, live in prod.</p>
 
-    <div class="shipped-grid" data-cascade>
-      <div class="shipped-card">
+    <!-- Wave timeline strip -->
+    <div class="wave-timeline" data-timeline>
+      <div class="wave-timeline__track"></div>
+      <div class="wave-timeline__dot" data-dot="1"><span class="wave-timeline__lbl">Wave 1 · Hybrid retrieval</span></div>
+      <div class="wave-timeline__dot" data-dot="2"><span class="wave-timeline__lbl">Wave 2 · Conflict resolution</span></div>
+      <div class="wave-timeline__dot" data-dot="3"><span class="wave-timeline__lbl">Wave 3 · Caching</span></div>
+      <div class="wave-timeline__dot" data-dot="4"><span class="wave-timeline__lbl">SV-10 · Shadow Verdict</span></div>
+      <div class="wave-timeline__dot" data-dot="5"><span class="wave-timeline__lbl">Keeper polish</span></div>
+      <div class="wave-timeline__dot" data-dot="6"><span class="wave-timeline__lbl">Synthesis tool</span></div>
+      <div class="wave-timeline__dot" data-dot="7"><span class="wave-timeline__lbl">Calibration + rerank A/B</span></div>
+      <div class="wave-timeline__dot wave-timeline__dot--flame" data-dot="8"><span class="wave-timeline__lbl">"Why" trace</span></div>
+    </div>
+
+    <div class="shipped-grid shipped-grid--eight" data-cascade>
+
+      <div class="shipped-card tilt-card">
         <span class="shipped-ribbon">NEW</span>
         <div class="shipped-card__icon"><i class="ti ti-eye"></i></div>
         <p class="shipped-card__tag">SV-10</p>
         <h3 class="shipped-card__title">Shadow Verdict on every card</h3>
-        <p class="shipped-card__body">The Haiku second-opinion now ships visible alongside the engine's stoplight on every V2CustomerCard. When AI disagrees with the engine, a small <span class="ne-glyph">≠</span> glyph + border-color shift surfaces it instantly. Click for the primary driver.</p>
+        <p class="shipped-card__body">The Haiku second-opinion now ships visible alongside the engine's stoplight on every V2CustomerCard. When AI disagrees with the engine, a small <span class="ne-glyph">≠</span> glyph + border-color shift surfaces it instantly.</p>
       </div>
 
-      <div class="shipped-card shipped-card--keeper">
+      <div class="shipped-card shipped-card--keeper tilt-card">
         <span class="shipped-ribbon shipped-ribbon--keeper">NEW</span>
         <div class="shipped-card__icon shipped-card__icon--keeper"><i class="ti ti-sparkles"></i></div>
         <p class="shipped-card__tag shipped-card__tag--keeper">Wave 2c.1</p>
         <h3 class="shipped-card__title">Keeper panel, polished</h3>
-        <p class="shipped-card__body">Category icons on every fact row. Relative-time age chips ("3d ago", "60d ago"). Source-trust badges color-coded to the ranking hierarchy. Expand-in-place version history showing who refined what, when, and why.</p>
+        <p class="shipped-card__body">Category icons. Relative-time age chips ("3d ago", "60d ago"). Source-trust badges color-coded to the ranking hierarchy. Expand-in-place version history.</p>
       </div>
 
-      <div class="shipped-card shipped-card--brass">
+      <div class="shipped-card shipped-card--brass tilt-card">
         <span class="shipped-ribbon shipped-ribbon--brass">NEW</span>
         <div class="shipped-card__icon shipped-card__icon--brass"><i class="ti ti-percentage"></i></div>
         <p class="shipped-card__tag shipped-card__tag--brass">W1.5</p>
         <h3 class="shipped-card__title">Reject-rate dashboard</h3>
-        <p class="shipped-card__body">New admin page at <code class="code-chip">/admin/brain/reject-rate</code>. Shows confirm / refine / reject / pending across 7d, 30d, all-time, broken down per AM. Copper callout fires when any window exceeds 30% — auto-prompts a Haiku tightening review.</p>
+        <p class="shipped-card__body">New page at <code class="code-chip">/admin/brain/reject-rate</code>. Confirm / refine / reject / pending across 7d / 30d / all-time, per AM. Auto-callout when any window exceeds 30%.</p>
       </div>
 
-      <div class="shipped-card shipped-card--voyage">
+      <div class="shipped-card shipped-card--voyage tilt-card">
         <span class="shipped-ribbon shipped-ribbon--voyage">NEW</span>
         <div class="shipped-card__icon shipped-card__icon--voyage"><i class="ti ti-puzzle"></i></div>
         <p class="shipped-card__tag shipped-card__tag--voyage">Tool</p>
         <h3 class="shipped-card__title">get_full_customer_view</h3>
-        <p class="shipped-card__body">A single Beam tool that bundles Keeper facts, comms perspective, perf summary, open escalations, and notes into one parallel-fetched response. Replaces chains of 4-5 separate tool calls when the user asks for the holistic picture.</p>
+        <p class="shipped-card__body">A single Beam tool bundling Keeper, comms, perf, escalations, notes in one parallel fetch. Replaces chains of 4-5 separate tool calls on holistic questions.</p>
       </div>
+
+      <div class="shipped-card tilt-card">
+        <span class="shipped-ribbon">NEW</span>
+        <div class="shipped-card__icon"><i class="ti ti-target-arrow"></i></div>
+        <p class="shipped-card__tag">Calibration</p>
+        <h3 class="shipped-card__title">Confidence calibration</h3>
+        <p class="shipped-card__body">New page at <code class="code-chip">/admin/beacon-ai-calibration</code>. Every thumbs vote records the tier Beam reported. Per-tier hit rate over 7d / 30d / all-time + inline calibration curve.</p>
+      </div>
+
+      <div class="shipped-card shipped-card--keeper tilt-card">
+        <span class="shipped-ribbon shipped-ribbon--keeper">NEW</span>
+        <div class="shipped-card__icon shipped-card__icon--keeper"><i class="ti ti-tree"></i></div>
+        <p class="shipped-card__tag shipped-card__tag--keeper">Taxonomy v2</p>
+        <h3 class="shipped-card__title">cadence + sentiment slots</h3>
+        <p class="shipped-card__body">Two new behavioral subcategories with structured slots: <code class="code-chip">rebook_window_weeks</code>, <code class="code-chip">last_rebook_at</code>, <code class="code-chip">nps_equivalent_signal</code>, <code class="code-chip">last_signal_at</code>, <code class="code-chip">signal_substance</code>. Backwards-compatible.</p>
+      </div>
+
+      <div class="shipped-card shipped-card--voyage tilt-card">
+        <span class="shipped-ribbon shipped-ribbon--voyage">NEW</span>
+        <div class="shipped-card__icon shipped-card__icon--voyage"><i class="ti ti-compare"></i></div>
+        <p class="shipped-card__tag shipped-card__tag--voyage">Rerank A/B</p>
+        <h3 class="shipped-card__title">Voyage A/B harness</h3>
+        <p class="shipped-card__body">New page at <code class="code-chip">/admin/brain/rerank-compare</code>. Same RRF candidate pool, reranked by both <code class="code-chip">rerank-2.5-lite</code> and <code class="code-chip">rerank-2.5</code>. Side-by-side top-K + Spearman correlation.</p>
+      </div>
+
+      <div class="shipped-card shipped-card--brass tilt-card">
+        <span class="shipped-ribbon shipped-ribbon--brass">NEW</span>
+        <div class="shipped-card__icon shipped-card__icon--brass"><i class="ti ti-link"></i></div>
+        <p class="shipped-card__tag shipped-card__tag--brass">Trace</p>
+        <h3 class="shipped-card__title">Cite-chip "why" trace</h3>
+        <p class="shipped-card__body">Click any Beam cite chip to expand the retrieval provenance: matched_via badges, RRF score, rerank score with a 0-1 bar, and "3rd of 47 candidates" pool position. Trust-building.</p>
+      </div>
+
     </div>
 
     <div class="shipped-foot" data-animate>
       <span class="shipped-foot__pill"><i class="ti ti-circle-check-filled"></i> typecheck clean</span>
       <span class="shipped-foot__pill"><i class="ti ti-circle-check-filled"></i> lint clean</span>
-      <span class="shipped-foot__pill"><i class="ti ti-circle-check-filled"></i> 60 / 60 tests pass</span>
+      <span class="shipped-foot__pill"><i class="ti ti-circle-check-filled"></i> 92 / 92 tests pass</span>
       <span class="shipped-foot__pill shipped-foot__pill--bright"><i class="ti ti-flame"></i> live in prod</span>
     </div>
   </div>
@@ -2039,29 +2353,29 @@
       <div class="roadmap-row">
         <div class="roadmap-row__num">1</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">Beam confidence calibration</p>
-          <p class="roadmap-row__desc">Beam reports High / Medium / Low confidence — but we've never measured whether the labels correlate with actual answer correctness. Build a per-tier thumbs aggregator + weekly calibration page. Closes the trust loop.</p>
+          <p class="roadmap-row__title">Beacon Mac app via Tauri</p>
+          <p class="roadmap-row__desc">Tauri wrapper around the Next.js frontend, Vercel backend unchanged. TestFlight distribution, native window controls, system tray, native notifications when a customer flips RED. Apple Developer account is already active.</p>
         </div>
       </div>
       <div class="roadmap-row">
         <div class="roadmap-row__num">2</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">Keeper taxonomy v2</p>
-          <p class="roadmap-row__desc">v1.1 added relationship, assignment, business_profile. v2 adds structured slots for preferred contact channel, rebook cadence, last NPS-equivalent signal. Moves Keeper from free-text-with-tag to a richer queryable schema.</p>
+          <p class="roadmap-row__title">Eval harness ship</p>
+          <p class="roadmap-row__desc">Wave 3c built the eval scaffold but never shipped it. Stand up the nightly judge run with the Tier 1 + Tier 2 cases seeded today. Weekly report card on Beam quality regressions per scope.</p>
         </div>
       </div>
       <div class="roadmap-row">
         <div class="roadmap-row__num">3</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">Voyage rerank quality A/B</p>
-          <p class="roadmap-row__desc">Currently on rerank-2.5-lite for cost. After a week of real use, A/B against the full rerank-2.5 on the same queries. If precision lifts materially, swap by env var.</p>
+          <p class="roadmap-row__title">Cross-scope synthesis usage analytics</p>
+          <p class="roadmap-row__desc">Now that <code class="code-chip">get_full_customer_view</code> exists, measure how often Beam picks it vs chaining 4-5 smaller tool calls. Tells us if the prompt teaching was effective and whether to nudge the model further.</p>
         </div>
       </div>
       <div class="roadmap-row">
         <div class="roadmap-row__num">4</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">Beam "why" trace on cite chips</p>
-          <p class="roadmap-row__desc">Hybrid retrieval already carries full provenance — embedding rank, keyword rank, RRF score, rerank score, matched_via. Surface it: clicking a cite chip expands an inline trace showing why that fact won. Trust-building.</p>
+          <p class="roadmap-row__title">Keeper read-replica for cost</p>
+          <p class="roadmap-row__desc">Heavy Beam usage now routes through Wave-3's in-memory cache, but every cold miss still hits primary Postgres. Standing up a read-replica for Keeper queries cuts primary load by ~80% and lets the cache TTL drop without throughput risk.</p>
         </div>
       </div>
     </div>
@@ -2114,7 +2428,7 @@
     });
   }, { threshold: 0.12 });
 
-  document.querySelectorAll('[data-animate], [data-cascade], .divider').forEach(el => io.observe(el));
+  document.querySelectorAll('[data-animate], [data-cascade], [data-timeline], .divider').forEach(el => io.observe(el));
 
   // ============================================================
   // Counter tick animation
@@ -2173,6 +2487,54 @@
   }, { threshold: 0.5 });
   const firstCacheRow = document.querySelector('[data-cache-row]');
   if (firstCacheRow) cacheIO.observe(firstCacheRow);
+
+  // ============================================================
+  // v3 — Hero subhead character-by-character reveal
+  // ============================================================
+  const subhead = document.querySelector('h2.hero-sub');
+  if (subhead && !subhead.querySelector('.char')) {
+    const text = subhead.textContent || '';
+    subhead.innerHTML = '';
+    [...text].forEach((c, i) => {
+      const span = document.createElement('span');
+      span.className = 'char';
+      span.textContent = c === ' ' ? ' ' : c;
+      span.style.transitionDelay = (300 + i * 22) + 'ms';
+      subhead.appendChild(span);
+    });
+    requestAnimationFrame(() => subhead.classList.add('is-revealed'));
+  }
+
+  // ============================================================
+  // v3 — Counter spring on land (re-uses existing countIO; layer after)
+  // ============================================================
+  const counterLandIO = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      // Wait until the count finishes (~1400ms in the original countIO),
+      // then add the landing pop.
+      setTimeout(() => el.classList.add('is-landed'), 1400);
+      counterLandIO.unobserve(el);
+    });
+  }, { threshold: 0.4 });
+  document.querySelectorAll('[data-counter]').forEach(el => counterLandIO.observe(el));
+
+  // ============================================================
+  // v3 — Cursor-anchored glow halo in dark sections
+  // ============================================================
+  if (window.matchMedia('(hover: hover)').matches &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.section--dark, .section--lapis, .section--final').forEach(sec => {
+      sec.addEventListener('mousemove', (e) => {
+        const rect = sec.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        sec.style.setProperty('--mx', x + '%');
+        sec.style.setProperty('--my', y + '%');
+      });
+    });
+  }
 
   // ============================================================
   // Smooth scroll for anchor links
