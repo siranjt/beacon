@@ -21,9 +21,11 @@
 
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { searchFacts } from "@/lib/brain/repo";
+import { retrieveFactsHybrid } from "@/lib/brain/retrieve";
 import { FIELD_CATALOG } from "@/lib/brain/types";
 import { logUmbrellaActivity } from "@/lib/activity/log";
 import type { BeaconTool, ToolExecutionContext, ToolResult } from "./index";
+import type { BrainFact } from "@/lib/brain/types";
 
 const MAX_ROWS_DEFAULT = 50;
 const MAX_ROWS_HARD = 200;
@@ -48,19 +50,24 @@ export const queryBrainTool: BeaconTool = {
     "  - 'Who has a latent risk flagged?'\n" +
     "  - 'Which customers were sold by Ravishankar N?'\n" +
     "  - 'List everyone where auto-debit history mentions failed transactions'\n\n" +
-    "You translate the manager's question into a filter using this schema:\n" +
+    "TWO query modes — pick the one that fits the question:\n\n" +
+    "1. NATURAL-LANGUAGE MODE — pass `query` (a short string describing what you're looking for). Routes through hybrid semantic + keyword search + Voyage rerank. Best for: paraphrase-tolerant questions ('who's frustrated with onboarding', 'customers worried about pricing', 'risk of churn this quarter') where the AM might phrase the fact differently than the value column. Returns the top-50 most relevant facts ranked by relevance score.\n\n" +
+    "2. STRUCTURED-FILTER MODE — pass the structured filters below (topic_category, topic_subcategory, field_name, value_contains). Use when the question maps to a clean schema lookup ('all customers on GlossGenius' → topic_subcategory='operational/platform', value_contains='GlossGenius'). Faster, deterministic, and supports pagination via limit/offset.\n\n" +
+    "Schema for structured mode:\n" +
     describeCatalog() +
-    "\n\nFilter shape:\n" +
-    "  - topic_category (optional): identity | operational | behavioral | concerns\n" +
-    "  - topic_subcategory (optional): one of the schema names above\n" +
-    "  - field_name (optional): a named field for the chosen subcategory OR 'other'\n" +
-    "  - value_contains (optional): substring (case-insensitive) to ILIKE-match in the value column\n\n" +
-    "At least ONE of these filters must be provided. Combine them when the question implies a specific field (e.g. 'who prefers WhatsApp' → topic_subcategory='comms_preference', field_name='preferred_channel', value_contains='WhatsApp').\n\n" +
-    "Returns up to 50 matching customer rows by default (200 max). Each row carries: customer_id, entity_id, bizname, am_name, the matched fact (topic, field, value, confirmed_at). Use the rows to compose a table or narrative answer.\n\n" +
+    "\n\nYou can combine `query` AND structured filters — the structured filters become AND-conditions on the hybrid search (e.g., `query='churn risk'` + `topic_category='concerns'` narrows hybrid search to the concerns category).\n\n" +
+    "At least ONE input is required (either `query`, or one of the structured filters). Cross-book queries with no input would return too many rows.\n\n" +
+    "Returns matching customer rows with: customer_id, entity_id, bizname, am_name, the matched fact (topic, field, value, confirmed_at). Use the rows to compose a table or narrative answer.\n\n" +
     "Manager + admin only — AMs use read_customer_brain for their own customers. Read-only, auto-approves.",
   input_schema: {
     type: "object",
     properties: {
+      query: {
+        type: "string",
+        description:
+          "Natural-language description of what you're looking for (e.g., 'customers worried about pricing', 'AMs who flagged onboarding risk'). When provided, runs hybrid semantic + keyword search + rerank across all confirmed facts. Combine with structured filters to narrow scope.",
+        minLength: 3,
+      },
       topic_category: {
         type: "string",
         enum: ["identity", "operational", "behavioral", "concerns"],
@@ -78,7 +85,7 @@ export const queryBrainTool: BeaconTool = {
       value_contains: {
         type: "string",
         description:
-          "Case-insensitive substring to match in the value column (ILIKE %X%).",
+          "Case-insensitive substring to match in the value column (ILIKE %X%). Structured-mode only — ignored when `query` is provided.",
         minLength: 1,
       },
       limit: {
@@ -91,7 +98,7 @@ export const queryBrainTool: BeaconTool = {
       offset: {
         type: "number",
         description:
-          "Skip the first N rows. Used for pagination when an earlier result trimmed at 20 and the user asked for more. Example: 'show next 20' → offset=20. Combine with limit to scroll a window.",
+          "Skip the first N rows. Used for pagination when an earlier result trimmed at 20 and the user asked for more. Example: 'show next 20' → offset=20. Combine with limit to scroll a window. Structured-mode only — hybrid mode returns the top-50 reranked candidates without pagination.",
         minimum: 0,
       },
     },
@@ -108,6 +115,10 @@ export const queryBrainTool: BeaconTool = {
       };
     }
 
+    const naturalQuery =
+      typeof args.query === "string" && args.query.trim().length >= 3
+        ? args.query.trim()
+        : undefined;
     const topic_category =
       typeof args.topic_category === "string" ? args.topic_category : undefined;
     const topic_subcategory =
@@ -128,6 +139,7 @@ export const queryBrainTool: BeaconTool = {
         : 0;
 
     if (
+      !naturalQuery &&
       !topic_category &&
       !topic_subcategory &&
       !field_name &&
@@ -136,19 +148,50 @@ export const queryBrainTool: BeaconTool = {
       return {
         ok: false,
         error:
-          "At least one filter is required (topic_category, topic_subcategory, field_name, or value_contains). Cross-book queries with no filter would return too many rows.",
+          "At least one input is required (`query` OR one of the structured filters). Cross-book queries with no input would return too many rows.",
       };
     }
 
     try {
-      const { rows: facts, total } = await searchFacts({
-        topic_category,
-        topic_subcategory,
-        field_name,
-        value_contains,
-        limit,
-        offset,
-      });
+      // Wave-1 hybrid path — when a natural-language query is provided,
+      // route through retrieveFactsHybrid. Structured filters (category/
+      // subcategory/field) become AND-conditions narrowing the search;
+      // value_contains is ignored in this mode because rerank handles
+      // substring matching better than ILIKE.
+      let facts: BrainFact[];
+      let total: number;
+      let retrievalMode: "hybrid" | "structured";
+      let timing_ms: Record<string, number> | undefined;
+      let stages_ran: Record<string, boolean> | undefined;
+
+      if (naturalQuery) {
+        const result = await retrieveFactsHybrid(naturalQuery, {
+          topic_category,
+          topic_subcategory,
+          field_name,
+          // For cross-book, pull more candidates and return more — the
+          // manager use case wants breadth over precision.
+          candidatesPerStage: 100,
+          topK: Math.min(limit, 50),
+        });
+        facts = result.facts.map((s) => s.fact);
+        total = facts.length;
+        retrievalMode = "hybrid";
+        timing_ms = result.timing as unknown as Record<string, number>;
+        stages_ran = result.ran as unknown as Record<string, boolean>;
+      } else {
+        const out = await searchFacts({
+          topic_category,
+          topic_subcategory,
+          field_name,
+          value_contains,
+          limit,
+          offset,
+        });
+        facts = out.rows;
+        total = out.total;
+        retrievalMode = "structured";
+      }
 
       if (facts.length === 0) {
         void logUmbrellaActivity({
@@ -160,14 +203,19 @@ export const queryBrainTool: BeaconTool = {
           surface: "customer-360",
           metadata: {
             tool: "query_brain",
+            mode: retrievalMode,
+            query: naturalQuery ? naturalQuery.slice(0, 200) : undefined,
             topic_category,
             topic_subcategory,
             field_name,
             value_contains,
             rows: 0,
+            timing_ms,
+            stages_ran,
           },
         });
-        const filterSummary = describeFilter({
+        const inputSummary = describeInput({
+          query: naturalQuery,
           topic_category,
           topic_subcategory,
           field_name,
@@ -175,14 +223,16 @@ export const queryBrainTool: BeaconTool = {
         });
         return {
           ok: true,
-          summary: `No matching Keeper facts for ${filterSummary}.`,
+          summary: `No matching Keeper facts for ${inputSummary}.`,
           data: {
             filter: {
+              query: naturalQuery ?? null,
               topic_category: topic_category ?? null,
               topic_subcategory: topic_subcategory ?? null,
               field_name: field_name ?? null,
               value_contains: value_contains ?? null,
             },
+            retrieval_mode: retrievalMode,
             rows: [],
             row_count: 0,
           },
@@ -227,7 +277,8 @@ export const queryBrainTool: BeaconTool = {
         };
       });
 
-      const filterSummary = describeFilter({
+      const inputSummary = describeInput({
+        query: naturalQuery,
         topic_category,
         topic_subcategory,
         field_name,
@@ -243,38 +294,50 @@ export const queryBrainTool: BeaconTool = {
         surface: "customer-360",
         metadata: {
           tool: "query_brain",
+          mode: retrievalMode,
+          query: naturalQuery ? naturalQuery.slice(0, 200) : undefined,
           topic_category,
           topic_subcategory,
           field_name,
           value_contains,
           rows: rows.length,
           total,
-          offset,
+          offset: retrievalMode === "structured" ? offset : 0,
           limit,
+          timing_ms,
+          stages_ran,
         },
       });
 
+      // Pagination only applies to structured mode. Hybrid mode returns
+      // the top-K reranked candidates without offset semantics.
       const pageInfo =
-        total > rows.length
+        retrievalMode === "structured" && total > rows.length
           ? ` (page ${Math.floor(offset / limit) + 1}: rows ${offset + 1}-${offset + rows.length} of ${total} total)`
           : "";
 
+      const modeLabel =
+        retrievalMode === "hybrid" ? " (ranked by relevance)" : "";
+
       return {
         ok: true,
-        summary: `Found ${total} Keeper fact${total === 1 ? "" : "s"} matching ${filterSummary}${pageInfo}.`,
+        summary: `Found ${total} Keeper fact${total === 1 ? "" : "s"} matching ${inputSummary}${modeLabel}${pageInfo}.`,
         data: {
           filter: {
+            query: naturalQuery ?? null,
             topic_category: topic_category ?? null,
             topic_subcategory: topic_subcategory ?? null,
             field_name: field_name ?? null,
             value_contains: value_contains ?? null,
           },
+          retrieval_mode: retrievalMode,
           rows,
           row_count: rows.length,
           total,
-          offset,
+          offset: retrievalMode === "structured" ? offset : 0,
           limit,
-          has_more: total > offset + rows.length,
+          has_more:
+            retrievalMode === "structured" && total > offset + rows.length,
         },
       };
     } catch (e) {
@@ -284,13 +347,15 @@ export const queryBrainTool: BeaconTool = {
   },
 };
 
-function describeFilter(opts: {
+function describeInput(opts: {
+  query?: string;
   topic_category?: string;
   topic_subcategory?: string;
   field_name?: string;
   value_contains?: string;
 }): string {
   const parts: string[] = [];
+  if (opts.query) parts.push(`query~"${opts.query.slice(0, 60)}"`);
   if (opts.topic_category) parts.push(`category=${opts.topic_category}`);
   if (opts.topic_subcategory)
     parts.push(`subcategory=${opts.topic_subcategory}`);

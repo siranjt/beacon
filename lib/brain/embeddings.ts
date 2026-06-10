@@ -21,6 +21,12 @@
 
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY;
 const VOYAGE_MODEL = process.env.VOYAGE_MODEL || "voyage-3-lite";
+// Wave-1 (hybrid retrieval): rerank-2.5-lite is the cheap variant
+// (~$0.05/1K queries). top-k 50 candidates → top-5 final is well inside
+// its 1K-doc context window and is the standard precision lift on top of
+// raw cosine. Tune model via env if needed.
+const VOYAGE_RERANK_MODEL =
+  process.env.VOYAGE_RERANK_MODEL || "rerank-2.5-lite";
 const EMBEDDING_DIM = 1024;
 
 /**
@@ -100,6 +106,150 @@ export async function embedText(text: string): Promise<EmbeddingResult | null> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(`[embeddings] Voyage call threw: ${msg}`);
+    return null;
+  }
+}
+
+/**
+ * Wave-1 (hybrid retrieval) — embed a search query.
+ *
+ * Voyage's asymmetric retrieval recommends `input_type: "query"` for the
+ * search side and `input_type: "document"` for the stored side. Same
+ * model, different input_type — Voyage applies a model-side prefix that
+ * lifts retrieval quality vs. using document-mode for both.
+ *
+ * Returns null on any failure (matches embedText's soft-fail pattern).
+ * Caller must tolerate null — fall back to keyword-only retrieval.
+ */
+export async function embedQuery(text: string): Promise<EmbeddingResult | null> {
+  if (!VOYAGE_API_KEY) return null;
+  if (!text || !text.trim()) return null;
+  try {
+    const res = await fetch("https://api.voyageai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${VOYAGE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        input: [text],
+        model: VOYAGE_MODEL,
+        input_type: "query",
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn(
+        `[embeddings] Voyage query ${res.status}: ${body.slice(0, 200)}`,
+      );
+      return null;
+    }
+    const json = (await res.json()) as {
+      data?: Array<{ embedding?: number[] }>;
+      usage?: { total_tokens?: number };
+    };
+    const vec = json.data?.[0]?.embedding;
+    if (!Array.isArray(vec) || vec.length !== EMBEDDING_DIM) {
+      console.warn(
+        `[embeddings] Voyage query returned wrong shape: ${
+          Array.isArray(vec) ? vec.length : typeof vec
+        }`,
+      );
+      return null;
+    }
+    return {
+      embedding: vec,
+      input_tokens: json.usage?.total_tokens ?? 0,
+      model: VOYAGE_MODEL,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[embeddings] Voyage query threw: ${msg}`);
+    return null;
+  }
+}
+
+/**
+ * Wave-1 (hybrid retrieval) — rerank a candidate set against a query.
+ *
+ * Pipeline position: after the hybrid (embedding ∪ BM25) merge stage
+ * produces ~50 candidates, we hand them to rerank-2.5-lite to pick the
+ * top-K with cross-attention scoring. This catches the cases where
+ * cosine + keyword both agree on something semantically close but
+ * substantively wrong (e.g., "owner prefers SMS" vs "owner prefers
+ * email" cosines very high; rerank catches the polarity flip).
+ *
+ * Returns the reranked indices + relevance scores, OR null on any
+ * failure. Caller must tolerate null and fall back to the input
+ * ordering. Indices are 0-based against the input `documents` array.
+ *
+ * Cost: ~$0.05 per 1K queries (rerank-2.5-lite). Each call counts as
+ * 1 query regardless of candidate count (up to 1000 docs).
+ */
+export interface RerankResult {
+  /** Index into the original `documents` array passed in. */
+  index: number;
+  /** Voyage's relevance score, 0-1. Higher = more relevant. */
+  relevance_score: number;
+}
+
+export async function rerankDocuments(
+  query: string,
+  documents: string[],
+  options?: { topK?: number; model?: string },
+): Promise<RerankResult[] | null> {
+  if (!VOYAGE_API_KEY) return null;
+  if (!query || !query.trim()) return null;
+  if (!documents.length) return [];
+
+  const topK = options?.topK ?? Math.min(5, documents.length);
+  const model = options?.model || VOYAGE_RERANK_MODEL;
+
+  try {
+    const res = await fetch("https://api.voyageai.com/v1/rerank", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${VOYAGE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        query,
+        documents,
+        model,
+        top_k: topK,
+        // We already have the documents locally — no need to ship them
+        // back over the wire. Cuts response size dramatically.
+        return_documents: false,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn(`[embeddings] Voyage rerank ${res.status}: ${body.slice(0, 200)}`);
+      return null;
+    }
+    const json = (await res.json()) as {
+      data?: Array<{ index?: number; relevance_score?: number }>;
+    };
+    const data = json.data;
+    if (!Array.isArray(data)) {
+      console.warn(`[embeddings] Voyage rerank returned no data array`);
+      return null;
+    }
+    const out: RerankResult[] = [];
+    for (const row of data) {
+      if (
+        typeof row.index === "number" &&
+        typeof row.relevance_score === "number" &&
+        row.index >= 0 &&
+        row.index < documents.length
+      ) {
+        out.push({ index: row.index, relevance_score: row.relevance_score });
+      }
+    }
+    return out;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[embeddings] Voyage rerank threw: ${msg}`);
     return null;
   }
 }
