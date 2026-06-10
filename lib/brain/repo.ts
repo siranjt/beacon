@@ -32,6 +32,7 @@ import {
   formatVectorLiteral,
   SEMANTIC_DUPLICATE_THRESHOLD,
 } from "./embeddings";
+import { applyConflictResolution } from "./ranking";
 
 /**
  * Wave 2b — semantic conflict surfaced when an incoming fact's embedding
@@ -261,6 +262,22 @@ export async function writeBrainFact(
         changed_by_email: input.confirmed_by_email ?? input.owning_am_email ?? "system",
         change_reason: "create",
       });
+      // Wave-2: when the caller explicitly forced past a semantic-conflict,
+      // run cluster resolution so Beam's read path knows which fact is
+      // authoritative. Soft-fail — if it errors, both facts stay
+      // authoritative (pre-Wave-2 behavior), which is recoverable but
+      // not ideal. Skipped when no real neighbor existed.
+      if (
+        input.force_semantic_conflict &&
+        neighbor &&
+        neighbor.fact_id &&
+        neighbor.similarity >= SEMANTIC_DUPLICATE_THRESHOLD
+      ) {
+        await applyConflictResolution({
+          new_fact: newRow,
+          neighbor_fact_id: neighbor.fact_id,
+        });
+      }
     }
     return newRow ?? null;
   }
@@ -308,6 +325,20 @@ export async function writeBrainFact(
         changed_by_email: input.confirmed_by_email ?? input.owning_am_email ?? "system",
         change_reason: "create",
       });
+      // Wave-2 conflict resolution — same gate as the unnamed/other
+      // insert path above. Named-field inserts on a fresh tuple can
+      // still semantically collide with a different-tuple sibling.
+      if (
+        input.force_semantic_conflict &&
+        neighbor &&
+        neighbor.fact_id &&
+        neighbor.similarity >= SEMANTIC_DUPLICATE_THRESHOLD
+      ) {
+        await applyConflictResolution({
+          new_fact: newRow,
+          neighbor_fact_id: neighbor.fact_id,
+        });
+      }
     }
     return newRow ?? null;
   }
@@ -400,13 +431,21 @@ async function writeVersion(input: {
   `;
 }
 
-/** Read all non-deleted facts for a customer. Used by Beacon AI retrieval + the Brain panel. */
+/**
+ * Read all non-deleted facts for a customer. Used by Beacon AI retrieval +
+ * the Brain panel.
+ *
+ * Wave-2: defaults to authoritative-only (`superseded_by IS NULL`). Set
+ * `includeSuperseded: true` for the Validate inbox audit view that wants
+ * to render the cluster history.
+ */
 export async function getFactsForCustomer(
   customer_id: string,
-  opts: { confirmedOnly?: boolean } = {},
+  opts: { confirmedOnly?: boolean; includeSuperseded?: boolean } = {},
 ): Promise<BrainFact[]> {
   const sql = getSql();
   if (!sql) return [];
+  const includeSuperseded = opts.includeSuperseded ?? false;
   const rows = opts.confirmedOnly
     ? ((await sql`
         SELECT * FROM beacon_brain_facts
@@ -414,12 +453,14 @@ export async function getFactsForCustomer(
           AND confidence_state = 'confirmed'
           AND soft_deleted_at IS NULL
           AND (sunset_at IS NULL OR sunset_at > NOW())
+          AND (${includeSuperseded}::boolean = true OR superseded_by IS NULL)
         ORDER BY topic_category, topic_subcategory, field_name
       `) as BrainFact[])
     : ((await sql`
         SELECT * FROM beacon_brain_facts
         WHERE customer_id = ${customer_id}
           AND soft_deleted_at IS NULL
+          AND (${includeSuperseded}::boolean = true OR superseded_by IS NULL)
         ORDER BY topic_category, topic_subcategory, field_name
       `) as BrainFact[]);
   return rows;
@@ -606,6 +647,7 @@ export async function searchFacts(opts: {
         WHERE confidence_state = 'confirmed'
           AND soft_deleted_at IS NULL
           AND (sunset_at IS NULL OR sunset_at > NOW())
+          AND superseded_by IS NULL
           AND (${cat}::text IS NULL OR topic_category = ${cat})
           AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
           AND (${field}::text IS NULL OR field_name = ${field})
@@ -621,6 +663,7 @@ export async function searchFacts(opts: {
         WHERE confidence_state = 'confirmed'
           AND soft_deleted_at IS NULL
           AND (sunset_at IS NULL OR sunset_at > NOW())
+          AND superseded_by IS NULL
           AND (${cat}::text IS NULL OR topic_category = ${cat})
           AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
           AND (${field}::text IS NULL OR field_name = ${field})
@@ -658,6 +701,7 @@ export async function getCategoryBreakdown(
     WHERE customer_id = ${customer_id}
       AND confidence_state = 'confirmed'
       AND soft_deleted_at IS NULL
+      AND superseded_by IS NULL
     GROUP BY topic_category
   `) as Array<{ topic_category: TopicCategory; n: number }>;
   const out: Record<TopicCategory, number> = {

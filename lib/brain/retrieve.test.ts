@@ -17,7 +17,7 @@ function f(id: string): BrainFact {
     fact_id: id,
     customer_id: "c1",
     topic_category: "identity",
-    topic_subcategory: "owner",
+    topic_subcategory: "owner_info",
     field_name: "name",
     value: `value-${id}`,
     confidence_state: "confirmed",

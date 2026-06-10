@@ -144,6 +144,7 @@ export async function searchByEmbedding(
       WHERE confidence_state = 'confirmed'
         AND soft_deleted_at IS NULL
         AND (sunset_at IS NULL OR sunset_at > NOW())
+        AND superseded_by IS NULL
         AND embedding IS NOT NULL
         AND (${cust}::text IS NULL OR customer_id = ${cust})
         AND (${cat}::text  IS NULL OR topic_category = ${cat})
@@ -206,6 +207,7 @@ export async function searchByKeyword(
       WHERE confidence_state = 'confirmed'
         AND soft_deleted_at IS NULL
         AND (sunset_at IS NULL OR sunset_at > NOW())
+        AND superseded_by IS NULL
         AND search_tsv @@ plainto_tsquery('english', ${query})
         AND (${cust}::text IS NULL OR customer_id = ${cust})
         AND (${cat}::text  IS NULL OR topic_category = ${cat})
