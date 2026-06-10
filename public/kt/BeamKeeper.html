@@ -1138,6 +1138,358 @@
     0%, 100% { opacity: 0; transform: scale(0.6); }
     50%      { opacity: 0.85; transform: scale(1); }
   }
+
+  /* ============================================================
+     v2 — Topnav pulse + hero amplification
+     ============================================================ */
+  .topnav__ver {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .topnav__pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 0 rgba(255,255,255,0.6);
+    animation: topnav-pulse 1.6s ease-out infinite;
+  }
+  @keyframes topnav-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.6); }
+    70%  { box-shadow: 0 0 0 7px rgba(255,255,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  }
+
+  /* Hero pulse rings — three concentric rings expanding around the flame */
+  .hero-flame-wrap {
+    position: relative;
+  }
+  .hero-flame-wrap::before,
+  .hero-flame-wrap::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 55%;
+    transform: translate(-50%, -50%);
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(200, 67, 29, 0.32);
+    pointer-events: none;
+    opacity: 0;
+    animation: hero-ring 3.4s ease-out infinite;
+  }
+  .hero-flame-wrap::after {
+    animation-delay: 1.7s;
+  }
+  @keyframes hero-ring {
+    0%   { width: 60px;  height: 60px;  opacity: 0; }
+    20%  {                              opacity: 0.7; }
+    100% { width: 220px; height: 220px; opacity: 0; }
+  }
+
+  /* Fresh hero tag — soft shimmer to signal newness */
+  .hero-tag--fresh {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(200, 67, 29, 0.10), rgba(251, 191, 36, 0.10));
+    border: 1px solid rgba(200, 67, 29, 0.18);
+  }
+  .hero-tag--fresh::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -120%;
+    width: 50%; height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.55), transparent);
+    animation: tag-shimmer 3.2s ease-in-out infinite;
+  }
+  @keyframes tag-shimmer {
+    0%   { left: -120%; }
+    100% { left: 220%; }
+  }
+
+  /* Hero title gradient breathing */
+  h1.hero-title {
+    background-size: 200% 200%;
+    animation: hero-gradient 8s ease-in-out infinite;
+  }
+  @keyframes hero-gradient {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  /* ============================================================
+     v2 — Just-shipped section
+     ============================================================ */
+  .ship-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--ember);
+    box-shadow: 0 0 0 0 rgba(200, 67, 29, 0.6);
+    vertical-align: 1px;
+    margin-right: 6px;
+    animation: ship-dot-pulse 1.6s ease-out infinite;
+  }
+  @keyframes ship-dot-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(200, 67, 29, 0.6); }
+    70%  { box-shadow: 0 0 0 9px rgba(200, 67, 29, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(200, 67, 29, 0); }
+  }
+
+  .shipped-grid {
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 760px) { .shipped-grid { grid-template-columns: 1fr; } }
+
+  .shipped-card {
+    position: relative;
+    background: #fff;
+    border-radius: 18px;
+    padding: 28px 26px 26px;
+    border: 1px solid var(--gray-150);
+    overflow: hidden;
+    transition: transform 320ms var(--ease-apple), box-shadow 320ms var(--ease-apple);
+  }
+  .shipped-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 50px rgba(200, 67, 29, 0.10);
+  }
+  /* Animated gradient border on hover */
+  .shipped-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    padding: 1.5px;
+    background: linear-gradient(135deg, var(--ember), var(--brass), var(--ember));
+    background-size: 200% 200%;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 320ms var(--ease-apple);
+    animation: shipped-border 4.5s linear infinite;
+  }
+  .shipped-card:hover::before { opacity: 1; }
+  @keyframes shipped-border {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+  .shipped-card--keeper::before {
+    background: linear-gradient(135deg, var(--keeper-accent), var(--slate), var(--keeper-accent));
+    background-size: 200% 200%;
+  }
+  .shipped-card--brass::before {
+    background: linear-gradient(135deg, var(--brass), var(--gold), var(--brass));
+    background-size: 200% 200%;
+  }
+  .shipped-card--voyage::before {
+    background: linear-gradient(135deg, var(--voyage-accent), #B69AFF, var(--voyage-accent));
+    background-size: 200% 200%;
+  }
+
+  .shipped-ribbon {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: var(--ember);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    padding: 4px 10px;
+    border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(200, 67, 29, 0.35);
+    animation: ribbon-glow 2.4s ease-in-out infinite;
+  }
+  @keyframes ribbon-glow {
+    0%, 100% { box-shadow: 0 4px 14px rgba(200, 67, 29, 0.35); }
+    50%      { box-shadow: 0 4px 22px rgba(200, 67, 29, 0.55); }
+  }
+  .shipped-ribbon--keeper { background: var(--keeper-accent); box-shadow: 0 4px 14px rgba(26, 47, 74, 0.35); }
+  .shipped-ribbon--brass  { background: var(--brass); color: var(--char); box-shadow: 0 4px 14px rgba(217, 164, 65, 0.35); }
+  .shipped-ribbon--voyage { background: var(--voyage-accent); box-shadow: 0 4px 14px rgba(107, 79, 187, 0.35); }
+  @media (prefers-reduced-motion: reduce) {
+    .shipped-ribbon, .shipped-ribbon--keeper, .shipped-ribbon--brass, .shipped-ribbon--voyage {
+      animation: none;
+    }
+  }
+
+  .shipped-card__icon {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--ember), var(--brass));
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 6px 18px rgba(200, 67, 29, 0.25);
+  }
+  .shipped-card__icon--keeper { background: linear-gradient(135deg, var(--keeper-accent), var(--slate)); box-shadow: 0 6px 18px rgba(26, 47, 74, 0.25); }
+  .shipped-card__icon--brass  { background: linear-gradient(135deg, var(--brass), var(--gold)); color: var(--char); box-shadow: 0 6px 18px rgba(217, 164, 65, 0.25); }
+  .shipped-card__icon--voyage { background: linear-gradient(135deg, var(--voyage-accent), #9579E0); box-shadow: 0 6px 18px rgba(107, 79, 187, 0.25); }
+
+  .shipped-card__tag {
+    font-size: 11px; font-weight: 700;
+    color: var(--ember);
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    margin: 0 0 6px;
+  }
+  .shipped-card__tag--keeper { color: var(--keeper-accent); }
+  .shipped-card__tag--brass  { color: #946A1F; }
+  .shipped-card__tag--voyage { color: var(--voyage-accent); }
+  .shipped-card__title {
+    font-size: 22px; font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .shipped-card__body {
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  .code-chip {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--gray-150);
+  }
+  .ne-glyph {
+    display: inline-block;
+    font-weight: 700;
+    color: var(--ember);
+    padding: 0 2px;
+  }
+
+  .shipped-foot {
+    display: flex; justify-content: center;
+    flex-wrap: wrap; gap: 10px;
+    margin-top: 36px;
+  }
+  .shipped-foot__pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(74, 124, 89, 0.08);
+    color: #2B7C49;
+    font-size: 12px; font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(74, 124, 89, 0.18);
+  }
+  .shipped-foot__pill i { font-size: 14px; }
+  .shipped-foot__pill--bright {
+    background: linear-gradient(135deg, var(--ember), var(--brass));
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(200, 67, 29, 0.30);
+  }
+  .shipped-foot__pill--bright i { animation: bright-flame 1.4s ease-in-out infinite; }
+  @keyframes bright-flame {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.12); }
+  }
+
+  /* ============================================================
+     v2 — Floating particles in dark sections (subtle ambience)
+     ============================================================ */
+  .section--dark,
+  .section--lapis,
+  .section--final {
+    position: relative;
+    overflow: hidden;
+  }
+  .section--dark::after,
+  .section--lapis::after,
+  .section--final::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(1.2px 1.2px at 12% 28%, rgba(251, 191, 36, 0.45), transparent 50%),
+      radial-gradient(1.5px 1.5px at 78% 18%, rgba(255, 255, 255, 0.35), transparent 50%),
+      radial-gradient(1px   1px   at 32% 70%, rgba(251, 191, 36, 0.30), transparent 50%),
+      radial-gradient(1.3px 1.3px at 88% 64%, rgba(255, 255, 255, 0.30), transparent 50%),
+      radial-gradient(1.1px 1.1px at 55% 90%, rgba(251, 191, 36, 0.35), transparent 50%),
+      radial-gradient(1.4px 1.4px at 18% 52%, rgba(255, 255, 255, 0.25), transparent 50%);
+    pointer-events: none;
+    animation: drift-particles 22s ease-in-out infinite;
+    opacity: 0.7;
+  }
+  @keyframes drift-particles {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    50%      { transform: translateY(-8px) translateX(4px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .section--dark::after,
+    .section--lapis::after,
+    .section--final::after { animation: none; }
+  }
+  /* Make sure section content sits above the particles */
+  .section--dark > *,
+  .section--lapis > *,
+  .section--final > * { position: relative; z-index: 1; }
+
+  /* ============================================================
+     v2 — Stronger cascade with stagger
+     ============================================================ */
+  [data-cascade].in-view > *:nth-child(1) { transition-delay: 80ms; }
+  [data-cascade].in-view > *:nth-child(2) { transition-delay: 160ms; }
+  [data-cascade].in-view > *:nth-child(3) { transition-delay: 240ms; }
+  [data-cascade].in-view > *:nth-child(4) { transition-delay: 320ms; }
+  [data-cascade].in-view > *:nth-child(5) { transition-delay: 400ms; }
+  [data-cascade].in-view > *:nth-child(6) { transition-delay: 480ms; }
+  [data-cascade].in-view > *:nth-child(7) { transition-delay: 560ms; }
+  [data-cascade].in-view > *:nth-child(8) { transition-delay: 640ms; }
+
+  /* ============================================================
+     v2 — Divider becomes an animated draw on scroll
+     ============================================================ */
+  .divider {
+    position: relative;
+    overflow: hidden;
+  }
+  .divider::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 50%;
+    width: 0%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--ember), transparent);
+    transform: translateX(-50%);
+    transition: width 1.4s var(--ease-apple);
+  }
+  .divider.in-view::after { width: 70%; }
+
+  /* ============================================================
+     v2 — Pipeline + counter polish
+     ============================================================ */
+  .counter__num { transition: transform 320ms var(--ease-out-back); }
+  .counter:hover .counter__num { transform: scale(1.06); }
+
+  /* Tool card subtle magnetic vibe */
+  .tool-card {
+    will-change: transform;
+  }
+  .tool-card:hover .tool-card__icon {
+    transform: rotate(-3deg) scale(1.08);
+    transition: transform 280ms var(--ease-out-back);
+  }
+  .tool-card__icon { transition: transform 280ms var(--ease-out-back); }
+
+  /* Half-card hover lift extended */
+  .half {
+    transition: transform 320ms var(--ease-apple), box-shadow 320ms var(--ease-apple);
+  }
+  .half:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 22px 60px rgba(200, 67, 29, 0.12);
+  }
+  .half--keeper:hover {
+    box-shadow: 0 22px 60px rgba(26, 47, 74, 0.14);
+  }
 </style>
 </head>
 <body class="page-loading">
@@ -1167,7 +1519,7 @@
     </a>
     <div class="topnav__right">
       <span>Beam &nbsp;+&nbsp; Keeper</span>
-      <span class="topnav__ver">Wave 3</span>
+      <span class="topnav__ver"><span class="topnav__pulse"></span>Live</span>
     </div>
   </div>
 </nav>
@@ -1193,6 +1545,9 @@
       <span class="hero-tag">Wave 1 · Hybrid retrieval</span>
       <span class="hero-tag">Wave 2 · Conflict resolution</span>
       <span class="hero-tag">Wave 3 · Caching</span>
+      <span class="hero-tag hero-tag--fresh">SV-10 · Shadow Verdict surfaced</span>
+      <span class="hero-tag hero-tag--keeper hero-tag--fresh">Keeper panel polished</span>
+      <span class="hero-tag hero-tag--fresh">Cross-scope synthesis</span>
     </div>
   </div>
 </section>
@@ -1616,41 +1971,97 @@
 <div class="divider"></div>
 
 <!-- ============================================================ -->
-<!-- 11. WHAT'S NEXT                                              -->
+<!-- 11. JUST SHIPPED (today)                                     -->
+<!-- ============================================================ -->
+<section class="section section--parchment">
+  <div class="container container--wide">
+    <p class="kicker kicker--brass" data-animate style="text-align:center;">
+      <span class="ship-dot"></span> Just shipped
+    </p>
+    <h2 class="headline" data-animate>Today's drop.</h2>
+    <p class="subhead" data-animate>Four polish + intelligence wins landed in one go — surfacing what was running in the shadows, sharpening the panel AMs see, and giving Beam a single tool for holistic questions.</p>
+
+    <div class="shipped-grid" data-cascade>
+      <div class="shipped-card">
+        <span class="shipped-ribbon">NEW</span>
+        <div class="shipped-card__icon"><i class="ti ti-eye"></i></div>
+        <p class="shipped-card__tag">SV-10</p>
+        <h3 class="shipped-card__title">Shadow Verdict on every card</h3>
+        <p class="shipped-card__body">The Haiku second-opinion now ships visible alongside the engine's stoplight on every V2CustomerCard. When AI disagrees with the engine, a small <span class="ne-glyph">≠</span> glyph + border-color shift surfaces it instantly. Click for the primary driver.</p>
+      </div>
+
+      <div class="shipped-card shipped-card--keeper">
+        <span class="shipped-ribbon shipped-ribbon--keeper">NEW</span>
+        <div class="shipped-card__icon shipped-card__icon--keeper"><i class="ti ti-sparkles"></i></div>
+        <p class="shipped-card__tag shipped-card__tag--keeper">Wave 2c.1</p>
+        <h3 class="shipped-card__title">Keeper panel, polished</h3>
+        <p class="shipped-card__body">Category icons on every fact row. Relative-time age chips ("3d ago", "60d ago"). Source-trust badges color-coded to the ranking hierarchy. Expand-in-place version history showing who refined what, when, and why.</p>
+      </div>
+
+      <div class="shipped-card shipped-card--brass">
+        <span class="shipped-ribbon shipped-ribbon--brass">NEW</span>
+        <div class="shipped-card__icon shipped-card__icon--brass"><i class="ti ti-percentage"></i></div>
+        <p class="shipped-card__tag shipped-card__tag--brass">W1.5</p>
+        <h3 class="shipped-card__title">Reject-rate dashboard</h3>
+        <p class="shipped-card__body">New admin page at <code class="code-chip">/admin/brain/reject-rate</code>. Shows confirm / refine / reject / pending across 7d, 30d, all-time, broken down per AM. Copper callout fires when any window exceeds 30% — auto-prompts a Haiku tightening review.</p>
+      </div>
+
+      <div class="shipped-card shipped-card--voyage">
+        <span class="shipped-ribbon shipped-ribbon--voyage">NEW</span>
+        <div class="shipped-card__icon shipped-card__icon--voyage"><i class="ti ti-puzzle"></i></div>
+        <p class="shipped-card__tag shipped-card__tag--voyage">Tool</p>
+        <h3 class="shipped-card__title">get_full_customer_view</h3>
+        <p class="shipped-card__body">A single Beam tool that bundles Keeper facts, comms perspective, perf summary, open escalations, and notes into one parallel-fetched response. Replaces chains of 4-5 separate tool calls when the user asks for the holistic picture.</p>
+      </div>
+    </div>
+
+    <div class="shipped-foot" data-animate>
+      <span class="shipped-foot__pill"><i class="ti ti-circle-check-filled"></i> typecheck clean</span>
+      <span class="shipped-foot__pill"><i class="ti ti-circle-check-filled"></i> lint clean</span>
+      <span class="shipped-foot__pill"><i class="ti ti-circle-check-filled"></i> 60 / 60 tests pass</span>
+      <span class="shipped-foot__pill shipped-foot__pill--bright"><i class="ti ti-flame"></i> live in prod</span>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 12. WHAT'S NEXT (forward-looking)                            -->
 <!-- ============================================================ -->
 <section class="section section--final">
   <div class="container container--narrow">
     <p class="kicker" data-animate style="text-align:center;">What's next</p>
     <h2 class="headline" data-animate style="color: var(--gray-50);">The roadmap, current.</h2>
-    <p class="subhead" data-animate>Wave 1, 2, and 3 shipped. Here's what's queued.</p>
+    <p class="subhead" data-animate>Today's drop closed the visible backlog. Here's what we'd build next, ranked by leverage.</p>
 
     <div class="roadmap" data-cascade>
       <div class="roadmap-row">
         <div class="roadmap-row__num">1</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">SV-10 · Surface Shadow Verdict on customer cards</p>
-          <p class="roadmap-row__desc">The LLM second-opinion has been running in shadow for weeks. Once stable, surface its YELLOW/RED/GREEN verdict alongside the engine's call on every V2CustomerCard.</p>
+          <p class="roadmap-row__title">Beam confidence calibration</p>
+          <p class="roadmap-row__desc">Beam reports High / Medium / Low confidence — but we've never measured whether the labels correlate with actual answer correctness. Build a per-tier thumbs aggregator + weekly calibration page. Closes the trust loop.</p>
         </div>
       </div>
       <div class="roadmap-row">
         <div class="roadmap-row__num">2</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">Wave 2c.1 · Keeper panel polish on Customer 360</p>
-          <p class="roadmap-row__desc">The read-only Keeper widget on Customer 360 ships v1 unstyled. Polish: category icons, age chips, source trust badges, "view history" affordance.</p>
+          <p class="roadmap-row__title">Keeper taxonomy v2</p>
+          <p class="roadmap-row__desc">v1.1 added relationship, assignment, business_profile. v2 adds structured slots for preferred contact channel, rebook cadence, last NPS-equivalent signal. Moves Keeper from free-text-with-tag to a richer queryable schema.</p>
         </div>
       </div>
       <div class="roadmap-row">
         <div class="roadmap-row__num">3</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">W1.5 quality check · Validate-inbox reject rate</p>
-          <p class="roadmap-row__desc">Measure how often AMs reject Haiku-extracted candidates after one week of triage. If reject rate &gt; 30%, tighten the extraction prompt.</p>
+          <p class="roadmap-row__title">Voyage rerank quality A/B</p>
+          <p class="roadmap-row__desc">Currently on rerank-2.5-lite for cost. After a week of real use, A/B against the full rerank-2.5 on the same queries. If precision lifts materially, swap by env var.</p>
         </div>
       </div>
       <div class="roadmap-row">
         <div class="roadmap-row__num">4</div>
         <div class="roadmap-row__body">
-          <p class="roadmap-row__title">Cross-scope synthesis</p>
-          <p class="roadmap-row__desc">Today Beam is scope-aware but scope-local. Future Beam pulls perf + comms + tickets + Keeper into a single synthesized answer when the question spans surfaces.</p>
+          <p class="roadmap-row__title">Beam "why" trace on cite chips</p>
+          <p class="roadmap-row__desc">Hybrid retrieval already carries full provenance — embedding rank, keyword rank, RRF score, rerank score, matched_via. Surface it: clicking a cite chip expands an inline trace showing why that fact won. Trust-building.</p>
         </div>
       </div>
     </div>
@@ -1703,7 +2114,7 @@
     });
   }, { threshold: 0.12 });
 
-  document.querySelectorAll('[data-animate], [data-cascade]').forEach(el => io.observe(el));
+  document.querySelectorAll('[data-animate], [data-cascade], .divider').forEach(el => io.observe(el));
 
   // ============================================================
   // Counter tick animation
