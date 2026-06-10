@@ -1753,6 +1753,400 @@
       0 28px 60px rgba(107, 79, 187, 0.16),
       0 2px 8px rgba(0, 0, 0, 0.04);
   }
+
+  /* ============================================================
+     v4 — ALIGNMENT FIXES
+     ============================================================ */
+
+  /* Hero monogram + flame centering */
+  .section--hero .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .section--hero .hero-flame-wrap {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .section--hero .hero-load {
+    width: 100%;
+    max-width: 720px;
+  }
+
+  /* Topnav badge — cap width on smaller viewports to prevent wrap */
+  @media (max-width: 760px) {
+    .topnav__right > span:first-child { display: none; }
+    .topnav__ver { font-size: 10px; padding: 3px 8px; }
+  }
+
+  /* Hero tags row — better wrap balance for 10 tags */
+  .hero-load > .hero-tag {
+    margin: 4px 2px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Wave timeline — better dot/label balance, hide labels in dense range */
+  @media (max-width: 1100px) and (min-width: 761px) {
+    .wave-timeline { padding: 24px 16px 40px; }
+    .wave-timeline__lbl {
+      font-size: 9px;
+      transform: translateX(-50%) rotate(-32deg);
+      transform-origin: top center;
+      max-width: 90px;
+      white-space: normal;
+      line-height: 1.2;
+      text-align: left;
+      top: 22px;
+    }
+  }
+
+  /* Eight-card grid — better breakpoint structure */
+  @media (max-width: 1200px) and (min-width: 1025px) {
+    .shipped-grid--eight { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .shipped-grid--eight .shipped-card { padding: 18px 16px; }
+    .shipped-grid--eight .shipped-card__title { font-size: 15px; }
+    .shipped-grid--eight .shipped-card__body { font-size: 12px; }
+  }
+
+  /* Footer pills wrap evenly */
+  .shipped-foot { justify-content: center; }
+
+  /* ============================================================
+     v4 — Geometric decorative SVGs (floating shapes)
+     ============================================================ */
+  .floaters {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .floater {
+    position: absolute;
+    opacity: 0.05;
+    animation: floater-drift 24s ease-in-out infinite;
+  }
+  .floater--triangle { color: var(--ember); }
+  .floater--circle { color: var(--brass); }
+  .floater--square { color: var(--keeper-accent); }
+  .floater--ring { color: var(--voyage-accent); }
+  @keyframes floater-drift {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25%      { transform: translate(8px, -6px) rotate(8deg); }
+    50%      { transform: translate(-4px, 4px) rotate(-4deg); }
+    75%      { transform: translate(-8px, -2px) rotate(2deg); }
+  }
+  .section--gray .floater { opacity: 0.04; }
+  .section--white .floater { opacity: 0.035; }
+  .section--parchment .floater { opacity: 0.06; }
+  @media (prefers-reduced-motion: reduce) { .floater { animation: none; } }
+
+  /* Floater layer should sit behind content */
+  .section > .container { position: relative; z-index: 1; }
+
+  /* ============================================================
+     v4 — ARCHITECTURE SECTION: animated SVG flow diagram
+     ============================================================ */
+  .arch-wrap {
+    position: relative;
+    margin: 36px auto 24px;
+    max-width: 980px;
+  }
+  .arch-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .arch-node {
+    fill: #fff;
+    stroke: var(--ember);
+    stroke-width: 2;
+    transition: fill 280ms var(--ease-apple), stroke 280ms var(--ease-apple);
+  }
+  .arch-node--keeper { stroke: var(--keeper-accent); }
+  .arch-node--voyage { stroke: var(--voyage-accent); }
+  .arch-node--anthropic { stroke: var(--brass); }
+  .arch-node-lbl {
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    fill: var(--gray-900);
+    text-anchor: middle;
+    letter-spacing: 0.02em;
+  }
+  .arch-node-sub {
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    fill: var(--gray-500);
+    text-anchor: middle;
+  }
+  .arch-path {
+    fill: none;
+    stroke: var(--gray-300);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+  }
+  .arch-flow {
+    fill: var(--ember);
+    r: 3;
+    animation: arch-flow-pulse 2.6s ease-in-out infinite;
+  }
+  .arch-flow--keeper { fill: var(--keeper-accent); animation-delay: 0.4s; }
+  .arch-flow--voyage { fill: var(--voyage-accent); animation-delay: 0.8s; }
+  .arch-flow--anthropic { fill: var(--brass); animation-delay: 1.2s; }
+  @keyframes arch-flow-pulse {
+    0%, 100% { opacity: 0.3; }
+    50%      { opacity: 1; }
+  }
+  .arch-legend {
+    display: flex; justify-content: center; flex-wrap: wrap;
+    gap: 18px; margin-top: 24px;
+    font-size: 12px; color: var(--gray-700);
+  }
+  .arch-legend__item {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .arch-legend__dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.05);
+  }
+
+  /* ============================================================
+     v4 — "WHAT YOU CAN ASK" example queries
+     ============================================================ */
+  .queries {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 32px;
+  }
+  @media (max-width: 760px) { .queries { grid-template-columns: 1fr; } }
+  .query-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--gray-150);
+    padding: 22px;
+    position: relative;
+    transition: transform 280ms var(--ease-apple), box-shadow 280ms var(--ease-apple);
+  }
+  .query-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.06);
+  }
+  .query-card__scope {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ember);
+    background: rgba(200, 67, 29, 0.08);
+    padding: 4px 9px; border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  .query-card__scope--keeper { color: var(--keeper-accent); background: rgba(26, 47, 74, 0.08); }
+  .query-card__scope--perf { color: var(--brass); background: rgba(217, 164, 65, 0.10); }
+  .query-card__scope--book { color: var(--voyage-accent); background: rgba(107, 79, 187, 0.08); }
+  .query-card__q {
+    font-size: 15px; font-weight: 600;
+    color: var(--gray-900);
+    margin: 0 0 12px;
+    line-height: 1.4;
+    font-style: italic;
+  }
+  .query-card__q::before {
+    content: "“";
+    color: var(--ember); font-size: 22px;
+    font-weight: 700;
+    margin-right: 2px;
+    vertical-align: -4px;
+  }
+  .query-card__q::after {
+    content: "”";
+    color: var(--ember); font-size: 22px;
+    font-weight: 700;
+    margin-left: 2px;
+    vertical-align: -4px;
+  }
+  .query-card__a {
+    font-size: 13px; line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0;
+    padding: 12px 14px;
+    background: var(--gray-50);
+    border-radius: 8px;
+    border-left: 3px solid var(--ember);
+  }
+  .query-card__a strong { color: var(--gray-900); font-weight: 700; }
+  .query-card__a .cite-chip {
+    display: inline-block;
+    background: rgba(107, 79, 187, 0.10);
+    color: var(--voyage-accent);
+    font-size: 10px; font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin: 0 2px;
+  }
+
+  /* ============================================================
+     v4 — Half-card detail bullets
+     ============================================================ */
+  .half__bullets {
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px dashed rgba(0,0,0,0.08);
+    text-align: left;
+  }
+  .half__bullet {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--gray-700);
+  }
+  .half__bullet:last-child { margin-bottom: 0; }
+  .half__bullet-icon {
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: rgba(200, 67, 29, 0.12);
+    color: var(--ember);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    margin-top: 1px;
+  }
+  .half--keeper .half__bullet-icon {
+    background: rgba(26, 47, 74, 0.10);
+    color: var(--keeper-accent);
+  }
+  .half__bullet strong { color: var(--gray-900); font-weight: 700; }
+
+  /* ============================================================
+     v4 — Extra stats row + context blocks
+     ============================================================ */
+  .context-block {
+    margin: 28px auto 0;
+    max-width: 740px;
+    padding: 20px 26px;
+    background: rgba(200, 67, 29, 0.04);
+    border-left: 3px solid var(--ember);
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--gray-700);
+  }
+  .context-block--keeper { background: rgba(26, 47, 74, 0.05); border-left-color: var(--keeper-accent); }
+  .context-block--voyage { background: rgba(107, 79, 187, 0.05); border-left-color: var(--voyage-accent); }
+  .context-block strong { color: var(--gray-900); font-weight: 700; }
+
+  /* Stats row already exists — add second row variant */
+  .stats--mini {
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 24px;
+    gap: 14px;
+  }
+  .stats--mini .stat { padding: 18px 12px; }
+  .stats--mini .stat__num { font-size: 32px; }
+  .stats--mini .stat__unit { font-size: 16px; }
+  .stats--mini .stat__lbl { font-size: 10px; }
+
+  /* ============================================================
+     v4 — Animated SVG flourish dividers
+     ============================================================ */
+  .flourish {
+    text-align: center;
+    margin: 32px auto;
+    color: var(--ember);
+  }
+  .flourish svg {
+    width: 60px; height: 18px;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 800ms var(--ease-apple), transform 800ms var(--ease-out-back);
+  }
+  .flourish.in-view svg {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+
+  /* Day-in-the-life card */
+  .dil-card {
+    margin-top: 36px;
+    background: linear-gradient(135deg, #FFF9F1 0%, #FFFFFF 100%);
+    border-radius: 18px;
+    padding: 32px 28px;
+    border: 1px solid rgba(200, 67, 29, 0.12);
+    max-width: 780px;
+    margin-left: auto; margin-right: auto;
+  }
+  .dil-card__title {
+    font-size: 18px; font-weight: 700; color: var(--gray-900);
+    margin: 0 0 14px;
+  }
+  .dil-flow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 18px;
+  }
+  @media (max-width: 760px) { .dil-flow { grid-template-columns: repeat(2, 1fr); } }
+  .dil-step {
+    text-align: center;
+    position: relative;
+  }
+  .dil-step::after {
+    content: "→";
+    position: absolute;
+    top: 18px; right: -10px;
+    color: var(--brass);
+    font-size: 18px;
+  }
+  .dil-step:last-child::after { display: none; }
+  @media (max-width: 760px) { .dil-step::after { display: none; } }
+  .dil-step__num {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--ember), var(--brass));
+    color: #fff;
+    font-size: 14px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .dil-step__name {
+    font-size: 12px; font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 4px;
+  }
+  .dil-step__desc {
+    font-size: 11px; color: var(--gray-500);
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  /* Built-with strip */
+  .built-with {
+    display: flex; justify-content: center; flex-wrap: wrap;
+    gap: 28px; margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .built-with__item {
+    text-align: center;
+    color: #a1a1a6;
+  }
+  .built-with__name {
+    font-size: 13px; font-weight: 700;
+    color: var(--gray-50);
+    margin: 0 0 4px;
+  }
+  .built-with__role {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+  }
 </style>
 </head>
 <body class="page-loading">
@@ -1836,12 +2230,22 @@
         <p class="half__role">The voice</p>
         <h3 class="half__title">Beam</h3>
         <p class="half__desc">An Anthropic-powered copilot that lives in every Beacon agent. Asks. Drafts. Cites. Acts. Eight tools across seven scopes, always grounded in your data.</p>
+        <div class="half__bullets">
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-bolt"></i></span><span><strong>Always on.</strong> Press <code class="code-chip">Cmd/Ctrl + K</code> or open the panel from any Customer 360, book view, or admin surface.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-tools"></i></span><span><strong>Eight tools.</strong> Lookup, query, draft email, draft Slack, read notes, read Keeper, write Keeper, full-customer-view.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-quote"></i></span><span><strong>Cites everything.</strong> Every answer carries an inline cite chip; click to see the source fact, recency, and now (Wave-4) the full ranking trace.</span></div>
+        </div>
       </div>
       <div class="half half--keeper">
         <div class="half__icon half__icon--keeper"><i class="ti ti-lock-square-rounded"></i></div>
         <p class="half__role">The vault</p>
         <h3 class="half__title">Keeper</h3>
         <p class="half__desc">A per-customer canonical fact store. Five categories. Twenty-plus subcategories. Every fact sourced, timestamped, version-logged. The truth Beam stands on.</p>
+        <div class="half__bullets">
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-tree"></i></span><span><strong>Structured taxonomy.</strong> Identity / Operational / Behavioral / Concerns / Relationship — with ~25 subcategories and ~70 named fields after v2.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-stack-2"></i></span><span><strong>Hybrid retrieval.</strong> pgvector cosine + Postgres tsvector, RRF-merged, reranked by Voyage. The right 5 of ~40 candidates land in Beam's context.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-shield-check"></i></span><span><strong>Authoritative-only by default.</strong> When two facts collide, deterministic ranking picks the winner; losers stay in the audit log via <code class="code-chip">superseded_by</code>.</span></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1896,6 +2300,66 @@
         <span class="cite-chip">[K:contract]</span>
         <span class="confidence-bar">High</span>
       </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 3.5 — WHAT YOU CAN ASK BEAM                                  -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="floaters" aria-hidden="true">
+    <svg class="floater floater--triangle" style="top: 8%; left: 6%; width: 36px; height: 36px;" viewBox="0 0 36 36"><polygon points="18,4 32,30 4,30" fill="currentColor"/></svg>
+    <svg class="floater floater--circle" style="top: 65%; right: 8%; width: 44px; height: 44px;" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="currentColor"/></svg>
+    <svg class="floater floater--ring" style="bottom: 18%; left: 14%; width: 28px; height: 28px;" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+  </div>
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">What you can ask</p>
+    <h2 class="headline" data-animate>Six questions. Six surfaces.</h2>
+    <p class="subhead" data-animate>The same Beam panel answers six different shapes of question depending on where it's invoked. Cite chips guarantee you can verify every claim.</p>
+
+    <div class="queries" data-cascade>
+      <div class="query-card">
+        <p class="query-card__scope"><i class="ti ti-user-check" style="font-size:11px"></i> Customer 360</p>
+        <p class="query-card__q">What platform are they on, and when did they migrate?</p>
+        <p class="query-card__a">They're on <strong>GlossGenius</strong>, migrated from Square in <strong>March 2025</strong>. Owner cited better calendar UX. <span class="cite-chip">[K:integration]</span> <span class="cite-chip">[K:contract]</span></p>
+      </div>
+
+      <div class="query-card">
+        <p class="query-card__scope query-card__scope--keeper"><i class="ti ti-binoculars" style="font-size:11px"></i> Customer Book</p>
+        <p class="query-card__q">Who in my book has a latent risk flagged in the last 30 days?</p>
+        <p class="query-card__a">Three customers: <strong>Pearl Salon</strong> (pricing concerns), <strong>Hair Inc</strong> (staff churn), <strong>ISH Studio</strong> (silent for 21d). <span class="cite-chip">[K:concerns]</span></p>
+      </div>
+
+      <div class="query-card">
+        <p class="query-card__scope query-card__scope--perf"><i class="ti ti-chart-line" style="font-size:11px"></i> Performance</p>
+        <p class="query-card__q">Why has this customer's lead trajectory flattened since April?</p>
+        <p class="query-card__a">GBP profile-clicks fell <strong>34%</strong> after a category change on Apr 18. Reviews have stalled too — only 2 in 60 days. Recommend a fresh GBP audit. <span class="cite-chip">[P:gbp]</span> <span class="cite-chip">[P:reviews]</span></p>
+      </div>
+
+      <div class="query-card">
+        <p class="query-card__scope query-card__scope--book"><i class="ti ti-mail" style="font-size:11px"></i> Email draft</p>
+        <p class="query-card__q">Draft a check-in email for Pearl Salon — they've been silent for 14 days.</p>
+        <p class="query-card__a"><strong>Subject:</strong> Quick check-in on your Pearl Salon dashboard<br/><em>Hi Maria, noticed traffic's held steady this month but bookings dipped slightly. Curious how the new spring menu is landing — want to hop on a quick call?</em></p>
+      </div>
+
+      <div class="query-card">
+        <p class="query-card__scope"><i class="ti ti-alert-circle" style="font-size:11px"></i> Escalation</p>
+        <p class="query-card__q">Summarize all open Linear tickets for this customer.</p>
+        <p class="query-card__a">Three open: <strong>BCN-1842</strong> (HubSpot sync delay, 4d), <strong>BCN-1901</strong> (review widget CSS, 2d), <strong>BCN-1923</strong> (calendar sync timezone, today). <span class="cite-chip">[E:tickets]</span></p>
+      </div>
+
+      <div class="query-card">
+        <p class="query-card__scope query-card__scope--keeper"><i class="ti ti-credit-card" style="font-size:11px"></i> Miss-Payment</p>
+        <p class="query-card__q">Who's on auto-pay-off in my book and has missed two cycles?</p>
+        <p class="query-card__a">Two: <strong>Hair Inc</strong> ($840 unpaid Mar + Apr) and <strong>Threadwork</strong> ($230 unpaid Apr). Both have manual-toggle history in Chargebee. <span class="cite-chip">[B:invoices]</span></p>
+      </div>
+    </div>
+
+    <div class="context-block" data-animate>
+      <strong>Why citations matter.</strong> Beam's confidence calibration page tracks whether the High / Medium / Low label correlates with actual correctness. The cite-chip "why" trace lets you verify any claim down to the source fact, its source-trust tier, recency, and the exact rerank score that placed it in the top-5.
     </div>
   </div>
 </section>
@@ -2199,15 +2663,43 @@
       </div>
       <div class="card">
         <h3 class="card__title"><i class="ti ti-progress" style="color: #4A7C59; margin-right: 6px;"></i>Calibrated confidence</h3>
-        <p class="card__body">Beam reports High / Medium / Low confidence based on source trust, recency, and corroboration. A fresh BaseSheet fact = High. A Beam-conversation inference with no Keeper backing = Low. Calibration tracked against AM thumbs.</p>
+        <p class="card__body">Beam reports High / Medium / Low confidence based on source trust, recency, and corroboration. A fresh BaseSheet fact = High. A Beam-conversation inference with no Keeper backing = Low. Calibration tracked against AM thumbs at <code class="code-chip">/admin/beacon-ai-calibration</code>.</p>
       </div>
       <div class="card">
         <h3 class="card__title"><i class="ti ti-history" style="color: var(--ember); margin-right: 6px;"></i>Full version log</h3>
-        <p class="card__body">Every Keeper write — create, refine, confirm, reject, supersede — appends to <code style="background: var(--gray-50); padding: 2px 6px; border-radius: 4px; font-size: 13px;">beacon_brain_fact_versions</code>. Soft-delete only. Nothing is ever truly gone.</p>
+        <p class="card__body">Every Keeper write — create, refine, confirm, reject, supersede — appends to <code class="code-chip">beacon_brain_fact_versions</code>. Soft-delete only. Nothing is ever truly gone. The Wave-2c.1 panel now expands each fact's history inline.</p>
       </div>
       <div class="card">
         <h3 class="card__title"><i class="ti ti-shield-check" style="color: var(--keeper-accent); margin-right: 6px;"></i>Validate inbox</h3>
-        <p class="card__body">Haiku-extracted candidates land in a triage queue. AMs confirm, edit, reject, or reclassify. Source quotes shown alongside every candidate so the AM sees exactly what the model saw.</p>
+        <p class="card__body">Haiku-extracted candidates land in a triage queue at <code class="code-chip">/admin/brain/validate</code>. AMs confirm, edit, reject, or reclassify. Source quotes shown alongside every candidate. Reject rate measured at <code class="code-chip">/admin/brain/reject-rate</code>.</p>
+      </div>
+    </div>
+
+    <!-- Day in the life -->
+    <div class="dil-card" data-animate>
+      <h3 class="dil-card__title"><i class="ti ti-sun" style="color: var(--brass); margin-right: 6px;"></i>A day in the life of an AM with Beam</h3>
+      <p style="font-size: 14px; line-height: 1.55; color: var(--gray-700); margin: 0 0 4px;">From morning triage to end-of-day handoff, Beam compresses what used to take hours into seconds — without ever asking you to trust it blindly.</p>
+      <div class="dil-flow">
+        <div class="dil-step">
+          <div class="dil-step__num">1</div>
+          <p class="dil-step__name">8:30 AM · Triage</p>
+          <p class="dil-step__desc">Open V2Dashboard. SV-10 chips surface the AI's call alongside the engine's stoplight. Click any RED card.</p>
+        </div>
+        <div class="dil-step">
+          <div class="dil-step__num">2</div>
+          <p class="dil-step__name">8:32 · Context</p>
+          <p class="dil-step__desc">Ask Beam: "Why this RED?" Beam calls get_full_customer_view. One answer with 5 cite chips.</p>
+        </div>
+        <div class="dil-step">
+          <div class="dil-step__num">3</div>
+          <p class="dil-step__name">8:35 · Verify</p>
+          <p class="dil-step__desc">Click a cite chip. Wave-4 trace shows: 3rd of 47 candidates, rerank 0.91, sourced from Mar 5 call note.</p>
+        </div>
+        <div class="dil-step">
+          <div class="dil-step__num">4</div>
+          <p class="dil-step__name">8:38 · Act</p>
+          <p class="dil-step__desc">Ask Beam: "Draft an email checking in." Done in 8 seconds with the right tone, ready to send.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -2231,6 +2723,96 @@
       <div class="surface"><div class="surface__icon"><i class="ti ti-credit-card"></i></div><p class="surface__name">Post-Payment Beacon</p><p class="surface__role">ICP review reports</p></div>
       <div class="surface"><div class="surface__icon"><i class="ti ti-receipt-tax"></i></div><p class="surface__name">Miss-Payment Beacon</p><p class="surface__role">unpaid invoice queue</p></div>
       <div class="surface"><div class="surface__icon"><i class="ti ti-search-off"></i></div><p class="surface__name">Negative Keyword</p><p class="surface__role">competitor + complaint scanning</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 10.5 — THE ARCHITECTURE (animated SVG flow)                   -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="floaters" aria-hidden="true">
+    <svg class="floater floater--square" style="top: 12%; left: 8%; width: 30px; height: 30px;" viewBox="0 0 30 30"><rect x="2" y="2" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <svg class="floater floater--triangle" style="bottom: 18%; right: 10%; width: 38px; height: 38px;" viewBox="0 0 38 38"><polygon points="19,4 34,32 4,32" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+  </div>
+  <div class="container container--wide">
+    <p class="kicker kicker--voyage" data-animate style="text-align:center;">Under the hood</p>
+    <h2 class="headline" data-animate>The architecture, one diagram.</h2>
+    <p class="subhead" data-animate>Every Beam question fans out across four parallel lanes, then converges into a single cited answer. Every node is observed; every path is timed; every failure soft-falls back.</p>
+
+    <div class="arch-wrap" data-animate="scale-in">
+      <svg class="arch-svg" viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg" aria-label="Beam + Keeper data flow architecture">
+        <!-- AM question (top) -->
+        <rect class="arch-node" x="350" y="14" width="180" height="48" rx="12"/>
+        <text class="arch-node-lbl" x="440" y="34">AM question</text>
+        <text class="arch-node-sub" x="440" y="49">"What platform are they on?"</text>
+
+        <!-- arrow to Beam -->
+        <path class="arch-path" d="M440 62 V104"/>
+        <circle class="arch-flow" cx="440" cy="83" r="3.5"/>
+
+        <!-- Beam orchestrator (center) -->
+        <rect class="arch-node" x="320" y="104" width="240" height="64" rx="14" style="fill: #FFF9F1; stroke-width: 2.5;"/>
+        <text class="arch-node-lbl" x="440" y="132" style="font-size: 14px;">Beam</text>
+        <text class="arch-node-sub" x="440" y="150">orchestrator · 8 tools · context cache</text>
+
+        <!-- 4 paths fanning out to parallel lanes -->
+        <path class="arch-path" d="M360 168 Q260 200 160 240"/>
+        <path class="arch-path" d="M400 168 Q380 200 360 240"/>
+        <path class="arch-path" d="M480 168 Q500 200 520 240"/>
+        <path class="arch-path" d="M520 168 Q620 200 720 240"/>
+
+        <!-- Animated flow dots, staggered -->
+        <circle class="arch-flow arch-flow--keeper" cx="260" cy="200" r="3.5"/>
+        <circle class="arch-flow" cx="380" cy="200" r="3.5"/>
+        <circle class="arch-flow arch-flow--voyage" cx="500" cy="200" r="3.5"/>
+        <circle class="arch-flow arch-flow--anthropic" cx="620" cy="200" r="3.5"/>
+
+        <!-- 4 parallel lane nodes -->
+        <rect class="arch-node arch-node--keeper" x="60" y="240" width="200" height="58" rx="12"/>
+        <text class="arch-node-lbl" x="160" y="262">Keeper</text>
+        <text class="arch-node-sub" x="160" y="278">pgvector + tsvector + RRF</text>
+        <text class="arch-node-sub" x="160" y="290">deterministic ranking</text>
+
+        <rect class="arch-node" x="280" y="240" width="160" height="58" rx="12"/>
+        <text class="arch-node-lbl" x="360" y="262">Snapshot</text>
+        <text class="arch-node-sub" x="360" y="278">Postgres + Wave-3 cache</text>
+        <text class="arch-node-sub" x="360" y="290">5-min TTL · auto-invalidates</text>
+
+        <rect class="arch-node arch-node--voyage" x="460" y="240" width="160" height="58" rx="12"/>
+        <text class="arch-node-lbl" x="540" y="262">Voyage AI</text>
+        <text class="arch-node-sub" x="540" y="278">voyage-3-lite embed</text>
+        <text class="arch-node-sub" x="540" y="290">rerank-2.5-lite</text>
+
+        <rect class="arch-node arch-node--anthropic" x="640" y="240" width="180" height="58" rx="12"/>
+        <text class="arch-node-lbl" x="730" y="262">Anthropic Claude</text>
+        <text class="arch-node-sub" x="730" y="278">Sonnet 4 · tool use</text>
+        <text class="arch-node-sub" x="730" y="290">streaming SSE</text>
+
+        <!-- converging back -->
+        <path class="arch-path" d="M160 298 Q260 340 400 360"/>
+        <path class="arch-path" d="M360 298 Q380 340 420 360"/>
+        <path class="arch-path" d="M540 298 Q500 340 460 360"/>
+        <path class="arch-path" d="M730 298 Q620 340 480 360"/>
+
+        <!-- Cited answer (bottom) -->
+        <rect class="arch-node" x="320" y="360" width="240" height="48" rx="12" style="fill: #FFF9F1;"/>
+        <text class="arch-node-lbl" x="440" y="382">Cited answer</text>
+        <text class="arch-node-sub" x="440" y="397">+ provenance trace + confidence</text>
+      </svg>
+    </div>
+
+    <div class="arch-legend">
+      <span class="arch-legend__item"><span class="arch-legend__dot" style="background: var(--ember);"></span> Tool call</span>
+      <span class="arch-legend__item"><span class="arch-legend__dot" style="background: var(--keeper-accent);"></span> Keeper read</span>
+      <span class="arch-legend__item"><span class="arch-legend__dot" style="background: var(--voyage-accent);"></span> Voyage rerank</span>
+      <span class="arch-legend__item"><span class="arch-legend__dot" style="background: var(--brass);"></span> LLM streaming</span>
+    </div>
+
+    <div class="context-block context-block--voyage" data-animate>
+      <strong>What this gets you.</strong> Beam's response on a typical Customer 360 question takes ~2-4 seconds end-to-end. Cold cache: ~620ms of which goes to the context fan-out. Hot cache: ~120ms. The longest path is always Anthropic's streaming — everything else parallelizes against it.
     </div>
   </div>
 </section>
@@ -2377,6 +2959,29 @@
           <p class="roadmap-row__title">Keeper read-replica for cost</p>
           <p class="roadmap-row__desc">Heavy Beam usage now routes through Wave-3's in-memory cache, but every cold miss still hits primary Postgres. Standing up a read-replica for Keeper queries cuts primary load by ~80% and lets the cache TTL drop without throughput risk.</p>
         </div>
+      </div>
+    </div>
+
+    <div class="built-with" data-cascade>
+      <div class="built-with__item">
+        <p class="built-with__name">Anthropic Claude</p>
+        <p class="built-with__role">LLM · tool use</p>
+      </div>
+      <div class="built-with__item">
+        <p class="built-with__name">Voyage AI</p>
+        <p class="built-with__role">embeddings · rerank</p>
+      </div>
+      <div class="built-with__item">
+        <p class="built-with__name">Neon Postgres</p>
+        <p class="built-with__role">pgvector + tsvector</p>
+      </div>
+      <div class="built-with__item">
+        <p class="built-with__name">Next.js · Vercel</p>
+        <p class="built-with__role">runtime · streaming SSE</p>
+      </div>
+      <div class="built-with__item">
+        <p class="built-with__name">Watchfire palette</p>
+        <p class="built-with__role">brand · motion system</p>
       </div>
     </div>
   </div>
