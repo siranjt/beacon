@@ -1,0 +1,69 @@
+{
+  "entity_id": "d7809778-d9a2-4104-8a98-201580f3a2ff",
+  "bizname": "Browfection Studio",
+  "customer_id": "AzZQe4UuGhsSTHMGi",
+  "am_count": 1,
+  "total_chars": 294,
+  "notes": [
+    {
+      "am_name": "Anu Srivastava",
+      "updated_at": "2026-05-19T19:19:57.891Z",
+      "note": "Had a word with the SP last week on Friday and today as well. She wants to churn because she is not getting enough leads. We have a proposition for her to offer her $75 per month for at least 3 months. \nWe prevented the churn over here, and the SP agreed to pay $75 per month for three months. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 5212,
+    "input_tokens": 2284,
+    "output_tokens": 662,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "Churning",
+        "source_quote": "She wants to churn because she is not getting enough leads.",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Explicit statement of churn intent with stated reason (lead generation dissatisfaction)."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_push_factors",
+        "value": "Insufficient lead volume from platform.",
+        "source_quote": "She wants to churn because she is not getting enough leads.",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Direct statement of the customer's primary pain point driving churn consideration."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "retention_strategy",
+        "value": "Offered reduced pricing of $75/month for 3-month commitment to retain customer.",
+        "source_quote": "We have a proposition for her to offer her $75 per month for at least 3 months. We prevented the churn over here, and the SP agreed to pay $75 per month for three months.",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Explicit intervention with pricing concession that successfully prevented churn."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Customer may re-churn after 3-month discounted pricing period expires if lead generation performance does not improve.",
+        "source_quote": "She wants to churn because she is not getting enough leads. We prevented the churn over here, and the SP agreed to pay $75 per month for three months.",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Underlying dissatisfaction with lead volume remains unresolved; pricing discount is temporary measure only."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Beauty services business (Browfection Studio) at active churn risk due to insufficient lead generation; AM retained customer via short-term pricing concession but underlying product/performance issue persists."
+    }
+  },
+  "validation": {
+    "total": 4,
+    "valid": 4,
+    "invalid": 0
+  },
+  "error": null
+}

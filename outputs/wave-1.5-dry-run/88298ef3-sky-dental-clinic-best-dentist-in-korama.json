@@ -1,0 +1,78 @@
+{
+  "entity_id": "88298ef3-591b-4873-902b-501e487215c0",
+  "bizname": "Sky Dental Clinic | Best dentist in koramangala",
+  "customer_id": "AzqiDcUsc1CPC3TEI",
+  "am_count": 1,
+  "total_chars": 268,
+  "notes": [
+    {
+      "am_name": "Siddhi Shetty",
+      "updated_at": "2026-06-02T16:55:59.578Z",
+      "note": "The comms is through WhatsApp - SP has a missed payment for the month of May as he wants to onboard other 2 locations as well - we are waiting on that to get the combined payment.\nMeeting is set for tomorrow to onboard a new location - Has cleared the missed - payment"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4557,
+    "input_tokens": 2275,
+    "output_tokens": 670,
+    "candidate_facts": [
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "preferred_channel",
+        "value": "WhatsApp",
+        "source_quote": "The comms is through WhatsApp",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "explicitly stated"
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "payment_pattern",
+        "field_name": "payment_timing",
+        "value": "Missed payment in May; cleared after onboarding discussion",
+        "source_quote": "SP has a missed payment for the month of May",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "explicitly stated with resolution"
+      },
+      {
+        "topic_category": "identity",
+        "topic_subcategory": "business_profile",
+        "field_name": "location_count",
+        "value": "Currently operating at least 1 location; expanding to 3 locations total",
+        "source_quote": "wants to onboard other 2 locations as well",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "expansion plan explicitly mentioned"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "onboarding",
+        "field_name": "onboarding_friction_points",
+        "value": "Payment coordination delayed multi-location onboarding; wants combined payment for all locations",
+        "source_quote": "we are waiting on that to get the combined payment",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "friction point explicit in payment hold"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "onboarding",
+        "field_name": "other",
+        "value": "Meeting scheduled for next day to onboard new location after missed payment was cleared.",
+        "source_quote": "Meeting is set for tomorrow to onboard a new location - Has cleared the missed - payment",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "explicitly stated with timeline"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Multi-location dental clinic experiencing payment friction during expansion phase; prefers WhatsApp comms; expansion plan includes 2 new locations with combined billing strategy."
+    }
+  },
+  "validation": {
+    "total": 5,
+    "valid": 5,
+    "invalid": 0
+  },
+  "error": null
+}

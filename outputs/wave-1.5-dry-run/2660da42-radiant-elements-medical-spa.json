@@ -1,0 +1,60 @@
+{
+  "entity_id": "2660da42-a5e9-4ef3-b11d-40d576d1d888",
+  "bizname": "Radiant Elements Medical Spa",
+  "customer_id": "16A513V5mYAip5Qq",
+  "am_count": 1,
+  "total_chars": 262,
+  "notes": [
+    {
+      "am_name": "Sudha Goutami",
+      "updated_at": "2026-05-18T21:29:08.532Z",
+      "note": "I spoke to the SP last week, who told me that she has removed the Zoca website and put her original website because she feels that she gets more leads when her original website is up on her full business profile. Also discussed her profile performance with her. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 3750,
+    "input_tokens": 2262,
+    "output_tokens": 466,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "tech_stack",
+        "field_name": "website_url",
+        "value": "Customer removed Zoca website and reinstated original website on business profile.",
+        "source_quote": "she has removed the Zoca website and put her original website",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Explicit statement of website change action."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "performance_context",
+        "field_name": "other",
+        "value": "Customer believes original website generates more leads than Zoca website.",
+        "source_quote": "she feels that she gets more leads when her original website is up on her full business profile",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Direct statement of customer's lead generation perception."
+      },
+      {
+        "topic_category": "identity",
+        "topic_subcategory": "decision_makers",
+        "field_name": "other",
+        "value": "Service provider (SP) is the decision-maker on website and profile configuration choices.",
+        "source_quote": "I spoke to the SP last week, who told me that she has removed the Zoca website",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "SP explicitly made the website removal decision and communicated it."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Medical spa customer has removed Zoca website integration and reverted to original website, citing better lead generation; SP is decision-maker on platform configuration."
+    }
+  },
+  "validation": {
+    "total": 3,
+    "valid": 3,
+    "invalid": 0
+  },
+  "error": null
+}

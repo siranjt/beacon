@@ -1,0 +1,69 @@
+{
+  "entity_id": "4e73850c-337f-46d5-b1a4-2930f58b53b8",
+  "bizname": "Rosy Tips Nail Salon Chula Vista CA",
+  "customer_id": "AzZNd8UzFu9Yg6ob",
+  "am_count": 1,
+  "total_chars": 249,
+  "notes": [
+    {
+      "am_name": "Siddhi Shetty",
+      "updated_at": "2026-06-02T16:55:43.882Z",
+      "note": "High risk client - had asked for cancellation. Meeting is set for today for the churn prevention - SP wants to get on the payments and scheduling but she is on Multi - staff. Dropped her a text to follow up - there is an active risk retention ticket"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4552,
+    "input_tokens": 2273,
+    "output_tokens": 576,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "Churning",
+        "source_quote": "High risk client - had asked for cancellation",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit statement of cancellation request and high-risk classification"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "retention_strategy",
+        "value": "Meeting scheduled for churn prevention and discussion of payments/scheduling capabilities",
+        "source_quote": "Meeting is set for today for the churn prevention - SP wants to get on the payments and scheduling",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit description of retention meeting agenda"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Customer is on Multi-staff product; SP seeking to move to payments and scheduling features",
+        "source_quote": "SP wants to get on the payments and scheduling but she is on Multi - staff",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Notes indicate feature/product mismatch may be contributing to churn risk"
+      },
+      {
+        "topic_category": "relationship",
+        "topic_subcategory": "engagement",
+        "field_name": "other",
+        "value": "Active risk retention ticket created; text follow-up sent to customer",
+        "source_quote": "there is an active risk retention ticket",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit mention of formal retention ticket in system"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "High-risk nail salon customer actively seeking cancellation; churn prevention meeting scheduled today with focus on payments/scheduling feature gaps; formal retention ticket filed."
+    }
+  },
+  "validation": {
+    "total": 4,
+    "valid": 4,
+    "invalid": 0
+  },
+  "error": null
+}

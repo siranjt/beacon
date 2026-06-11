@@ -1,0 +1,1406 @@
+{
+  "generated_at": "2026-06-05T09:02:45.422Z",
+  "audit": {
+    "total_rows": "167",
+    "distinct_entities": "166",
+    "distinct_ams": "9",
+    "avg_note_length": 97,
+    "max_note_length": 417,
+    "total_text_length": "16191"
+  },
+  "sample_size": 20,
+  "haiku_model": "claude-haiku-4-5-20251001",
+  "skip_api": false,
+  "per_customer": [
+    {
+      "entity_id": "48416e2d-9751-4fce-89f0-d2f26266b686",
+      "bizname": "Sante Wellness & Aesthetics",
+      "customer_id": "AzZhQoUyy0eKP14e",
+      "am_count": 1,
+      "total_chars": 417,
+      "notes": [
+        {
+          "am_name": "Siddhi Shetty",
+          "updated_at": "2026-06-02T15:43:47.341Z",
+          "note": "The comms is through WhatsApp - SP is highly unresponsive. The major concern is that the access to their profile is with the previous owner. I'm constantly trying to get in touch to resolve this concern. We have to give 1 month free to the client. Also the business shows permanently closed. SP has requested to cancel the services - created a churn ticket already and we have refunded the recent subscription as well"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 5244,
+        "input_tokens": 2302,
+        "output_tokens": 784,
+        "candidate_facts": [
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "preferred_channel",
+            "value": "WhatsApp",
+            "source_quote": "The comms is through WhatsApp",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicitly stated communication channel"
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "response_pattern",
+            "value": "Highly unresponsive",
+            "source_quote": "SP is highly unresponsive",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Clear statement of communication responsiveness"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Profile access is with the previous owner, not current stakeholder",
+            "source_quote": "the access to their profile is with the previous owner",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit operational blocker preventing customer control"
+          },
+          {
+            "topic_category": "identity",
+            "topic_subcategory": "business_profile",
+            "field_name": "other",
+            "value": "Business is permanently closed.",
+            "source_quote": "the business shows permanently closed",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Clear statement of business operational status"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "Churned",
+            "source_quote": "SP has requested to cancel the services - created a churn ticket already and we have refunded the recent subscription as well",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit churn: cancellation requested, churn ticket created, refund issued"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "other",
+            "value": "Customer given 1 month free service as retention/compensation effort.",
+            "source_quote": "We have to give 1 month free to the client",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit mention of promotional credit being applied"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Sante Wellness & Aesthetics is a churned customer with a permanently closed business; critical blocker is profile access held by previous owner, and SP is unresponsive despite retention efforts including 1-month free credit."
+        }
+      },
+      "validation": {
+        "total": 6,
+        "valid": 6,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "cca9ec0e-a537-4cdd-bdaa-c74974cfd306",
+      "bizname": "Naree Massage & Spa",
+      "customer_id": "AzqPyuV37Dvpv6UB",
+      "am_count": 1,
+      "total_chars": 350,
+      "notes": [
+        {
+          "am_name": "Anu Srivastava",
+          "updated_at": "2026-05-22T18:31:13.162Z",
+          "note": "The SP has requested to pause the services as she is having shortage of staff and financial issues. We already downgraded her previously. The SP has been getting leads consistently and also booking the leads. So the product is clearly working here. Spoke to Rinitha about this specific account, she has given me the approval to off board the account."
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 5441,
+        "input_tokens": 2280,
+        "output_tokens": 804,
+        "candidate_facts": [
+          {
+            "topic_category": "identity",
+            "topic_subcategory": "owner_info",
+            "field_name": "other",
+            "value": "Service provider (SP) is female and operates the business.",
+            "source_quote": "The SP has requested to pause the services as she is having shortage of staff",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Explicitly stated; pronoun 'she' identifies SP gender"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Service provider experiencing staff shortage and financial difficulties.",
+            "source_quote": "she is having shortage of staff and financial issues",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Explicitly stated risk factors"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "Churning",
+            "source_quote": "The SP has requested to pause the services",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Service pause requested; approval given to offboard account"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "feature_usage",
+            "field_name": "features_active",
+            "value": "Lead generation and booking capture actively in use.",
+            "source_quote": "The SP has been getting leads consistently and also booking the leads. So the product is clearly working here.",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Explicitly states consistent lead flow and booking success"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_decision_makers",
+            "value": "Rinitha approved offboarding decision.",
+            "source_quote": "Spoke to Rinitha about this specific account, she has given me the approval to off board the account.",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Explicitly named as decision-maker for account offboarding"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "other",
+            "value": "Account previously downgraded due to customer constraints.",
+            "source_quote": "We already downgraded her previously.",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Explicitly states prior downgrade action"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Naree Massage & Spa is a churning massage spa customer whose product (lead generation and booking) was working well, but SP faces staffing and financial constraints; account approval given for offboarding."
+        }
+      },
+      "validation": {
+        "total": 6,
+        "valid": 6,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "e6e817f6-4779-460f-b229-8ed7e72bcc2d",
+      "bizname": "Calm Minds Matter | Reiki Practitioner, Holistic Wellness Life Coach",
+      "customer_id": "cus_QjduBAATOmOpDX",
+      "am_count": 1,
+      "total_chars": 315,
+      "notes": [
+        {
+          "am_name": "Siddhi Shetty",
+          "updated_at": "2026-06-02T16:08:42.100Z",
+          "note": "High churn risk - SP is highly dissatisfied with how things were working on the profile. We need to work on the profile as there are no keyword to help her business. SP doesn’t use the landing page as she is not happy with it. Sent her the landing page link - she has not reviewed it yet - did drop her a text today"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4506,
+        "input_tokens": 2294,
+        "output_tokens": 596,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "High",
+            "source_quote": "High churn risk",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicitly stated risk level"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "SP is highly dissatisfied with profile configuration; no keywords present to help business visibility; SP not using landing page due to dissatisfaction with it.",
+            "source_quote": "SP is highly dissatisfied with how things were working on the profile. We need to work on the profile as there are no keyword to help her business. SP doesn't use the landing page as she is not happy with it.",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Multiple explicit statements of dissatisfaction and operational blockers"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "performance_context",
+            "field_name": "gbp_setup_quality",
+            "value": "Poor — profile lacks keywords and optimization.",
+            "source_quote": "there are no keyword to help her business",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit statement of missing keywords in profile"
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "other",
+            "value": "AM reached out via text message to follow up on landing page review.",
+            "source_quote": "did drop her a text today",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit communication method used"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "High-risk wellness/reiki practitioner account with critical profile configuration issues (missing keywords, poor landing page) causing SP dissatisfaction and potential churn; AM actively working to remediate."
+        }
+      },
+      "validation": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "d7809778-d9a2-4104-8a98-201580f3a2ff",
+      "bizname": "Browfection Studio",
+      "customer_id": "AzZQe4UuGhsSTHMGi",
+      "am_count": 1,
+      "total_chars": 294,
+      "notes": [
+        {
+          "am_name": "Anu Srivastava",
+          "updated_at": "2026-05-19T19:19:57.891Z",
+          "note": "Had a word with the SP last week on Friday and today as well. She wants to churn because she is not getting enough leads. We have a proposition for her to offer her $75 per month for at least 3 months. \nWe prevented the churn over here, and the SP agreed to pay $75 per month for three months. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 5212,
+        "input_tokens": 2284,
+        "output_tokens": 662,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "Churning",
+            "source_quote": "She wants to churn because she is not getting enough leads.",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Explicit statement of churn intent with stated reason (lead generation dissatisfaction)."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_push_factors",
+            "value": "Insufficient lead volume from platform.",
+            "source_quote": "She wants to churn because she is not getting enough leads.",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Direct statement of the customer's primary pain point driving churn consideration."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "retention_strategy",
+            "value": "Offered reduced pricing of $75/month for 3-month commitment to retain customer.",
+            "source_quote": "We have a proposition for her to offer her $75 per month for at least 3 months. We prevented the churn over here, and the SP agreed to pay $75 per month for three months.",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Explicit intervention with pricing concession that successfully prevented churn."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Customer may re-churn after 3-month discounted pricing period expires if lead generation performance does not improve.",
+            "source_quote": "She wants to churn because she is not getting enough leads. We prevented the churn over here, and the SP agreed to pay $75 per month for three months.",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "Underlying dissatisfaction with lead volume remains unresolved; pricing discount is temporary measure only."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Beauty services business (Browfection Studio) at active churn risk due to insufficient lead generation; AM retained customer via short-term pricing concession but underlying product/performance issue persists."
+        }
+      },
+      "validation": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "127d40cf-7e76-434c-9eb8-2546f1a52c1a",
+      "bizname": "Sadjo African Hair Braiding",
+      "customer_id": "cus_Ok8x3ENQRzHfo9",
+      "am_count": 1,
+      "total_chars": 293,
+      "notes": [
+        {
+          "am_name": "Siddhi Shetty",
+          "updated_at": "2026-06-03T16:58:45.338Z",
+          "note": "SP is a Chrone client - Migration is scheduled for Monday - SP was busy. She didn't have the access to her profile and we have claimed it for her and she has received a post card for the verification. Meeting set for tomorrow around 9am. SP has asked to reschedule the call as she was occupied"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4733,
+        "input_tokens": 2278,
+        "output_tokens": 606,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "integration",
+            "field_name": "platform",
+            "value": "Chrone",
+            "source_quote": "SP is a Chrone client",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicitly stated current platform"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "integration",
+            "field_name": "integration_notes",
+            "value": "Migration from Chrone is scheduled for Monday",
+            "source_quote": "Migration is scheduled for Monday",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit migration timeline stated"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Profile access was initially unavailable; Zoca claimed profile on customer's behalf and sent verification postcard",
+            "source_quote": "She didn't have the access to her profile and we have claimed it for her and she has received a post card for the verification",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit statement of access issue and resolution step taken"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "next_call_agenda",
+            "field_name": "agenda_item",
+            "value": "Onboarding/migration call rescheduled; originally set for next day around 9am but customer asked to reschedule due to being occupied",
+            "source_quote": "Meeting set for tomorrow around 9am. SP has asked to reschedule the call as she was occupied",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Clear statement of meeting and reschedule request"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Sadjo African Hair Braiding is a Chrone-platform customer mid-migration to Zoca with profile access issues being resolved; owner/operator is occupied and has rescheduled onboarding call."
+        }
+      },
+      "validation": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "96cacad9-1b6c-4c28-b0eb-04cfe1b88b99",
+      "bizname": "Habibti Salon - Hair and Beauty | Braiding",
+      "customer_id": "AzZkPWV4ceI0yTJW",
+      "am_count": 1,
+      "total_chars": 277,
+      "notes": [
+        {
+          "am_name": "Sakshi Mamgain",
+          "updated_at": "2026-05-18T18:28:21.467Z",
+          "note": "The client is not very happy with Zoca's services, as she has paid twice and her lead prediction is low, and she also gets very few leads through Zoca. That is why she is not that happy with Zoca's services. There will be a proactive approach to downgrading the subscription. \n"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4192,
+        "input_tokens": 2285,
+        "output_tokens": 538,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "High risk of churn or downgrade due to dissatisfaction with lead volume and prediction accuracy.",
+            "source_quote": "The client is not very happy with Zoca's services, as she has paid twice and her lead prediction is low, and she also gets very few leads through Zoca.",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicit statement of unhappiness with service performance and low lead generation."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "risk_description": "Client reporting very few leads from Zoca despite payment; low lead prediction accuracy.",
+            "field_name": "risk_description",
+            "value": "Very few leads coming through Zoca despite paid subscriptions; lead prediction accuracy is low.",
+            "source_quote": "she has paid twice and her lead prediction is low, and she also gets very few leads through Zoca",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicit performance issue and root cause of dissatisfaction."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "retention_strategy",
+            "value": "Proactive approach planned to offer downgrade options rather than risk full churn.",
+            "source_quote": "There will be a proactive approach to downgrading the subscription.",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Clear statement of intended retention tactic."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "High-risk renewal account (Habibti Salon) experiencing dissatisfaction with Zoca's lead generation performance; AM planning proactive downgrade offer to retain partial relationship."
+        }
+      },
+      "validation": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "adbaf37a-f501-445a-a5bf-413be2676935",
+      "bizname": "Manny - Online & Personal Fitness Trainer",
+      "customer_id": "cus_S1lYI1OCuSkaDc",
+      "am_count": 1,
+      "total_chars": 277,
+      "notes": [
+        {
+          "am_name": "Sakshi Mamgain",
+          "updated_at": "2026-05-18T18:32:12.681Z",
+          "note": "Client only takes the website from us, and the client does not like to be called or texted. The client has been looking for an alternative because the client wants to own the website and not just be hosted with us. That is the reason there has been no contact with the client. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 5076,
+        "input_tokens": 2267,
+        "output_tokens": 733,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "tech_stack",
+            "field_name": "website_url",
+            "value": "Client uses Zoca for website hosting/management.",
+            "source_quote": "Client only takes the website from us",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicitly stated as primary product used"
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "channel_avoid",
+            "value": "Client does not like to be called or texted.",
+            "source_quote": "the client does not like to be called or texted",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicitly stated communication preference"
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "competitive_context",
+            "field_name": "switch_risks",
+            "value": "Client wants to own the website and not be hosted; actively looking for alternative platform.",
+            "source_quote": "the client has been looking for an alternative because the client wants to own the website and not just be hosted with us",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicitly stated as reason for seeking alternatives"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "High churn risk: client fundamentally wants website ownership model rather than SaaS hosting model; actively shopping alternatives.",
+            "source_quote": "the client has been looking for an alternative because the client wants to own the website and not just be hosted with us",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Clear statement of product-market misalignment driving alternative search"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "High",
+            "source_quote": "the client has been looking for an alternative because the client wants to own the website and not just be hosted with us. That is the reason there has been no contact with the client",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Client actively seeking alternatives due to fundamental product mismatch"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Online fitness trainer using Zoca website hosting but fundamentally misaligned on ownership model; actively seeking self-hosted alternatives and has gone silent due to communication preference and churn intent."
+        }
+      },
+      "validation": {
+        "total": 5,
+        "valid": 5,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "88298ef3-591b-4873-902b-501e487215c0",
+      "bizname": "Sky Dental Clinic | Best dentist in koramangala",
+      "customer_id": "AzqiDcUsc1CPC3TEI",
+      "am_count": 1,
+      "total_chars": 268,
+      "notes": [
+        {
+          "am_name": "Siddhi Shetty",
+          "updated_at": "2026-06-02T16:55:59.578Z",
+          "note": "The comms is through WhatsApp - SP has a missed payment for the month of May as he wants to onboard other 2 locations as well - we are waiting on that to get the combined payment.\nMeeting is set for tomorrow to onboard a new location - Has cleared the missed - payment"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4557,
+        "input_tokens": 2275,
+        "output_tokens": 670,
+        "candidate_facts": [
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "preferred_channel",
+            "value": "WhatsApp",
+            "source_quote": "The comms is through WhatsApp",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "explicitly stated"
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "payment_pattern",
+            "field_name": "payment_timing",
+            "value": "Missed payment in May; cleared after onboarding discussion",
+            "source_quote": "SP has a missed payment for the month of May",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "explicitly stated with resolution"
+          },
+          {
+            "topic_category": "identity",
+            "topic_subcategory": "business_profile",
+            "field_name": "location_count",
+            "value": "Currently operating at least 1 location; expanding to 3 locations total",
+            "source_quote": "wants to onboard other 2 locations as well",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "expansion plan explicitly mentioned"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "onboarding",
+            "field_name": "onboarding_friction_points",
+            "value": "Payment coordination delayed multi-location onboarding; wants combined payment for all locations",
+            "source_quote": "we are waiting on that to get the combined payment",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "friction point explicit in payment hold"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "onboarding",
+            "field_name": "other",
+            "value": "Meeting scheduled for next day to onboard new location after missed payment was cleared.",
+            "source_quote": "Meeting is set for tomorrow to onboard a new location - Has cleared the missed - payment",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "explicitly stated with timeline"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Multi-location dental clinic experiencing payment friction during expansion phase; prefers WhatsApp comms; expansion plan includes 2 new locations with combined billing strategy."
+        }
+      },
+      "validation": {
+        "total": 5,
+        "valid": 5,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "6fa7c16b-cb90-4378-ad33-07fd71f72402",
+      "bizname": "Hydrat8 Med spa & Wellness",
+      "customer_id": "cus_RDBicOhlYm9AbH",
+      "am_count": 1,
+      "total_chars": 267,
+      "notes": [
+        {
+          "am_name": "Siddhi Shetty",
+          "updated_at": "2026-06-02T15:43:19.107Z",
+          "note": "SP is been recently downgraded to $99 - she is a Chrone client who was highly dissatisfied with the communication as she wanted to cancel with us long back - Major hiccup was also the website and the integration with the booking platform. Updated the notes on Hubspot"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4805,
+        "input_tokens": 2270,
+        "output_tokens": 678,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "High risk — customer was highly dissatisfied and wanted to cancel.",
+            "source_quote": "she is a Chrone client who was highly dissatisfied with the communication as she wanted to cancel with us long back",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit statement of dissatisfaction and cancellation intent."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Website and booking platform integration were major friction points.",
+            "source_quote": "Major hiccup was also the website and the integration with the booking platform",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicitly identified as major hiccup blocking customer satisfaction."
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "other",
+            "value": "Customer was highly dissatisfied with communication from Zoca.",
+            "source_quote": "highly dissatisfied with the communication",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit statement of communication dissatisfaction."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "contract",
+            "field_name": "custom_pricing",
+            "value": "Recently downgraded to $99 service package.",
+            "source_quote": "SP is been recently downgraded to $99",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit pricing downgrade noted."
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "competitive_context",
+            "field_name": "prior_platforms",
+            "value": "Customer is a Chrone client.",
+            "source_quote": "she is a Chrone client",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicitly states current or prior platform affiliation."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "High-risk med spa wellness customer on downgraded pricing with unresolved technical and communication issues; churn candidate."
+        }
+      },
+      "validation": {
+        "total": 5,
+        "valid": 5,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "2660da42-a5e9-4ef3-b11d-40d576d1d888",
+      "bizname": "Radiant Elements Medical Spa",
+      "customer_id": "16A513V5mYAip5Qq",
+      "am_count": 1,
+      "total_chars": 262,
+      "notes": [
+        {
+          "am_name": "Sudha Goutami",
+          "updated_at": "2026-05-18T21:29:08.532Z",
+          "note": "I spoke to the SP last week, who told me that she has removed the Zoca website and put her original website because she feels that she gets more leads when her original website is up on her full business profile. Also discussed her profile performance with her. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 3750,
+        "input_tokens": 2262,
+        "output_tokens": 466,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "tech_stack",
+            "field_name": "website_url",
+            "value": "Customer removed Zoca website and reinstated original website on business profile.",
+            "source_quote": "she has removed the Zoca website and put her original website",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Explicit statement of website change action."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "performance_context",
+            "field_name": "other",
+            "value": "Customer believes original website generates more leads than Zoca website.",
+            "source_quote": "she feels that she gets more leads when her original website is up on her full business profile",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Direct statement of customer's lead generation perception."
+          },
+          {
+            "topic_category": "identity",
+            "topic_subcategory": "decision_makers",
+            "field_name": "other",
+            "value": "Service provider (SP) is the decision-maker on website and profile configuration choices.",
+            "source_quote": "I spoke to the SP last week, who told me that she has removed the Zoca website",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "SP explicitly made the website removal decision and communicated it."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Medical spa customer has removed Zoca website integration and reverted to original website, citing better lead generation; SP is decision-maker on platform configuration."
+        }
+      },
+      "validation": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "fce7a080-3457-4427-aeb5-806caf7f8cf8",
+      "bizname": "Houston Mobile Massage - Swedish massage, Deep Tissue Massage, Gua Shua in Houston, TX",
+      "customer_id": "Azqc6hUsTFeHr3Rrw",
+      "am_count": 1,
+      "total_chars": 251,
+      "notes": [
+        {
+          "am_name": "Sudha Goutami",
+          "updated_at": "2026-05-18T21:25:41.419Z",
+          "note": "I tried reaching out to the SP through calls and texts, but she is unresponsive. There was a meeting scheduled last week with the SP where the SP did not join and did not respond to the app chat message. Will re-try reaching out to her and follow up. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 3149,
+        "input_tokens": 2285,
+        "output_tokens": 405,
+        "candidate_facts": [
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Service Provider is unresponsive to calls, texts, and app chat messages; missed scheduled meeting without notice or explanation.",
+            "source_quote": "I tried reaching out to the SP through calls and texts, but she is unresponsive. There was a meeting scheduled last week with the SP where the SP did not join and did not respond to the app chat message.",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Explicitly stated across multiple communication channels and a missed meeting"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_severity",
+            "value": "High",
+            "source_quote": "I tried reaching out to the SP through calls and texts, but she is unresponsive. There was a meeting scheduled last week with the SP where the SP did not join and did not respond to the app chat message.",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Pattern of unresponsiveness across multiple channels plus missed meeting indicates serious engagement issue"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Houston Mobile Massage customer has a critical Service Provider engagement issue with unresponsiveness across all communication channels and a missed meeting."
+        }
+      },
+      "validation": {
+        "total": 2,
+        "valid": 2,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "4e73850c-337f-46d5-b1a4-2930f58b53b8",
+      "bizname": "Rosy Tips Nail Salon Chula Vista CA",
+      "customer_id": "AzZNd8UzFu9Yg6ob",
+      "am_count": 1,
+      "total_chars": 249,
+      "notes": [
+        {
+          "am_name": "Siddhi Shetty",
+          "updated_at": "2026-06-02T16:55:43.882Z",
+          "note": "High risk client - had asked for cancellation. Meeting is set for today for the churn prevention - SP wants to get on the payments and scheduling but she is on Multi - staff. Dropped her a text to follow up - there is an active risk retention ticket"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4552,
+        "input_tokens": 2273,
+        "output_tokens": 576,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "Churning",
+            "source_quote": "High risk client - had asked for cancellation",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit statement of cancellation request and high-risk classification"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "retention_strategy",
+            "value": "Meeting scheduled for churn prevention and discussion of payments/scheduling capabilities",
+            "source_quote": "Meeting is set for today for the churn prevention - SP wants to get on the payments and scheduling",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit description of retention meeting agenda"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Customer is on Multi-staff product; SP seeking to move to payments and scheduling features",
+            "source_quote": "SP wants to get on the payments and scheduling but she is on Multi - staff",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Notes indicate feature/product mismatch may be contributing to churn risk"
+          },
+          {
+            "topic_category": "relationship",
+            "topic_subcategory": "engagement",
+            "field_name": "other",
+            "value": "Active risk retention ticket created; text follow-up sent to customer",
+            "source_quote": "there is an active risk retention ticket",
+            "source_am_name": "Siddhi Shetty",
+            "confidence_note": "Explicit mention of formal retention ticket in system"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "High-risk nail salon customer actively seeking cancellation; churn prevention meeting scheduled today with focus on payments/scheduling feature gaps; formal retention ticket filed."
+        }
+      },
+      "validation": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "68fef837-6013-462c-8797-f7e6e3142108",
+      "bizname": "Your New Barber",
+      "customer_id": "6obVqUqklbuY77XP",
+      "am_count": 1,
+      "total_chars": 241,
+      "notes": [
+        {
+          "am_name": "Bikash Mishra",
+          "updated_at": "2026-06-03T17:02:39.584Z",
+          "note": "We have quoted a restructured price, and we need to have a meeting with all of his barbers to address what needs to be done to improve the business further. We are waiting for a response from the SPN to get back to us regarding the meeting. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 3368,
+        "input_tokens": 2256,
+        "output_tokens": 460,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "other",
+            "value": "A restructured price has been quoted to the customer.",
+            "source_quote": "We have quoted a restructured price",
+            "source_am_name": "Bikash Mishra",
+            "confidence_note": "Explicitly stated pricing action in progress."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "next_call_agenda",
+            "field_name": "agenda_item",
+            "value": "Meeting with all barbers to address what needs to be done to improve the business further.",
+            "source_quote": "we need to have a meeting with all of his barbers to address what needs to be done to improve the business further",
+            "source_am_name": "Bikash Mishra",
+            "confidence_note": "Explicitly stated planned meeting agenda."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "next_call_agenda",
+            "field_name": "other",
+            "value": "Waiting for SPN response to schedule the meeting with barbers.",
+            "source_quote": "We are waiting for a response from the SPN to get back to us regarding the meeting",
+            "source_am_name": "Bikash Mishra",
+            "confidence_note": "Explicitly stated blocking condition for meeting confirmation."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "A barber shop with multiple staff (barbers) is undergoing a pricing restructure and requires a team meeting to discuss business improvement; meeting is pending SPN confirmation."
+        }
+      },
+      "validation": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "4ed0f5bc-4859-45e2-8aef-0c61220fcbc7",
+      "bizname": "Patrick Einwechter & Son, Inc",
+      "customer_id": "16CVMMUz3vlIM39wB",
+      "am_count": 1,
+      "total_chars": 224,
+      "notes": [
+        {
+          "am_name": "Sakshi Mamgain",
+          "updated_at": "2026-05-18T18:33:00.882Z",
+          "note": "I have tried to reach out to the client, but the client he does not have the manager access, therefore he can't see the app. His partner has the access, and he's still waiting for his partner to come back from the vacation. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 3632,
+        "input_tokens": 2261,
+        "output_tokens": 385,
+        "candidate_facts": [
+          {
+            "topic_category": "identity",
+            "topic_subcategory": "decision_makers",
+            "field_name": "secondary_contacts",
+            "value": "Partner holds manager access to the app; primary contact lacks manager access.",
+            "source_quote": "His partner has the access, and he's still waiting for his partner to come back from the vacation.",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicitly states partner has access and primary contact does not; clear secondary contact structure."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Primary contact cannot access the app due to lack of manager access; dependent on partner's availability.",
+            "source_quote": "the client he does not have the manager access, therefore he can't see the app. His partner has the access, and he's still waiting for his partner to come back from the vacation.",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Clear blocker to engagement: access is gated on unavailable partner; operational friction point."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Primary contact is blocked from app access and cannot be reached until partner returns from vacation; access permission and availability are critical blockers."
+        }
+      },
+      "validation": {
+        "total": 2,
+        "valid": 2,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "8819ec3f-7c6e-4328-86fe-1b2b98f51ff0",
+      "bizname": "Waxflower spa, Eyebrows Threading, Laser Hair Removal",
+      "customer_id": "16Af9wUyUPe3UUQt",
+      "am_count": 1,
+      "total_chars": 221,
+      "notes": [
+        {
+          "am_name": "Sudha Goutami",
+          "updated_at": "2026-05-25T19:53:15.118Z",
+          "note": "Spoke to the SP. Check-in call done. She is interested in Zoca's scheduling. Schedule a meeting tomorrow at 1:00 p.m. Eastern Standard Time, and also she wanted to add a new service on the website. Guided her on the same "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4526,
+        "input_tokens": 2282,
+        "output_tokens": 605,
+        "candidate_facts": [
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "best_time_to_reach",
+            "value": "1:00 p.m. Eastern Standard Time",
+            "source_quote": "Schedule a meeting tomorrow at 1:00 p.m. Eastern Standard Time",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Explicit meeting time preference stated."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "feature_usage",
+            "field_name": "features_active",
+            "value": "Scheduling feature is of interest to customer.",
+            "source_quote": "She is interested in Zoca's scheduling",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Clear statement of feature interest."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "onboarding",
+            "field_name": "onboarding_friction_points",
+            "value": "Customer needed guidance on adding a new service to the website.",
+            "source_quote": "she wanted to add a new service on the website. Guided her on the same",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Customer required onboarding support for website service management."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "next_call_agenda",
+            "field_name": "agenda_item",
+            "value": "Scheduling feature demo and website service addition support.",
+            "source_quote": "She is interested in Zoca's scheduling. Schedule a meeting tomorrow at 1:00 p.m. Eastern Standard Time, and also she wanted to add a new service on the website",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Upcoming meeting agenda explicitly described."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Waxflower spa (beauty/aesthetics multi-service) is early in engagement, interested in scheduling features, and requires guidance on website service management; scheduled for follow-up call."
+        }
+      },
+      "validation": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "5265074e-b4d5-46c6-8503-bfb2c3e891fc",
+      "bizname": "Contornos Studio | Eyebrows, Lashes & Facials",
+      "customer_id": "AzqfgpUqNCWTH3KOs",
+      "am_count": 1,
+      "total_chars": 214,
+      "notes": [
+        {
+          "am_name": "Sudha Goutami",
+          "updated_at": "2026-05-25T19:58:30.709Z",
+          "note": "Spoke to the SP, check-in call done. Asked her to work on reviews, as she hasn't received any reviews for the month of May so far. The SP told that she is not keeping well and will reach out once she feels better. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 2947,
+        "input_tokens": 2275,
+        "output_tokens": 345,
+        "candidate_facts": [
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Service provider not keeping well and unavailable; no reviews received in May.",
+            "source_quote": "The SP told that she is not keeping well and will reach out once she feels better.",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Explicitly stated; clear operational risk due to SP unavailability."
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "performance_context",
+            "field_name": "review_velocity_pattern",
+            "value": "No reviews received in May 2026.",
+            "source_quote": "she hasn't received any reviews for the month of May so far",
+            "source_am_name": "Sudha Goutami",
+            "confidence_note": "Explicitly stated; concrete review data point."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Beauty studio (eyebrows, lashes, facials) currently experiencing service provider health issue affecting review generation; check-in call conducted, awaiting SP recovery."
+        }
+      },
+      "validation": {
+        "total": 2,
+        "valid": 2,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "31d8b0b4-9052-4763-a310-acd042868b4c",
+      "bizname": "Glo Spa",
+      "customer_id": "AzqJ3YV5BKT3lOy4",
+      "am_count": 1,
+      "total_chars": 214,
+      "notes": [
+        {
+          "am_name": "Anu Srivastava",
+          "updated_at": "2026-05-22T18:25:15.750Z",
+          "note": "Same, just got this account assigned last week on Thursday and also had a word with the SP on Thursday itself. \nThe SP wants to churn. I have shared the ranking keywords performance with the SP via email yesterday."
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 4733,
+        "input_tokens": 2255,
+        "output_tokens": 559,
+        "candidate_facts": [
+          {
+            "topic_category": "identity",
+            "topic_subcategory": "assignment",
+            "field_name": "last_transition_at",
+            "value": "2026-05-15 (Thursday of the week prior to note date 2026-05-22)",
+            "source_quote": "just got this account assigned last week on Thursday",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "explicit assignment date stated"
+          },
+          {
+            "topic_category": "identity",
+            "topic_subcategory": "assignment",
+            "field_name": "transition_history",
+            "value": "Account transitioned to Anu Srivastava on 2026-05-15",
+            "source_quote": "just got this account assigned last week on Thursday",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "explicit transition event"
+          },
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "renewal",
+            "field_name": "renewal_risk_level",
+            "value": "Churning",
+            "source_quote": "The SP wants to churn",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "explicit churn intent stated by service provider"
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Service provider has expressed intent to churn; AM is attempting retention with ranking keywords performance data",
+            "source_quote": "The SP wants to churn. I have shared the ranking keywords performance with the SP via email yesterday",
+            "source_am_name": "Anu Srivastava",
+            "confidence_note": "explicit risk statement with mitigation action"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Newly assigned spa account with active churn risk; AM conducting retention outreach via performance data sharing."
+        }
+      },
+      "validation": {
+        "total": 4,
+        "valid": 4,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "eba5da75-2981-4495-b10c-2f11baf6317c",
+      "bizname": "Connected Health Suwanee",
+      "customer_id": "6omHHVEDdhUk2zV",
+      "am_count": 1,
+      "total_chars": 199,
+      "notes": [
+        {
+          "am_name": "Shruti Sinha",
+          "updated_at": "2026-05-18T19:12:39.677Z",
+          "note": "Just had a discussion with the SP about reviews, and he should be uploading pictures soon because it's been a long time since the pictures have not been uploaded. Had a check-in call with him today. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 6334,
+        "input_tokens": 2250,
+        "output_tokens": 332,
+        "candidate_facts": [
+          {
+            "topic_category": "operational",
+            "topic_subcategory": "performance_context",
+            "field_name": "other",
+            "value": "SP has not uploaded pictures to reviews for an extended period; pictures upload expected soon.",
+            "source_quote": "he should be uploading pictures soon because it's been a long time since the pictures have not been uploaded",
+            "source_am_name": "Shruti Sinha",
+            "confidence_note": "explicit statement about review content gap and planned action"
+          },
+          {
+            "topic_category": "relationship",
+            "topic_subcategory": "engagement",
+            "field_name": "other",
+            "value": "Check-in call conducted with SP on 2026-05-18.",
+            "source_quote": "Had a check-in call with him today",
+            "source_am_name": "Shruti Sinha",
+            "confidence_note": "explicit meeting occurrence on note date"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Connected Health Suwanee has a known operational gap in review photo management; SP recently checked in and committed to uploading pictures soon."
+        }
+      },
+      "validation": {
+        "total": 2,
+        "valid": 2,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "044dfbd0-ab51-4ae4-bc24-380e849709e1",
+      "bizname": "Millie's All About You Salon Spa",
+      "customer_id": "AzqB0hVEoKgBSBbu",
+      "am_count": 1,
+      "total_chars": 192,
+      "notes": [
+        {
+          "am_name": "Shruti Sinha",
+          "updated_at": "2026-06-02T19:47:38.991Z",
+          "note": "SP had mentioned on the activation call that she is not willing to contact the leads. We will schedule a check-in call this week. SP has asked to cancel have a meeting scheduled for tomorrow\n\n"
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 3769,
+        "input_tokens": 2248,
+        "output_tokens": 473,
+        "candidate_facts": [
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "latent_risk",
+            "field_name": "risk_description",
+            "value": "Service provider not willing to contact leads, which may limit lead conversion and platform value realization.",
+            "source_quote": "SP had mentioned on the activation call that she is not willing to contact the leads",
+            "source_am_name": "Shruti Sinha",
+            "confidence_note": "Explicitly stated during activation call; clear operational concern."
+          },
+          {
+            "topic_category": "concerns",
+            "topic_subcategory": "next_call_agenda",
+            "field_name": "agenda_item",
+            "value": "Check-in call to address SP's reluctance to contact leads and engagement strategy.",
+            "source_quote": "We will schedule a check-in call this week",
+            "source_am_name": "Shruti Sinha",
+            "confidence_note": "Explicit action plan stated in note."
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "other",
+            "value": "SP cancelled a meeting scheduled for tomorrow.",
+            "source_quote": "SP has asked to cancel have a meeting scheduled for tomorrow",
+            "source_am_name": "Shruti Sinha",
+            "confidence_note": "Explicit cancellation request stated; suggests potential engagement or availability friction."
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Millie's All About You Salon Spa is in early activation phase with a service provider engagement concern: the SP is unwilling to contact leads, triggering a planned check-in call and meeting cancellation flags."
+        }
+      },
+      "validation": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "error": null
+    },
+    {
+      "entity_id": "e7b45fde-5084-4667-940f-908b9cceaa1d",
+      "bizname": "Celebrityz Barbershop",
+      "customer_id": "cus_QZsLOmGGygvs4X",
+      "am_count": 1,
+      "total_chars": 179,
+      "notes": [
+        {
+          "am_name": "Sakshi Mamgain",
+          "updated_at": "2026-05-18T18:29:44.607Z",
+          "note": "Client does not like to get in touch on calls and neither on message. He is on a WhatsApp group. Whenever he has any issue, he will reach out to us. This is the client behaviour. "
+        }
+      ],
+      "extraction": {
+        "elapsed_ms": 3247,
+        "input_tokens": 2254,
+        "output_tokens": 460,
+        "candidate_facts": [
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "preferred_channel",
+            "value": "WhatsApp group",
+            "source_quote": "He is on a WhatsApp group.",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicitly stated as the channel where client is reachable"
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "channel_avoid",
+            "value": "Calls and direct messages",
+            "source_quote": "Client does not like to get in touch on calls and neither on message.",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicitly stated that client avoids calls and direct messages"
+          },
+          {
+            "topic_category": "behavioral",
+            "topic_subcategory": "comms_preference",
+            "field_name": "response_pattern",
+            "value": "Client reaches out proactively when issues arise rather than responding to outreach",
+            "source_quote": "Whenever he has any issue, he will reach out to us. This is the client behaviour.",
+            "source_am_name": "Sakshi Mamgain",
+            "confidence_note": "Explicitly described as reactive/proactive engagement pattern"
+          }
+        ],
+        "invalid_candidates": [],
+        "extraction_meta": {
+          "total_notes_processed": 1,
+          "notes_skipped_reason": "",
+          "extractor_summary": "Celebrityz Barbershop is a client with strong communication preferences—prefers WhatsApp group interaction, avoids calls/DMs, and initiates contact only when experiencing issues."
+        }
+      },
+      "validation": {
+        "total": 3,
+        "valid": 3,
+        "invalid": 0
+      },
+      "error": null
+    }
+  ],
+  "stats": {
+    "total_candidates": 74,
+    "valid_candidates": 74,
+    "invalid_candidates": 0,
+    "empty_extractions": 0,
+    "api_errors": 0,
+    "total_input_chars": 5204,
+    "category_distribution": {
+      "behavioral": 14,
+      "concerns": 20,
+      "identity": 7,
+      "operational": 31,
+      "relationship": 2
+    },
+    "subcategory_distribution": {
+      "comms_preference": 11,
+      "latent_risk": 15,
+      "business_profile": 2,
+      "renewal": 17,
+      "owner_info": 1,
+      "feature_usage": 2,
+      "performance_context": 4,
+      "integration": 2,
+      "next_call_agenda": 5,
+      "tech_stack": 2,
+      "competitive_context": 2,
+      "payment_pattern": 1,
+      "onboarding": 3,
+      "contract": 1,
+      "decision_makers": 2,
+      "engagement": 2,
+      "assignment": 2
+    },
+    "field_name_distribution": {
+      "preferred_channel": 3,
+      "response_pattern": 2,
+      "risk_description": 14,
+      "other": 15,
+      "renewal_risk_level": 9,
+      "features_active": 2,
+      "renewal_decision_makers": 1,
+      "gbp_setup_quality": 1,
+      "renewal_push_factors": 1,
+      "retention_strategy": 3,
+      "platform": 1,
+      "integration_notes": 1,
+      "agenda_item": 4,
+      "website_url": 2,
+      "channel_avoid": 2,
+      "switch_risks": 1,
+      "payment_timing": 1,
+      "location_count": 1,
+      "onboarding_friction_points": 2,
+      "custom_pricing": 1,
+      "prior_platforms": 1,
+      "risk_severity": 1,
+      "secondary_contacts": 1,
+      "best_time_to_reach": 1,
+      "review_velocity_pattern": 1,
+      "last_transition_at": 1,
+      "transition_history": 1
+    }
+  }
+}

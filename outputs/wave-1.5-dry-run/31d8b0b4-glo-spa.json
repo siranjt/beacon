@@ -1,0 +1,69 @@
+{
+  "entity_id": "31d8b0b4-9052-4763-a310-acd042868b4c",
+  "bizname": "Glo Spa",
+  "customer_id": "AzqJ3YV5BKT3lOy4",
+  "am_count": 1,
+  "total_chars": 214,
+  "notes": [
+    {
+      "am_name": "Anu Srivastava",
+      "updated_at": "2026-05-22T18:25:15.750Z",
+      "note": "Same, just got this account assigned last week on Thursday and also had a word with the SP on Thursday itself. \nThe SP wants to churn. I have shared the ranking keywords performance with the SP via email yesterday."
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4733,
+    "input_tokens": 2255,
+    "output_tokens": 559,
+    "candidate_facts": [
+      {
+        "topic_category": "identity",
+        "topic_subcategory": "assignment",
+        "field_name": "last_transition_at",
+        "value": "2026-05-15 (Thursday of the week prior to note date 2026-05-22)",
+        "source_quote": "just got this account assigned last week on Thursday",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "explicit assignment date stated"
+      },
+      {
+        "topic_category": "identity",
+        "topic_subcategory": "assignment",
+        "field_name": "transition_history",
+        "value": "Account transitioned to Anu Srivastava on 2026-05-15",
+        "source_quote": "just got this account assigned last week on Thursday",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "explicit transition event"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "Churning",
+        "source_quote": "The SP wants to churn",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "explicit churn intent stated by service provider"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Service provider has expressed intent to churn; AM is attempting retention with ranking keywords performance data",
+        "source_quote": "The SP wants to churn. I have shared the ranking keywords performance with the SP via email yesterday",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "explicit risk statement with mitigation action"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Newly assigned spa account with active churn risk; AM conducting retention outreach via performance data sharing."
+    }
+  },
+  "validation": {
+    "total": 4,
+    "valid": 4,
+    "invalid": 0
+  },
+  "error": null
+}

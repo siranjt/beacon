@@ -1,0 +1,60 @@
+{
+  "entity_id": "044dfbd0-ab51-4ae4-bc24-380e849709e1",
+  "bizname": "Millie's All About You Salon Spa",
+  "customer_id": "AzqB0hVEoKgBSBbu",
+  "am_count": 1,
+  "total_chars": 192,
+  "notes": [
+    {
+      "am_name": "Shruti Sinha",
+      "updated_at": "2026-06-02T19:47:38.991Z",
+      "note": "SP had mentioned on the activation call that she is not willing to contact the leads. We will schedule a check-in call this week. SP has asked to cancel have a meeting scheduled for tomorrow\n\n"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 3769,
+    "input_tokens": 2248,
+    "output_tokens": 473,
+    "candidate_facts": [
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Service provider not willing to contact leads, which may limit lead conversion and platform value realization.",
+        "source_quote": "SP had mentioned on the activation call that she is not willing to contact the leads",
+        "source_am_name": "Shruti Sinha",
+        "confidence_note": "Explicitly stated during activation call; clear operational concern."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "next_call_agenda",
+        "field_name": "agenda_item",
+        "value": "Check-in call to address SP's reluctance to contact leads and engagement strategy.",
+        "source_quote": "We will schedule a check-in call this week",
+        "source_am_name": "Shruti Sinha",
+        "confidence_note": "Explicit action plan stated in note."
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "other",
+        "value": "SP cancelled a meeting scheduled for tomorrow.",
+        "source_quote": "SP has asked to cancel have a meeting scheduled for tomorrow",
+        "source_am_name": "Shruti Sinha",
+        "confidence_note": "Explicit cancellation request stated; suggests potential engagement or availability friction."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Millie's All About You Salon Spa is in early activation phase with a service provider engagement concern: the SP is unwilling to contact leads, triggering a planned check-in call and meeting cancellation flags."
+    }
+  },
+  "validation": {
+    "total": 3,
+    "valid": 3,
+    "invalid": 0
+  },
+  "error": null
+}

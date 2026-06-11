@@ -55,6 +55,10 @@ import { queryBrainTool } from "./query-brain";
 import { getChargebeeBillingTool } from "./get-chargebee-billing";
 import { getCustomerPerformanceTool } from "./get-customer-performance";
 import { getFullCustomerViewTool } from "./get-full-customer-view";
+import { getCustomerFromMetabaseTool } from "./get-customer-from-metabase";
+import { getBookingHistoryTool } from "./get-booking-history";
+import { getMixpanelActivityTool } from "./get-mixpanel-activity";
+import { getReviewSummaryTool } from "./get-review-summary";
 
 /**
  * The execution context passed to every tool's `execute()` handler. Filled
@@ -162,6 +166,23 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
   // tool call instead of 4-5 chained read_* hops. Reachable from
   // customer-360 and customer-book scopes.
   getFullCustomerViewTool,
+  // META-A1 — Self-healing BaseSheet fallback. When Keeper is empty for
+  // a newly-bootstrapped customer, this tool pulls the live BaseSheet
+  // row from Metabase, returns the requested fields, AND writes them
+  // back to Keeper as confirmed/basesheet facts. Next ask is a Keeper
+  // hit — every fallback compounds.
+  getCustomerFromMetabaseTool,
+  // META-A3 — Live dynamic data tools (read-only, no Keeper write-back
+  // because the underlying data changes daily/hourly). All three are
+  // single-entity scoped, sliding window, 5-min in-process cached, and
+  // soft-fail to clean error strings on Metabase outage so the model
+  // can keep going.
+  //   - get_booking_history   → website.booking_enquiries (Postgres)
+  //   - get_mixpanel_activity → mixpanelzocaappdata.export (Aurora)
+  //   - get_review_summary    → reviews.reviews (Aurora)
+  getBookingHistoryTool,
+  getMixpanelActivityTool,
+  getReviewSummaryTool,
 ];
 
 /** Alias for callers that prefer the umbrella naming. */
@@ -200,7 +221,13 @@ export const SCOPE_TOOL_ALLOWLIST: Partial<Record<AiScope["kind"], BeaconTool[]>
     readCustomerNotesTool,
     getChargebeeBillingTool,
     getCustomerPerformanceTool,
+    getCustomerFromMetabaseTool,
     getFullCustomerViewTool,
+    // META-A3 live dynamic tools — alongside the existing performance/
+    // billing reads on Customer 360.
+    getBookingHistoryTool,
+    getMixpanelActivityTool,
+    getReviewSummaryTool,
     draftEmailToContactTool,
     draftSlackMessageTool,
     addNoteTool,
@@ -213,7 +240,11 @@ export const SCOPE_TOOL_ALLOWLIST: Partial<Record<AiScope["kind"], BeaconTool[]>
     queryCustomerBookTool,
     queryBrainTool,
     readCustomerBrainTool,
+    getCustomerFromMetabaseTool,
     getFullCustomerViewTool,
+    // META-A3 — booking history is the most book-relevant of the three
+    // (mixpanel + reviews stay scoped to per-customer surfaces).
+    getBookingHistoryTool,
     draftEmailToContactTool,
     draftSlackMessageTool,
   ],
@@ -222,11 +253,21 @@ export const SCOPE_TOOL_ALLOWLIST: Partial<Record<AiScope["kind"], BeaconTool[]>
     lookupCustomerTool,
     getCustomerPerformanceTool,
     readCustomerBrainTool,
+    getCustomerFromMetabaseTool,
+    // META-A3 — performance-report is the natural home for all three
+    // live data tools.
+    getBookingHistoryTool,
+    getMixpanelActivityTool,
+    getReviewSummaryTool,
     draftEmailToContactTool,
   ],
   "escalation-overview": [
     lookupCustomerTool,
     readCustomerBrainTool,
+    getCustomerFromMetabaseTool,
+    // META-A3 — review summary helps escalation triage spot rating
+    // collapses faster.
+    getReviewSummaryTool,
     draftSlackMessageTool,
     draftEmailToContactTool,
   ],
@@ -245,6 +286,7 @@ export const SCOPE_TOOL_ALLOWLIST: Partial<Record<AiScope["kind"], BeaconTool[]>
     lookupCustomerTool,
     queryCustomerBookTool,
     getChargebeeBillingTool,
+    getCustomerFromMetabaseTool,
     draftEmailToContactTool,
     draftSlackMessageTool,
   ],
@@ -310,4 +352,8 @@ export {
   getChargebeeBillingTool,
   getCustomerPerformanceTool,
   getFullCustomerViewTool,
+  getCustomerFromMetabaseTool,
+  getBookingHistoryTool,
+  getMixpanelActivityTool,
+  getReviewSummaryTool,
 };

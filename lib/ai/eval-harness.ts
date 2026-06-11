@@ -20,6 +20,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { getSql } from "@/lib/customer/postgres";
+// META-A5 — spend instrumentation.
+import { logSpend, extractUsage } from "./spend-log";
 
 const JUDGE_MODEL = process.env.ANTHROPIC_JUDGE_MODEL ?? "claude-haiku-4-5-20251001";
 const JUDGE_MAX_TOKENS = 800;
@@ -265,6 +267,12 @@ Return JSON only.`;
     max_tokens: JUDGE_MAX_TOKENS,
     system: promptSystem,
     messages: [{ role: "user", content: userMsg }],
+  });
+  // META-A5 — eval is weekly but Sonnet-grade; track separately.
+  void logSpend({
+    feature: "evaluator",
+    model: JUDGE_MODEL,
+    ...extractUsage(res),
   });
 
   // Extract text from response blocks

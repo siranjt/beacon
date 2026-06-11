@@ -1,0 +1,78 @@
+{
+  "entity_id": "6fa7c16b-cb90-4378-ad33-07fd71f72402",
+  "bizname": "Hydrat8 Med spa & Wellness",
+  "customer_id": "cus_RDBicOhlYm9AbH",
+  "am_count": 1,
+  "total_chars": 267,
+  "notes": [
+    {
+      "am_name": "Siddhi Shetty",
+      "updated_at": "2026-06-02T15:43:19.107Z",
+      "note": "SP is been recently downgraded to $99 - she is a Chrone client who was highly dissatisfied with the communication as she wanted to cancel with us long back - Major hiccup was also the website and the integration with the booking platform. Updated the notes on Hubspot"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4805,
+    "input_tokens": 2270,
+    "output_tokens": 678,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "High risk — customer was highly dissatisfied and wanted to cancel.",
+        "source_quote": "she is a Chrone client who was highly dissatisfied with the communication as she wanted to cancel with us long back",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit statement of dissatisfaction and cancellation intent."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Website and booking platform integration were major friction points.",
+        "source_quote": "Major hiccup was also the website and the integration with the booking platform",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicitly identified as major hiccup blocking customer satisfaction."
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "other",
+        "value": "Customer was highly dissatisfied with communication from Zoca.",
+        "source_quote": "highly dissatisfied with the communication",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit statement of communication dissatisfaction."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "contract",
+        "field_name": "custom_pricing",
+        "value": "Recently downgraded to $99 service package.",
+        "source_quote": "SP is been recently downgraded to $99",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit pricing downgrade noted."
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "competitive_context",
+        "field_name": "prior_platforms",
+        "value": "Customer is a Chrone client.",
+        "source_quote": "she is a Chrone client",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicitly states current or prior platform affiliation."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "High-risk med spa wellness customer on downgraded pricing with unresolved technical and communication issues; churn candidate."
+    }
+  },
+  "validation": {
+    "total": 5,
+    "valid": 5,
+    "invalid": 0
+  },
+  "error": null
+}

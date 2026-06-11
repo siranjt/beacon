@@ -228,6 +228,16 @@ export default async function LauncherPage() {
               >
                 Admin · Keeper rerank compare
               </Link>
+              <Link
+                href="/admin/anthropic-spend"
+                style={{
+                  color: "var(--zoca-text-2)",
+                  textDecoration: "none",
+                  borderBottom: "1px dotted var(--zoca-text-3)",
+                }}
+              >
+                Admin · Anthropic spend
+              </Link>
             </>
           )}
         </div>

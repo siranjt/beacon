@@ -28,6 +28,7 @@
 import "server-only";
 import { put as blobPut } from "@vercel/blob";
 import Anthropic from "@anthropic-ai/sdk";
+import { logSpend, extractUsage } from "./spend-log";
 
 const VISION_MODEL =
   process.env.ANTHROPIC_VISION_MODEL ?? "claude-haiku-4-5-20251001";
@@ -200,6 +201,11 @@ Output exactly those two sections with those exact headers. No preamble.`;
           ],
         },
       ],
+    });
+    void logSpend({
+      feature: "knowledge-upload",
+      model: VISION_MODEL,
+      ...extractUsage(message),
     });
 
     // Find the first text block in the response.

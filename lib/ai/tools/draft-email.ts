@@ -32,6 +32,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { logUmbrellaActivity } from "@/lib/activity/log";
+import { logSpend, extractUsage } from "../spend-log";
 import { listFactsForUser, renderFactsForPrompt } from "@/lib/ai/facts";
 import type { ScoredCustomerV2 } from "@/lib/customer/types";
 import type { BeaconTool, ToolExecutionContext, ToolResult } from "./index";
@@ -225,6 +226,11 @@ Draft the email now. JSON only.`;
         max_tokens: MAX_TOKENS,
         system,
         messages: [{ role: "user", content: userPrompt }],
+      });
+      void logSpend({
+        feature: "draft-email",
+        model: DRAFT_MODEL,
+        ...extractUsage(res),
       });
 
       const text = res.content

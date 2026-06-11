@@ -12,6 +12,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Bundle } from "@/lib/post-payment/validator/bundle";
 import { PROMPT_MD } from "./prompt";
+// META-A5 — log post-payment evaluator spend. This is the most expensive
+// per-call workload (Sonnet, full reports, ~$4/customer) so the dashboard
+// must track it precisely.
+import { logSpend, extractUsage } from "@/lib/ai/spend-log";
 
 // Default model when no per-request override is supplied. Set
 // ANTHROPIC_MODEL=claude-sonnet-4-6 (or opus) in Vercel envs. Sonnet is the
@@ -444,6 +448,16 @@ async function callOnce(systemPrompt: string, userPrompt: string, model: string)
       `cache=${cacheHit ? "HIT" : "MISS"} ` +
       `tokens=in:${inputTok}+cache_read:${cacheRead}+cache_write:${cacheWrite}/out:${outputTok}`
     );
+    // META-A5 — post-payment evaluator spend (the most expensive per-call
+    // workload in the app).
+    void logSpend({
+      feature: "post-payment-evaluator",
+      model,
+      input_tokens: inputTok,
+      output_tokens: outputTok,
+      cache_read_tokens: cacheRead,
+      cache_creation_tokens: cacheWrite,
+    });
 
     let markdown = "";
     let toolInput: any = null;

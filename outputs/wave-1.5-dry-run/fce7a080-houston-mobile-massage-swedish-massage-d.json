@@ -1,0 +1,51 @@
+{
+  "entity_id": "fce7a080-3457-4427-aeb5-806caf7f8cf8",
+  "bizname": "Houston Mobile Massage - Swedish massage, Deep Tissue Massage, Gua Shua in Houston, TX",
+  "customer_id": "Azqc6hUsTFeHr3Rrw",
+  "am_count": 1,
+  "total_chars": 251,
+  "notes": [
+    {
+      "am_name": "Sudha Goutami",
+      "updated_at": "2026-05-18T21:25:41.419Z",
+      "note": "I tried reaching out to the SP through calls and texts, but she is unresponsive. There was a meeting scheduled last week with the SP where the SP did not join and did not respond to the app chat message. Will re-try reaching out to her and follow up. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 3149,
+    "input_tokens": 2285,
+    "output_tokens": 405,
+    "candidate_facts": [
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Service Provider is unresponsive to calls, texts, and app chat messages; missed scheduled meeting without notice or explanation.",
+        "source_quote": "I tried reaching out to the SP through calls and texts, but she is unresponsive. There was a meeting scheduled last week with the SP where the SP did not join and did not respond to the app chat message.",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Explicitly stated across multiple communication channels and a missed meeting"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_severity",
+        "value": "High",
+        "source_quote": "I tried reaching out to the SP through calls and texts, but she is unresponsive. There was a meeting scheduled last week with the SP where the SP did not join and did not respond to the app chat message.",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Pattern of unresponsiveness across multiple channels plus missed meeting indicates serious engagement issue"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Houston Mobile Massage customer has a critical Service Provider engagement issue with unresponsiveness across all communication channels and a missed meeting."
+    }
+  },
+  "validation": {
+    "total": 2,
+    "valid": 2,
+    "invalid": 0
+  },
+  "error": null
+}

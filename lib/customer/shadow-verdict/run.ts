@@ -16,6 +16,9 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { loadCustomer360Context } from "@/lib/ai/context-loaders";
+// META-A5 — spend instrumentation. SV cron is disabled today (SV-DOWN-1)
+// but the manual refresh endpoint still runs this path.
+import { logSpend, extractUsage } from "@/lib/ai/spend-log";
 import { SHADOW_VERDICT_SYSTEM_PROMPT, buildUserPrompt } from "./prompt";
 import { upsertShadowVerdict } from "./repo";
 import {
@@ -201,6 +204,11 @@ async function classifyEntity(
       max_tokens: MAX_TOKENS,
       system: SHADOW_VERDICT_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
+    });
+    void logSpend({
+      feature: "shadow-verdict",
+      model: MODEL,
+      ...extractUsage(res),
     });
     const text = res.content
       .filter((b) => b.type === "text")

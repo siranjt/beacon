@@ -27,6 +27,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { CandidateMessage, RiskCategory } from "./types";
 import { RISK_CATEGORIES } from "./types";
+// META-A5 — spend instrumentation.
+import { logSpend, extractUsage } from "@/lib/ai/spend-log";
 
 const MODEL = process.env.ANTHROPIC_NK_MODEL ?? "claude-haiku-4-5-20251001";
 const MAX_TOKENS_PER_BATCH = 2000;
@@ -161,6 +163,14 @@ async function classifyBatch(
       max_tokens: MAX_TOKENS_PER_BATCH,
       system: CLASSIFY_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
+    });
+    // META-A5 — NK classify is one of the high-volume crons. Track its
+    // burn separately from the regex-fallback path (instrumented elsewhere
+    // if/when it makes Anthropic calls).
+    void logSpend({
+      feature: "negative-keyword-classify",
+      model: MODEL,
+      ...extractUsage(res),
     });
     const text = res.content
       .filter((b) => b.type === "text")

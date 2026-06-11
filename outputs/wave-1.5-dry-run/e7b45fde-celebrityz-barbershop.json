@@ -1,0 +1,60 @@
+{
+  "entity_id": "e7b45fde-5084-4667-940f-908b9cceaa1d",
+  "bizname": "Celebrityz Barbershop",
+  "customer_id": "cus_QZsLOmGGygvs4X",
+  "am_count": 1,
+  "total_chars": 179,
+  "notes": [
+    {
+      "am_name": "Sakshi Mamgain",
+      "updated_at": "2026-05-18T18:29:44.607Z",
+      "note": "Client does not like to get in touch on calls and neither on message. He is on a WhatsApp group. Whenever he has any issue, he will reach out to us. This is the client behaviour. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 3247,
+    "input_tokens": 2254,
+    "output_tokens": 460,
+    "candidate_facts": [
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "preferred_channel",
+        "value": "WhatsApp group",
+        "source_quote": "He is on a WhatsApp group.",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicitly stated as the channel where client is reachable"
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "channel_avoid",
+        "value": "Calls and direct messages",
+        "source_quote": "Client does not like to get in touch on calls and neither on message.",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicitly stated that client avoids calls and direct messages"
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "response_pattern",
+        "value": "Client reaches out proactively when issues arise rather than responding to outreach",
+        "source_quote": "Whenever he has any issue, he will reach out to us. This is the client behaviour.",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicitly described as reactive/proactive engagement pattern"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Celebrityz Barbershop is a client with strong communication preferences—prefers WhatsApp group interaction, avoids calls/DMs, and initiates contact only when experiencing issues."
+    }
+  },
+  "validation": {
+    "total": 3,
+    "valid": 3,
+    "invalid": 0
+  },
+  "error": null
+}

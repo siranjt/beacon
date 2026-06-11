@@ -1,0 +1,61 @@
+{
+  "entity_id": "96cacad9-1b6c-4c28-b0eb-04cfe1b88b99",
+  "bizname": "Habibti Salon - Hair and Beauty | Braiding",
+  "customer_id": "AzZkPWV4ceI0yTJW",
+  "am_count": 1,
+  "total_chars": 277,
+  "notes": [
+    {
+      "am_name": "Sakshi Mamgain",
+      "updated_at": "2026-05-18T18:28:21.467Z",
+      "note": "The client is not very happy with Zoca's services, as she has paid twice and her lead prediction is low, and she also gets very few leads through Zoca. That is why she is not that happy with Zoca's services. There will be a proactive approach to downgrading the subscription. \n"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4192,
+    "input_tokens": 2285,
+    "output_tokens": 538,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "High risk of churn or downgrade due to dissatisfaction with lead volume and prediction accuracy.",
+        "source_quote": "The client is not very happy with Zoca's services, as she has paid twice and her lead prediction is low, and she also gets very few leads through Zoca.",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicit statement of unhappiness with service performance and low lead generation."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "risk_description": "Client reporting very few leads from Zoca despite payment; low lead prediction accuracy.",
+        "field_name": "risk_description",
+        "value": "Very few leads coming through Zoca despite paid subscriptions; lead prediction accuracy is low.",
+        "source_quote": "she has paid twice and her lead prediction is low, and she also gets very few leads through Zoca",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicit performance issue and root cause of dissatisfaction."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "retention_strategy",
+        "value": "Proactive approach planned to offer downgrade options rather than risk full churn.",
+        "source_quote": "There will be a proactive approach to downgrading the subscription.",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Clear statement of intended retention tactic."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "High-risk renewal account (Habibti Salon) experiencing dissatisfaction with Zoca's lead generation performance; AM planning proactive downgrade offer to retain partial relationship."
+    }
+  },
+  "validation": {
+    "total": 3,
+    "valid": 3,
+    "invalid": 0
+  },
+  "error": null
+}

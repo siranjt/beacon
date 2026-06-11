@@ -1,0 +1,51 @@
+{
+  "entity_id": "5265074e-b4d5-46c6-8503-bfb2c3e891fc",
+  "bizname": "Contornos Studio | Eyebrows, Lashes & Facials",
+  "customer_id": "AzqfgpUqNCWTH3KOs",
+  "am_count": 1,
+  "total_chars": 214,
+  "notes": [
+    {
+      "am_name": "Sudha Goutami",
+      "updated_at": "2026-05-25T19:58:30.709Z",
+      "note": "Spoke to the SP, check-in call done. Asked her to work on reviews, as she hasn't received any reviews for the month of May so far. The SP told that she is not keeping well and will reach out once she feels better. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 2947,
+    "input_tokens": 2275,
+    "output_tokens": 345,
+    "candidate_facts": [
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Service provider not keeping well and unavailable; no reviews received in May.",
+        "source_quote": "The SP told that she is not keeping well and will reach out once she feels better.",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Explicitly stated; clear operational risk due to SP unavailability."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "performance_context",
+        "field_name": "review_velocity_pattern",
+        "value": "No reviews received in May 2026.",
+        "source_quote": "she hasn't received any reviews for the month of May so far",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Explicitly stated; concrete review data point."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Beauty studio (eyebrows, lashes, facials) currently experiencing service provider health issue affecting review generation; check-in call conducted, awaiting SP recovery."
+    }
+  },
+  "validation": {
+    "total": 2,
+    "valid": 2,
+    "invalid": 0
+  },
+  "error": null
+}

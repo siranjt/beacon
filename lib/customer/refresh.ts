@@ -1838,6 +1838,50 @@ export async function runStageAAndStore(snapshotDate?: string): Promise<{
     console.warn(`[stage-a G3] diff against yesterday failed: ${msg}`);
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // META-A2 — Auto-bootstrap Keeper facts for new entity_ids from BaseSheet.
+  // Proactive complement to META-A1 (on-demand fallback tool). Compounds:
+  // A2 lands the systems-of-record facts immediately so Beam never has to
+  // call A1 for already-bootstrapped customers. Idempotent at write time
+  // (skips existing slots) so a re-fire of Stage A is a no-op.
+  //
+  // This runs AFTER the G3 background trigger fires from the route layer
+  // (route wraps `runTargetedRefreshForNewCustomers` in waitUntil), so the
+  // two paths don't double up — G3 fills SIGNALS, A2 fills FACTS.
+  //
+  // Soft-fail: if bootstrap throws, log + Slack-alert, never crash the cron.
+  // ─────────────────────────────────────────────────────────────────────────
+  if (newEntityIds.length > 0) {
+    try {
+      const { bootstrapKeeperForEntities } = await import(
+        "@/lib/brain/metabase-bootstrap"
+      );
+      const tBoot = Date.now();
+      const bootResult = await bootstrapKeeperForEntities(newEntityIds);
+      const bootMs = Date.now() - tBoot;
+      console.log(
+        `[stage-a A2] keeper bootstrap: ${bootResult.facts_written} facts written, ${bootResult.facts_skipped_idempotent} skipped (idempotent), ${bootResult.facts_failed} failed across ${bootResult.entities_processed} entities (${bootMs}ms)`,
+      );
+      // Slack alert when > 5 entities bootstrapped (per spec) — high-signal
+      // event worth surfacing to ops, low-noise for routine 1-2 customer days.
+      if (bootResult.entities_processed > 5) {
+        postSlack({
+          text: `:keeper: *Keeper bootstrap*: wrote ${bootResult.facts_written} facts for ${bootResult.entities_processed} new customers`,
+        }).catch(() => {
+          /* never crash on Slack hiccups */
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[stage-a A2] keeper bootstrap failed: ${msg}`);
+      postSlack({
+        text: `:warning: *Keeper bootstrap failed* for ${newEntityIds.length} new customer(s): ${msg.slice(0, 200)}`,
+      }).catch(() => {
+        /* never crash on Slack hiccups */
+      });
+    }
+  }
+
   // Wave-3 — bust the Beam context cache once new snapshot data has
   // landed. The 5-min TTL is the safety net; explicit invalidation here
   // ensures the next Beam invocation sees fresh data immediately instead

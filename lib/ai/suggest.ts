@@ -44,6 +44,8 @@ import { listFactsForUser, renderFactsForPrompt } from "./facts";
 import { getRoleForEmail } from "@/lib/customer/config";
 import { getCachedContext, makeCacheKey } from "./context-cache";
 import { todaySnapshotDate } from "@/lib/customer/pipeline-state";
+// META-A5 — log spend for every suggest call.
+import { logSpend, extractUsage } from "./spend-log";
 
 const MODEL = process.env.ANTHROPIC_SUGGEST_MODEL ?? "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 1500;
@@ -399,6 +401,15 @@ async function computeSuggestion(
       max_tokens: MAX_TOKENS,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
+    });
+    // META-A5 — record this suggest call's spend.
+    const usage = extractUsage(res);
+    void logSpend({
+      feature: "suggest",
+      model: MODEL,
+      ...usage,
+      scope: scope.kind,
+      email,
     });
     const text = res.content
       .filter((b) => b.type === "text")

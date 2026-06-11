@@ -1,0 +1,69 @@
+{
+  "entity_id": "127d40cf-7e76-434c-9eb8-2546f1a52c1a",
+  "bizname": "Sadjo African Hair Braiding",
+  "customer_id": "cus_Ok8x3ENQRzHfo9",
+  "am_count": 1,
+  "total_chars": 293,
+  "notes": [
+    {
+      "am_name": "Siddhi Shetty",
+      "updated_at": "2026-06-03T16:58:45.338Z",
+      "note": "SP is a Chrone client - Migration is scheduled for Monday - SP was busy. She didn't have the access to her profile and we have claimed it for her and she has received a post card for the verification. Meeting set for tomorrow around 9am. SP has asked to reschedule the call as she was occupied"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4733,
+    "input_tokens": 2278,
+    "output_tokens": 606,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "integration",
+        "field_name": "platform",
+        "value": "Chrone",
+        "source_quote": "SP is a Chrone client",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicitly stated current platform"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "integration",
+        "field_name": "integration_notes",
+        "value": "Migration from Chrone is scheduled for Monday",
+        "source_quote": "Migration is scheduled for Monday",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit migration timeline stated"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Profile access was initially unavailable; Zoca claimed profile on customer's behalf and sent verification postcard",
+        "source_quote": "She didn't have the access to her profile and we have claimed it for her and she has received a post card for the verification",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit statement of access issue and resolution step taken"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "next_call_agenda",
+        "field_name": "agenda_item",
+        "value": "Onboarding/migration call rescheduled; originally set for next day around 9am but customer asked to reschedule due to being occupied",
+        "source_quote": "Meeting set for tomorrow around 9am. SP has asked to reschedule the call as she was occupied",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Clear statement of meeting and reschedule request"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Sadjo African Hair Braiding is a Chrone-platform customer mid-migration to Zoca with profile access issues being resolved; owner/operator is occupied and has rescheduled onboarding call."
+    }
+  },
+  "validation": {
+    "total": 4,
+    "valid": 4,
+    "invalid": 0
+  },
+  "error": null
+}

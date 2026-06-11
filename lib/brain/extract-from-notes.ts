@@ -28,6 +28,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSql } from "../customer/postgres";
 import { readLatestSnapshotV2 } from "../customer/postgres";
 import { writeBrainFact, SemanticConflictError } from "./repo";
+// META-A5 — spend instrumentation.
+import { logSpend, extractUsage } from "../ai/spend-log";
 import {
   FIELD_CATALOG,
   categoryForSubcategory,
@@ -396,6 +398,14 @@ export async function extractAndPersistForEntity(
   }
   result.haiku_input_tokens = resp.usage?.input_tokens ?? null;
   result.haiku_output_tokens = resp.usage?.output_tokens ?? null;
+  // META-A5 — record per-customer extract spend so the dashboard can show
+  // how the brain extraction cron loads up vs the interactive copilot.
+  void logSpend({
+    feature: "extract-notes",
+    model: HAIKU_MODEL,
+    ...extractUsage(resp),
+    scope: entity_id,
+  });
 
   const firstBlock = resp.content?.[0];
   const text = firstBlock && firstBlock.type === "text" ? firstBlock.text : "";

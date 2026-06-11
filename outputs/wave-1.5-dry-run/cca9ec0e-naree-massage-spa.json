@@ -1,0 +1,87 @@
+{
+  "entity_id": "cca9ec0e-a537-4cdd-bdaa-c74974cfd306",
+  "bizname": "Naree Massage & Spa",
+  "customer_id": "AzqPyuV37Dvpv6UB",
+  "am_count": 1,
+  "total_chars": 350,
+  "notes": [
+    {
+      "am_name": "Anu Srivastava",
+      "updated_at": "2026-05-22T18:31:13.162Z",
+      "note": "The SP has requested to pause the services as she is having shortage of staff and financial issues. We already downgraded her previously. The SP has been getting leads consistently and also booking the leads. So the product is clearly working here. Spoke to Rinitha about this specific account, she has given me the approval to off board the account."
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 5441,
+    "input_tokens": 2280,
+    "output_tokens": 804,
+    "candidate_facts": [
+      {
+        "topic_category": "identity",
+        "topic_subcategory": "owner_info",
+        "field_name": "other",
+        "value": "Service provider (SP) is female and operates the business.",
+        "source_quote": "The SP has requested to pause the services as she is having shortage of staff",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Explicitly stated; pronoun 'she' identifies SP gender"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Service provider experiencing staff shortage and financial difficulties.",
+        "source_quote": "she is having shortage of staff and financial issues",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Explicitly stated risk factors"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "Churning",
+        "source_quote": "The SP has requested to pause the services",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Service pause requested; approval given to offboard account"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "feature_usage",
+        "field_name": "features_active",
+        "value": "Lead generation and booking capture actively in use.",
+        "source_quote": "The SP has been getting leads consistently and also booking the leads. So the product is clearly working here.",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Explicitly states consistent lead flow and booking success"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_decision_makers",
+        "value": "Rinitha approved offboarding decision.",
+        "source_quote": "Spoke to Rinitha about this specific account, she has given me the approval to off board the account.",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Explicitly named as decision-maker for account offboarding"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "other",
+        "value": "Account previously downgraded due to customer constraints.",
+        "source_quote": "We already downgraded her previously.",
+        "source_am_name": "Anu Srivastava",
+        "confidence_note": "Explicitly states prior downgrade action"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Naree Massage & Spa is a churning massage spa customer whose product (lead generation and booking) was working well, but SP faces staffing and financial constraints; account approval given for offboarding."
+    }
+  },
+  "validation": {
+    "total": 6,
+    "valid": 6,
+    "invalid": 0
+  },
+  "error": null
+}

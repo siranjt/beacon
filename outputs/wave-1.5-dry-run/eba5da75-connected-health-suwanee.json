@@ -1,0 +1,51 @@
+{
+  "entity_id": "eba5da75-2981-4495-b10c-2f11baf6317c",
+  "bizname": "Connected Health Suwanee",
+  "customer_id": "6omHHVEDdhUk2zV",
+  "am_count": 1,
+  "total_chars": 199,
+  "notes": [
+    {
+      "am_name": "Shruti Sinha",
+      "updated_at": "2026-05-18T19:12:39.677Z",
+      "note": "Just had a discussion with the SP about reviews, and he should be uploading pictures soon because it's been a long time since the pictures have not been uploaded. Had a check-in call with him today. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 6334,
+    "input_tokens": 2250,
+    "output_tokens": 332,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "performance_context",
+        "field_name": "other",
+        "value": "SP has not uploaded pictures to reviews for an extended period; pictures upload expected soon.",
+        "source_quote": "he should be uploading pictures soon because it's been a long time since the pictures have not been uploaded",
+        "source_am_name": "Shruti Sinha",
+        "confidence_note": "explicit statement about review content gap and planned action"
+      },
+      {
+        "topic_category": "relationship",
+        "topic_subcategory": "engagement",
+        "field_name": "other",
+        "value": "Check-in call conducted with SP on 2026-05-18.",
+        "source_quote": "Had a check-in call with him today",
+        "source_am_name": "Shruti Sinha",
+        "confidence_note": "explicit meeting occurrence on note date"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Connected Health Suwanee has a known operational gap in review photo management; SP recently checked in and committed to uploading pictures soon."
+    }
+  },
+  "validation": {
+    "total": 2,
+    "valid": 2,
+    "invalid": 0
+  },
+  "error": null
+}

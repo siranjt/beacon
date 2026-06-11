@@ -1,0 +1,60 @@
+{
+  "entity_id": "68fef837-6013-462c-8797-f7e6e3142108",
+  "bizname": "Your New Barber",
+  "customer_id": "6obVqUqklbuY77XP",
+  "am_count": 1,
+  "total_chars": 241,
+  "notes": [
+    {
+      "am_name": "Bikash Mishra",
+      "updated_at": "2026-06-03T17:02:39.584Z",
+      "note": "We have quoted a restructured price, and we need to have a meeting with all of his barbers to address what needs to be done to improve the business further. We are waiting for a response from the SPN to get back to us regarding the meeting. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 3368,
+    "input_tokens": 2256,
+    "output_tokens": 460,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "other",
+        "value": "A restructured price has been quoted to the customer.",
+        "source_quote": "We have quoted a restructured price",
+        "source_am_name": "Bikash Mishra",
+        "confidence_note": "Explicitly stated pricing action in progress."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "next_call_agenda",
+        "field_name": "agenda_item",
+        "value": "Meeting with all barbers to address what needs to be done to improve the business further.",
+        "source_quote": "we need to have a meeting with all of his barbers to address what needs to be done to improve the business further",
+        "source_am_name": "Bikash Mishra",
+        "confidence_note": "Explicitly stated planned meeting agenda."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "next_call_agenda",
+        "field_name": "other",
+        "value": "Waiting for SPN response to schedule the meeting with barbers.",
+        "source_quote": "We are waiting for a response from the SPN to get back to us regarding the meeting",
+        "source_am_name": "Bikash Mishra",
+        "confidence_note": "Explicitly stated blocking condition for meeting confirmation."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "A barber shop with multiple staff (barbers) is undergoing a pricing restructure and requires a team meeting to discuss business improvement; meeting is pending SPN confirmation."
+    }
+  },
+  "validation": {
+    "total": 3,
+    "valid": 3,
+    "invalid": 0
+  },
+  "error": null
+}

@@ -1,0 +1,51 @@
+{
+  "entity_id": "4ed0f5bc-4859-45e2-8aef-0c61220fcbc7",
+  "bizname": "Patrick Einwechter & Son, Inc",
+  "customer_id": "16CVMMUz3vlIM39wB",
+  "am_count": 1,
+  "total_chars": 224,
+  "notes": [
+    {
+      "am_name": "Sakshi Mamgain",
+      "updated_at": "2026-05-18T18:33:00.882Z",
+      "note": "I have tried to reach out to the client, but the client he does not have the manager access, therefore he can't see the app. His partner has the access, and he's still waiting for his partner to come back from the vacation. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 3632,
+    "input_tokens": 2261,
+    "output_tokens": 385,
+    "candidate_facts": [
+      {
+        "topic_category": "identity",
+        "topic_subcategory": "decision_makers",
+        "field_name": "secondary_contacts",
+        "value": "Partner holds manager access to the app; primary contact lacks manager access.",
+        "source_quote": "His partner has the access, and he's still waiting for his partner to come back from the vacation.",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicitly states partner has access and primary contact does not; clear secondary contact structure."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Primary contact cannot access the app due to lack of manager access; dependent on partner's availability.",
+        "source_quote": "the client he does not have the manager access, therefore he can't see the app. His partner has the access, and he's still waiting for his partner to come back from the vacation.",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Clear blocker to engagement: access is gated on unavailable partner; operational friction point."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Primary contact is blocked from app access and cannot be reached until partner returns from vacation; access permission and availability are critical blockers."
+    }
+  },
+  "validation": {
+    "total": 2,
+    "valid": 2,
+    "invalid": 0
+  },
+  "error": null
+}

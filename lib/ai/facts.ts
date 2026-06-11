@@ -15,6 +15,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getSql } from "@/lib/customer/postgres";
 import { getRecentCrossScope } from "./memory";
+// META-A5 — spend log helper (fire-and-forget).
+import { logSpend, extractUsage } from "./spend-log";
 
 /**
  * Phase E-12 — expanded category taxonomy.
@@ -469,6 +471,13 @@ export async function runExtractionForUser(email: string): Promise<{
           content: `Here are the user's last ${turns.length} Beacon AI conversation turns from the past ${EXTRACTION_WINDOW_DAYS} days. Extract stable facts about them following the rules above. Output ONLY the JSON array — no preamble, no markdown fences.\n\n${transcript}`,
         },
       ],
+    });
+    // META-A5 — instrumented.
+    void logSpend({
+      feature: "facts-extract",
+      model: EXTRACTION_MODEL,
+      ...extractUsage(res),
+      email,
     });
     const text = res.content
       .filter((b) => b.type === "text")

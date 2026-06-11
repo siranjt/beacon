@@ -20,6 +20,8 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import type { CommsFeedRow, CommsFeedChannel } from "./comms-feed-v2";
+// META-A5 — spend instrumentation.
+import { logSpend, extractUsage } from "@/lib/ai/spend-log";
 
 export type Sentiment = "warm" | "neutral" | "tense" | "escalating";
 export type InitiatorPattern = "mostly_us" | "mostly_them" | "balanced";
@@ -284,6 +286,13 @@ async function callHaikuOnce(
     max_tokens: PERSPECTIVE_MAX_TOKENS,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
+  });
+  // META-A5 — comms-perspective is per-entity; we don't have a useful
+  // email/scope to attach here, so we leave them null.
+  void logSpend({
+    feature: "comms-perspective",
+    model: PERSPECTIVE_MODEL,
+    ...extractUsage(res),
   });
   const text = res.content
     .filter((b) => b.type === "text")

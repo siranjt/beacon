@@ -1,0 +1,69 @@
+{
+  "entity_id": "e6e817f6-4779-460f-b229-8ed7e72bcc2d",
+  "bizname": "Calm Minds Matter | Reiki Practitioner, Holistic Wellness Life Coach",
+  "customer_id": "cus_QjduBAATOmOpDX",
+  "am_count": 1,
+  "total_chars": 315,
+  "notes": [
+    {
+      "am_name": "Siddhi Shetty",
+      "updated_at": "2026-06-02T16:08:42.100Z",
+      "note": "High churn risk - SP is highly dissatisfied with how things were working on the profile. We need to work on the profile as there are no keyword to help her business. SP doesn’t use the landing page as she is not happy with it. Sent her the landing page link - she has not reviewed it yet - did drop her a text today"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4506,
+    "input_tokens": 2294,
+    "output_tokens": 596,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "High",
+        "source_quote": "High churn risk",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicitly stated risk level"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "SP is highly dissatisfied with profile configuration; no keywords present to help business visibility; SP not using landing page due to dissatisfaction with it.",
+        "source_quote": "SP is highly dissatisfied with how things were working on the profile. We need to work on the profile as there are no keyword to help her business. SP doesn't use the landing page as she is not happy with it.",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Multiple explicit statements of dissatisfaction and operational blockers"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "performance_context",
+        "field_name": "gbp_setup_quality",
+        "value": "Poor — profile lacks keywords and optimization.",
+        "source_quote": "there are no keyword to help her business",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit statement of missing keywords in profile"
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "other",
+        "value": "AM reached out via text message to follow up on landing page review.",
+        "source_quote": "did drop her a text today",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit communication method used"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "High-risk wellness/reiki practitioner account with critical profile configuration issues (missing keywords, poor landing page) causing SP dissatisfaction and potential churn; AM actively working to remediate."
+    }
+  },
+  "validation": {
+    "total": 4,
+    "valid": 4,
+    "invalid": 0
+  },
+  "error": null
+}

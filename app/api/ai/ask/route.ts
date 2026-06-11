@@ -62,6 +62,9 @@ import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
 // citation lookup is merged alongside the scope-specific one.
 import { searchDocs } from "@/lib/ai/knowledge";
 import { buildKnowledgeCitations } from "@/lib/ai/citations";
+// META-A5 — log every Anthropic call's spend (fire-and-forget). Drives the
+// /admin/anthropic-spend dashboard. Never blocks the SSE response.
+import { logSpend } from "@/lib/ai/spend-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -597,6 +600,17 @@ export async function POST(req: NextRequest) {
               `cache_read=${cacheRead} output=${outputTok} ` +
               `cache=${cacheRead > 0 ? "HIT" : cacheWrite > 0 ? "WRITE" : "MISS"}`,
           );
+          // META-A5 — fire-and-forget spend insert.
+          void logSpend({
+            feature: "ask",
+            model: MODEL,
+            input_tokens: inputTok,
+            output_tokens: outputTok,
+            cache_read_tokens: cacheRead,
+            cache_creation_tokens: cacheWrite,
+            scope: sKey,
+            email,
+          });
         } catch {
           // metric logging is best-effort — never break the response on it.
         }

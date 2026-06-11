@@ -1,0 +1,69 @@
+{
+  "entity_id": "8819ec3f-7c6e-4328-86fe-1b2b98f51ff0",
+  "bizname": "Waxflower spa, Eyebrows Threading, Laser Hair Removal",
+  "customer_id": "16Af9wUyUPe3UUQt",
+  "am_count": 1,
+  "total_chars": 221,
+  "notes": [
+    {
+      "am_name": "Sudha Goutami",
+      "updated_at": "2026-05-25T19:53:15.118Z",
+      "note": "Spoke to the SP. Check-in call done. She is interested in Zoca's scheduling. Schedule a meeting tomorrow at 1:00 p.m. Eastern Standard Time, and also she wanted to add a new service on the website. Guided her on the same "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 4526,
+    "input_tokens": 2282,
+    "output_tokens": 605,
+    "candidate_facts": [
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "best_time_to_reach",
+        "value": "1:00 p.m. Eastern Standard Time",
+        "source_quote": "Schedule a meeting tomorrow at 1:00 p.m. Eastern Standard Time",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Explicit meeting time preference stated."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "feature_usage",
+        "field_name": "features_active",
+        "value": "Scheduling feature is of interest to customer.",
+        "source_quote": "She is interested in Zoca's scheduling",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Clear statement of feature interest."
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "onboarding",
+        "field_name": "onboarding_friction_points",
+        "value": "Customer needed guidance on adding a new service to the website.",
+        "source_quote": "she wanted to add a new service on the website. Guided her on the same",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Customer required onboarding support for website service management."
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "next_call_agenda",
+        "field_name": "agenda_item",
+        "value": "Scheduling feature demo and website service addition support.",
+        "source_quote": "She is interested in Zoca's scheduling. Schedule a meeting tomorrow at 1:00 p.m. Eastern Standard Time, and also she wanted to add a new service on the website",
+        "source_am_name": "Sudha Goutami",
+        "confidence_note": "Upcoming meeting agenda explicitly described."
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Waxflower spa (beauty/aesthetics multi-service) is early in engagement, interested in scheduling features, and requires guidance on website service management; scheduled for follow-up call."
+    }
+  },
+  "validation": {
+    "total": 4,
+    "valid": 4,
+    "invalid": 0
+  },
+  "error": null
+}

@@ -1,0 +1,78 @@
+{
+  "entity_id": "adbaf37a-f501-445a-a5bf-413be2676935",
+  "bizname": "Manny - Online & Personal Fitness Trainer",
+  "customer_id": "cus_S1lYI1OCuSkaDc",
+  "am_count": 1,
+  "total_chars": 277,
+  "notes": [
+    {
+      "am_name": "Sakshi Mamgain",
+      "updated_at": "2026-05-18T18:32:12.681Z",
+      "note": "Client only takes the website from us, and the client does not like to be called or texted. The client has been looking for an alternative because the client wants to own the website and not just be hosted with us. That is the reason there has been no contact with the client. "
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 5076,
+    "input_tokens": 2267,
+    "output_tokens": 733,
+    "candidate_facts": [
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "tech_stack",
+        "field_name": "website_url",
+        "value": "Client uses Zoca for website hosting/management.",
+        "source_quote": "Client only takes the website from us",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicitly stated as primary product used"
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "channel_avoid",
+        "value": "Client does not like to be called or texted.",
+        "source_quote": "the client does not like to be called or texted",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicitly stated communication preference"
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "competitive_context",
+        "field_name": "switch_risks",
+        "value": "Client wants to own the website and not be hosted; actively looking for alternative platform.",
+        "source_quote": "the client has been looking for an alternative because the client wants to own the website and not just be hosted with us",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Explicitly stated as reason for seeking alternatives"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "High churn risk: client fundamentally wants website ownership model rather than SaaS hosting model; actively shopping alternatives.",
+        "source_quote": "the client has been looking for an alternative because the client wants to own the website and not just be hosted with us",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Clear statement of product-market misalignment driving alternative search"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "High",
+        "source_quote": "the client has been looking for an alternative because the client wants to own the website and not just be hosted with us. That is the reason there has been no contact with the client",
+        "source_am_name": "Sakshi Mamgain",
+        "confidence_note": "Client actively seeking alternatives due to fundamental product mismatch"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Online fitness trainer using Zoca website hosting but fundamentally misaligned on ownership model; actively seeking self-hosted alternatives and has gone silent due to communication preference and churn intent."
+    }
+  },
+  "validation": {
+    "total": 5,
+    "valid": 5,
+    "invalid": 0
+  },
+  "error": null
+}

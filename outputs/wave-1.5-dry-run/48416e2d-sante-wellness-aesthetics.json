@@ -1,0 +1,87 @@
+{
+  "entity_id": "48416e2d-9751-4fce-89f0-d2f26266b686",
+  "bizname": "Sante Wellness & Aesthetics",
+  "customer_id": "AzZhQoUyy0eKP14e",
+  "am_count": 1,
+  "total_chars": 417,
+  "notes": [
+    {
+      "am_name": "Siddhi Shetty",
+      "updated_at": "2026-06-02T15:43:47.341Z",
+      "note": "The comms is through WhatsApp - SP is highly unresponsive. The major concern is that the access to their profile is with the previous owner. I'm constantly trying to get in touch to resolve this concern. We have to give 1 month free to the client. Also the business shows permanently closed. SP has requested to cancel the services - created a churn ticket already and we have refunded the recent subscription as well"
+    }
+  ],
+  "extraction": {
+    "elapsed_ms": 5244,
+    "input_tokens": 2302,
+    "output_tokens": 784,
+    "candidate_facts": [
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "preferred_channel",
+        "value": "WhatsApp",
+        "source_quote": "The comms is through WhatsApp",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicitly stated communication channel"
+      },
+      {
+        "topic_category": "behavioral",
+        "topic_subcategory": "comms_preference",
+        "field_name": "response_pattern",
+        "value": "Highly unresponsive",
+        "source_quote": "SP is highly unresponsive",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Clear statement of communication responsiveness"
+      },
+      {
+        "topic_category": "concerns",
+        "topic_subcategory": "latent_risk",
+        "field_name": "risk_description",
+        "value": "Profile access is with the previous owner, not current stakeholder",
+        "source_quote": "the access to their profile is with the previous owner",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit operational blocker preventing customer control"
+      },
+      {
+        "topic_category": "identity",
+        "topic_subcategory": "business_profile",
+        "field_name": "other",
+        "value": "Business is permanently closed.",
+        "source_quote": "the business shows permanently closed",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Clear statement of business operational status"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "renewal_risk_level",
+        "value": "Churned",
+        "source_quote": "SP has requested to cancel the services - created a churn ticket already and we have refunded the recent subscription as well",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit churn: cancellation requested, churn ticket created, refund issued"
+      },
+      {
+        "topic_category": "operational",
+        "topic_subcategory": "renewal",
+        "field_name": "other",
+        "value": "Customer given 1 month free service as retention/compensation effort.",
+        "source_quote": "We have to give 1 month free to the client",
+        "source_am_name": "Siddhi Shetty",
+        "confidence_note": "Explicit mention of promotional credit being applied"
+      }
+    ],
+    "invalid_candidates": [],
+    "extraction_meta": {
+      "total_notes_processed": 1,
+      "notes_skipped_reason": "",
+      "extractor_summary": "Sante Wellness & Aesthetics is a churned customer with a permanently closed business; critical blocker is profile access held by previous owner, and SP is unresponsive despite retention efforts including 1-month free credit."
+    }
+  },
+  "validation": {
+    "total": 6,
+    "valid": 6,
+    "invalid": 0
+  },
+  "error": null
+}

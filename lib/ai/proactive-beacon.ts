@@ -10,6 +10,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { logSpend, extractUsage } from "./spend-log";
 import { AM_EMAILS, AM_SLACK_IDS } from "@/lib/customer/config";
 import { readLatestSnapshotV2, readSnapshotByDate } from "@/lib/customer/postgres";
 import { resolveAmNameForEmail } from "@/lib/customer/auth-mapping";
@@ -213,6 +214,11 @@ async function callHaiku(
   system: string,
   user: string,
   maxTokens: number,
+  /**
+   * META-A5 — pass through "monday-briefing" / "daily-digest" as the
+   * feature label so the dashboard breaks the two crons apart.
+   */
+  feature: "monday-briefing" | "daily-digest" = "daily-digest",
 ): Promise<{ text: string } | { error: string }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return { error: "ANTHROPIC_API_KEY not configured" };
@@ -223,6 +229,11 @@ async function callHaiku(
       max_tokens: maxTokens,
       system,
       messages: [{ role: "user", content: user }],
+    });
+    void logSpend({
+      feature,
+      model: PROACTIVE_MODEL,
+      ...extractUsage(res),
     });
     const text = res.content
       .filter((b): b is { type: "text"; text: string } => b.type === "text")
@@ -418,7 +429,12 @@ export async function runMondayBriefingForAm(
     factsBlock,
     amMissPayment,
   );
-  const llm = await callHaiku(system, user, MONDAY_BRIEFING_PROMPT_MAX_TOKENS);
+  const llm = await callHaiku(
+    system,
+    user,
+    MONDAY_BRIEFING_PROMPT_MAX_TOKENS,
+    "monday-briefing",
+  );
   if ("error" in llm) {
     return {
       kind: "monday_briefing",
@@ -862,7 +878,12 @@ export async function runDailyDigestForAm(
     factsBlock,
     amMissPayment,
   );
-  const llm = await callHaiku(system, user, DAILY_DIGEST_PROMPT_MAX_TOKENS);
+  const llm = await callHaiku(
+    system,
+    user,
+    DAILY_DIGEST_PROMPT_MAX_TOKENS,
+    "daily-digest",
+  );
   if ("error" in llm) {
     return {
       kind: "daily_digest",
