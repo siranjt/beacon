@@ -20,6 +20,7 @@ import { useCallback, useState } from "react";
 import ConfidenceBadge, {
   type ConfidenceData,
 } from "@/components/ai/ConfidenceBadge";
+import type { ActionCardStatus as SharedActionCardStatus } from "@/lib/ai/action-state";
 
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -37,12 +38,13 @@ const C = {
   char: "#2B1F14",
 };
 
-export type ActionCardStatus =
-  | "pending"
-  | "approving"
-  | "approved"
-  | "discarded"
-  | "error";
+/**
+ * Re-export of the shared ActionCardStatus type. Single source of truth is
+ * `lib/ai/action-state.ts` — see the comment there for the state machine and
+ * the 2026-06-11 hang bug that motivated the consolidation. Existing imports
+ * of `ActionCardStatus` from this file keep working unchanged.
+ */
+export type ActionCardStatus = SharedActionCardStatus;
 
 export interface ActionCardData {
   /** Anthropic-assigned id of the proposed tool_use block. */

@@ -46,6 +46,7 @@ import ActionCard, {
   type ActionCardData,
   type ActionCardStatus,
 } from "@/components/ai/ActionCard";
+import { isResolvable } from "@/lib/ai/action-state";
 // Phase E-17 Wave 3a — inline citations + confidence calibration.
 import CitationChip from "@/components/ai/CitationChip";
 import ConfidenceBadge, {
@@ -718,12 +719,10 @@ export default function AskPanel() {
       );
       if (entryIdx === -1) return;
       const entry = currentUses[entryIdx];
-      // 2026-06-11 auto-fire — initial status is "approving" (not "pending")
-      // for the new no-gate flow. Accept both: "pending" comes from the legacy
-      // manual-click path (kept for the rare case where we re-introduce
-      // approval), "approving" comes from auto-fire. Anything else (already
-      // approved, discarded, errored) bails — those are terminal.
-      if (entry.status !== "pending" && entry.status !== "approving") return;
+      // Single source of truth in lib/ai/action-state.ts. DO NOT inline
+      // status comparisons here — the 2026-06-11 hang bug was caused by
+      // exactly that drift. See action-state.test.ts for the regression test.
+      if (!isResolvable(entry.status)) return;
       const { data } = entry;
 
       // Now transition the visual state. The updater is allowed to run
@@ -735,13 +734,8 @@ export default function AskPanel() {
         const uses = turn.toolUses ?? [];
         const idx = uses.findIndex((u) => u.data.toolUseId === toolUseId);
         if (idx === -1) return prev;
-        // Same guard as above — accept "pending" (legacy) or "approving"
-        // (auto-fire). Other states are terminal.
-        if (
-          uses[idx].status !== "pending" &&
-          uses[idx].status !== "approving"
-        )
-          return prev;
+        // Same guard as the outer check — shared helper, see lib/ai/action-state.ts.
+        if (!isResolvable(uses[idx].status)) return prev;
         const updatedUses = uses.slice();
         updatedUses[idx] = {
           ...uses[idx],
