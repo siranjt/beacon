@@ -612,37 +612,28 @@ export default function AskPanel() {
                       customerId,
                       customerName,
                     } satisfies ActionCardData,
-                    status: "pending" as ActionCardStatus,
+                    // User preference 2026-06-11 — ALL tools auto-fire, including
+                    // drafts (draft_email, draft_slack) and writes
+                    // (add_fact_to_brain). Initial status is "approving" so the
+                    // pending Discard/Approve buttons never render at all — the
+                    // card streams in already-running. The previous behavior
+                    // (gate everything except a read-only allowlist) was creating
+                    // friction on every Beam answer that used a tool. Tradeoff:
+                    // no human-in-the-loop safety net on writes/drafts; if Beam
+                    // hallucinates and fires a write, it lands.
+                    status: "approving" as ActionCardStatus,
                   };
                   next[next.length - 1] = {
                     ...last,
                     toolUses: [...(last.toolUses ?? []), newEntry],
                   };
-                  // Wave 2 + Tier 2 — read-only tools auto-execute. We schedule
-                  // the approve a tick after setState lands so the status flip
-                  // from "pending" → "approving" → "approved" is visible
-                  // (matches the flow other tools follow on Approve).
-                  if (
-                    tu.name === "lookup_customer" ||
-                    tu.name === "query_customer_book" ||
-                    tu.name === "read_customer_notes" ||
-                    tu.name === "get_chargebee_billing" ||
-                    tu.name === "get_customer_performance" ||
-                    // Brain Wave 2a.1 — read-only, auto-approve.
-                    tu.name === "read_customer_brain" ||
-                    // Brain Wave 2a.3 — read-only manager search, auto-approve.
-                    tu.name === "query_brain"
-                  ) {
-                    const turnIdx = next.length - 1;
-                    const toolUseId = tu.id;
-                    queueMicrotask(() => {
-                      resolveToolUseRef.current?.(
-                        turnIdx,
-                        toolUseId,
-                        "approve",
-                      );
-                    });
-                  }
+                  // Auto-fire every tool. Server endpoint executes regardless
+                  // of approval state — "approval" was purely a UI concept.
+                  const turnIdx = next.length - 1;
+                  const toolUseId = tu.id;
+                  queueMicrotask(() => {
+                    resolveToolUseRef.current?.(turnIdx, toolUseId, "approve");
+                  });
                 }
                 return next;
               });
