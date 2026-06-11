@@ -120,6 +120,58 @@ Rules:
 
 const COMMON = `${IDENTITY}\n\n${REASONING}\n\n${VOICE}\n\n${PERSPECTIVE_INTERPRETATION}\n\n${KNOWLEDGE_BASE_INTERPRETATION}\n\n${TOOL_USE_CONTRACT}\n\n${GAP_REPORTING}`;
 
+/**
+ * Three-part system prompt structure used by the prompt-caching path in
+ * `/api/ai/ask` (OPT-1).
+ *
+ * The full system prompt is split into:
+ *   - `common` — the identity / reasoning / voice / etc. block that's IDENTICAL
+ *     across every scope and every call. Highest cache-hit potential.
+ *   - `scopeStatic` — the per-scope framing (SCOPE / TOOLS AVAILABLE /
+ *     SCOPE-SPECIFIC HEURISTICS). Identical for every call WITHIN one scope.
+ *   - `volatileTail` — the timestamp header + USER PROFILE + memory blocks +
+ *     CONTEXT JSON. Changes every call — NEVER caches.
+ *
+ * The route wraps `common` + `scopeStatic` with `cache_control: ephemeral` and
+ * leaves `volatileTail` plain. Two markers means two cache breakpoints:
+ *   1. `common` alone hits across all 11 scopes (>50% of total tokens)
+ *   2. `common + scopeStatic` hits when the same user stays on one scope
+ *
+ * `buildSystemPrompt` keeps the previous one-string contract for backward
+ * compatibility (and as a fallback if the SDK ever rejects the array form).
+ */
+export interface SystemBlocks {
+  common: string;
+  scopeStatic: string;
+  volatileTail: string;
+}
+
+export function buildSystemBlocks(
+  scope: AiScope,
+  contextBlob: string,
+  memory?: { scopeBlock: string; crossScopeBlock: string },
+  userProfile?: string | null,
+): SystemBlocks {
+  const full = buildSystemPrompt(scope, contextBlob, memory, userProfile);
+  // Split the full prompt into the three parts. The `${COMMON}` block always
+  // appears at the very start of every scope's output. The volatile tail
+  // begins at the timestamped header. Everything in between is the scope's
+  // static framing (the SCOPE: ... + TOOLS AVAILABLE: ... + SCOPE-SPECIFIC
+  // HEURISTICS: ... block).
+  const headerMarker = "Context generated at ";
+  const headerIdx = full.indexOf(headerMarker);
+  if (!full.startsWith(COMMON) || headerIdx < 0) {
+    // Defensive fallback — if anything about the prompt template changes
+    // such that the markers don't line up, fall back to a single block (no
+    // cache hits, but no crash either).
+    return { common: "", scopeStatic: "", volatileTail: full };
+  }
+  const common = COMMON;
+  const scopeStatic = full.slice(COMMON.length, headerIdx).replace(/^\n+|\n+$/g, "");
+  const volatileTail = full.slice(headerIdx);
+  return { common, scopeStatic, volatileTail };
+}
+
 export function buildSystemPrompt(
   scope: AiScope,
   contextBlob: string,
@@ -247,7 +299,7 @@ You have eight tools: snooze_customer, pin_customer, mark_contacted_today, add_n
 GET_FULL_CUSTOMER_VIEW — bundled holistic read for one customer:
 When the user asks for a holistic view of a SPECIFIC customer ("tell me everything about X", "give me the full picture of Y", "brief me on Z", "walk me through this customer"), call get_full_customer_view(entity_id, question?) instead of chaining read_customer_brain + read_customer_notes + (separate perspective / performance / tickets fetches) — it's one parallel fan-out that returns Keeper facts, comms perspective, performance summary (YTD leads + GBP click trend + keyword counts), open escalations, and notes summary in a single tool call. Faster (one round-trip) and the answer stays coherent across sections. Pass the 'question' arg when the holistic ask has a specific intent (e.g. "brief me on Salon X focusing on churn risk" → question="churn risk picture") so the Keeper portion is ranked top-10 instead of dumped. Flow: resolve bizname → entity_id via lookup_customer (or pick from CONTEXT.top_at_risk), then call get_full_customer_view. Each sub-section can independently be null — the response's meta.loaded / meta.failed arrays tell you which loaded; surface partial answers honestly when something soft-failed. Action tools need a customer_id (entity_id). Since this scope shows MANY customers, your job is to resolve WHICH customer when the user proposes an action. Rules:
 - If the user names a customer that IS already in CONTEXT.top_at_risk or CONTEXT.customers, use that entity_id directly.
-- If the user names a customer that is NOT in CONTEXT (the book scope only carries the top 80), call lookup_customer({query: "..."}) FIRST. Then use the returned entity_id for the follow-up action.
+- If the user names a customer that is NOT in CONTEXT (the book scope only carries the top 20 at-risk customers), call lookup_customer({query: "..."}) FIRST. Then use the returned entity_id for the follow-up action. The CONTEXT block carries the top-20 at-risk customers from this AM's book. If the question requires reaching beyond those 20 (e.g., "show me everyone with comms_preference=email", "MRR distribution across the book", "all customers in pod X"), call query_customer_book — it queries the full active book without injecting it into context.
 - If the user refers by position ("snooze the first one", "the top RED"), use the ordering as it appears in the relevant CONTEXT list and pick that entity_id — no lookup needed.
 - If the user gives no signal at all about which customer ("snooze them"), do NOT call a tool — ask which customer first.
 - For bulk-sounding asks ("snooze all my RED tier"), refuse with one sentence: "I can act on one customer at a time today — batch actions are coming. Want me to start with the highest-risk one?" Then propose a single tool call for that one customer.

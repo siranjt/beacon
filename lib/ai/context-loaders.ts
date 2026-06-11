@@ -98,7 +98,14 @@ function asCitationPerspective(
   };
 }
 
-const AM_BOOK_TOP_N = 80;
+// OPT-3 — trimmed from 80 to 20 to cut context tokens on every customer-book
+// turn. Beam reaches customers 21+ via the `query_customer_book` tool, which
+// queries the full active book without pre-injecting it into the prompt.
+// Trade-off: occasional extra tool call for the long-tail; savings: tens of
+// thousands of tokens per turn that DOESN'T need long-tail rows. Net win
+// because the latter dominates real usage. The 60-row trim also drops the
+// per-row Haiku comms_perspective payload which is the heaviest field.
+const AM_BOOK_TOP_N = 20;
 const TICKETS_TOP_N = 40;
 const POSTPAYMENT_TOP_N = 50;
 

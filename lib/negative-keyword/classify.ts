@@ -2,8 +2,8 @@
  * Negative Keyword Beacon — Haiku classifier. Phase NK-2.4.
  *
  * Stage 2 of the two-stage detector. Pre-screened candidates from
- * `prescreen.ts` come in batches of 12; each batch becomes ONE Haiku
- * call returning JSON for all 12 messages at once. The model:
+ * `prescreen.ts` come in batches of 20; each batch becomes ONE Haiku
+ * call returning JSON for all 20 messages at once. The model:
  *   - re-confirms the message expresses genuine churn-risk sentiment
  *     from the customer's perspective (drops keyword-only false
  *     positives like outbound copy that quotes a complaint)
@@ -12,8 +12,11 @@
  *   - writes a 2-sentence operator-facing analysis (what the customer
  *     wants + the AM action implied)
  *
- * The batch size of 12 is the doc's spec — fits ~3-4K input tokens per
- * call, returns ~1.5K output, ~1s wall-clock per batch under load.
+ * The batch size of 20 (raised from 12 in OPT-4, ~$8-15/mo savings) fits
+ * comfortably under Haiku's context — 20 short snippets capped at 600
+ * chars each + ~120 tokens of header is ~5-6K input tokens per call,
+ * well below the 2000-token output cap. Haiku handles 20 messages in
+ * one structured JSON response without quality loss.
  *
  * If `ANTHROPIC_API_KEY` is missing or the call errors / returns malformed
  * JSON, the caller (cron) is expected to fall through to
@@ -27,7 +30,7 @@ import { RISK_CATEGORIES } from "./types";
 
 const MODEL = process.env.ANTHROPIC_NK_MODEL ?? "claude-haiku-4-5-20251001";
 const MAX_TOKENS_PER_BATCH = 2000;
-const BATCH_SIZE = 12;
+const BATCH_SIZE = 20;
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY ?? "",

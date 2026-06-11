@@ -1,10 +1,13 @@
-// Phase E-17.3c — Beacon AI eval nightly cron.
+// Phase E-17.3c — Beacon AI eval weekly cron.
 //
 // Runs the full eval harness against all active golden Q&A pairs.
 // Compares today's pass rate to the trailing 7-day baseline and Slack-
 // alerts if it drops materially (>15 percentage points).
 //
-// Scheduled in vercel.json at 04:30 UTC (after daily refresh settles).
+// Scheduled in vercel.json at 04:30 UTC every Sunday (after daily refresh settles).
+// Previously ran nightly; moved to weekly (OPT-4, ~$35/mo savings) — the
+// rate of meaningful regression is much slower than daily, so a weekly
+// cadence catches the same drift at 1/7th the cost.
 //
 // Manual trigger: POST/GET with Authorization: Bearer $CRON_SECRET.
 
@@ -71,7 +74,7 @@ export async function GET(req: NextRequest) {
       }
       if (fails.length > 10) lines.push(`...and ${fails.length - 10} more`);
     } else {
-      lines.push(`:white_check_mark: *Beacon AI eval — nightly run complete*`);
+      lines.push(`:white_check_mark: *Beacon AI eval — weekly run complete*`);
       lines.push(
         `${todayPct}% pass (${run.passed}/${run.total}) · partial ${run.partial} · failed ${run.failed} · errors ${run.errored}`,
       );
@@ -81,7 +84,7 @@ export async function GET(req: NextRequest) {
       const result = await postSlack({ text: lines.join("\n") });
       slackPosted = result.sent;
     } catch (e) {
-      console.warn("[eval-nightly] slack post failed:", e);
+      console.warn("[eval-weekly] slack post failed:", e);
     }
   }
 

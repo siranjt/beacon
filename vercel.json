@@ -36,8 +36,8 @@
       "schedule": "35 22 * * *"
     },
     {
-      "path": "/api/cron/beacon-ai/eval-nightly",
-      "schedule": "30 4 * * *"
+      "path": "/api/cron/beacon-ai/eval-weekly",
+      "schedule": "30 4 * * 0"
     },
     {
       "path": "/api/cron/prune",
@@ -165,7 +165,7 @@
       "memory": 1024,
       "maxDuration": 120
     },
-    "app/(customer)/api/cron/beacon-ai/eval-nightly/route.ts": {
+    "app/(customer)/api/cron/beacon-ai/eval-weekly/route.ts": {
       "memory": 1024,
       "maxDuration": 300
     },

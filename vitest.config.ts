@@ -19,6 +19,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "."),
+      // OPT-2 — stub Next.js's `server-only` package for vitest. The barrier
+      // is enforced at build time by Next; vitest doesn't load it. Without
+      // this alias, any test that transitively imports a `server-only`
+      // module fails. Empty-module shim is safe — production code paths
+      // still respect the build-time check.
+      "server-only": resolve(__dirname, "tests/_stubs/server-only.ts"),
     },
   },
   test: {

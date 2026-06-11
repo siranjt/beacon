@@ -53,8 +53,8 @@ import {
   loadPostPaymentCustomerContext,
   type LoadedContext,
 } from "@/lib/ai/context-loaders";
-import { buildSystemPrompt } from "@/lib/ai/prompts";
-import { CUSTOMER_360_TOOLS, toAnthropicTools } from "@/lib/ai/tools";
+import { buildSystemBlocks } from "@/lib/ai/prompts";
+import { getToolsForScope, toAnthropicTools } from "@/lib/ai/tools";
 import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
 // Phase G — Knowledge Base. Each request retrieves top-K relevant docs
 // scoped to the surface; the chunks are injected into CONTEXT and a kb
@@ -202,7 +202,7 @@ async function loadContextForScope(
 }
 
 export async function POST(req: NextRequest) {
-  // Phase E-17.3c — eval harness service-token bypass. The nightly eval
+  // Phase E-17.3c — eval harness service-token bypass. The weekly eval
   // cron hits this endpoint to score Beam quality. It can't carry a
   // user session (it's a server-to-server call), so we accept a shared
   // service token via x-eval-runner-token header. The token is set as the
@@ -272,12 +272,21 @@ export async function POST(req: NextRequest) {
 
   // Phase G — Knowledge Base retrieval. Search beacon_ai_docs for chunks
   // relevant to this question, filtered to docs tagged with the current
-  // scope (or 'all'). Top-3 chunks get inlined into the CONTEXT blob and
+  // scope (or 'all'). Top-K chunks get inlined into the CONTEXT blob and
   // their citation keys merged into the lookup so the model can emit
   // [cite:kb:<slug>] markers. Soft-fails to no-op on retrieval errors —
   // the rest of the request still works without KB context.
+  //
+  // OPT-3 — DEFAULT_KB_CHUNK_LIMIT is the per-turn ceiling. Audit data
+  // showed most answers cite 1-2 chunks; the old default of 10 inflated
+  // the prompt by ~5K tokens per turn for no measurable answer-quality
+  // gain. Bumping back up should be tied to a specific failure mode
+  // (e.g. KB recall miss in evals), not vibes. customer-360 +
+  // customer-book are the heaviest scopes — we intentionally keep them
+  // at this same limit instead of letting them request more.
+  const DEFAULT_KB_CHUNK_LIMIT = 3;
   try {
-    const kbChunks = await searchDocs(question, scope, 3);
+    const kbChunks = await searchDocs(question, scope, DEFAULT_KB_CHUNK_LIMIT);
     if (kbChunks.length > 0) {
       // Inject the chunks into the existing JSON blob. Reuses the loader's
       // already-stringified blob: parse → add → restringify. This is the
@@ -402,7 +411,14 @@ export async function POST(req: NextRequest) {
         // Performance-landing was missing — give it the same tool set so
         // Beam can lookup customers + draft outreach from there too.
         scope.kind === "performance-landing";
-      const tools = wantsTools ? toAnthropicTools(CUSTOMER_360_TOOLS) : undefined;
+      // OPT-2 — per-scope tool whitelist. Each scope now receives only the
+      // subset of tools it actually uses. Customer-360 keeps the full
+      // mutator suite; the inbox gets just lookup + read_notes; etc. This
+      // trims the tools payload by 50-70% on most scopes (~1-3K tokens per
+      // call). Scopes without an explicit allowlist entry fall back to the
+      // full registry inside getToolsForScope.
+      const scopeTools = getToolsForScope(scope.kind);
+      const tools = wantsTools ? toAnthropicTools(scopeTools) : undefined;
       // Phase E-17 Wave 3a — emit the citation lookup at stream start so the
       // client can render `[cite:KEY]` chips in deltas as they arrive. Empty
       // lookups (scopes without v1 support) still send the frame so the
@@ -426,13 +442,63 @@ export async function POST(req: NextRequest) {
       }
 
       try {
+        // OPT-1 — prompt caching. Same pattern as
+        // lib/post-payment/evaluator/anthropic.ts. The system prompt is split
+        // into a stable `common` block (identity / reasoning / voice — same
+        // across all 11 scopes) + a `scopeStatic` block (per-scope framing —
+        // same for every call on this scope) + a `volatileTail` (timestamp,
+        // memory, CONTEXT JSON — changes every call).
+        //
+        // Two `cache_control: ephemeral` markers create two cache breakpoints.
+        // The common block hits across every scope; the per-scope block hits
+        // when the same user stays on one surface. The volatile tail is
+        // unmarked so cache lookups land on a stable prefix.
+        //
+        // The tools array also gets one `cache_control` marker on the LAST
+        // tool entry. Per Anthropic's docs, one marker on the tools list
+        // caches the entire tools block. The per-scope tool subset (from
+        // OPT-2's getToolsForScope) is identical across calls on the same
+        // scope, so this hits whenever tools are enabled.
+        //
+        // SDK 0.30.x types don't expose `cache_control` on the relevant
+        // union shapes (TextBlockParam, Tool) — runtime accepts them fine
+        // since prompt caching is GA. We cast to `any`, mirroring the
+        // approach in lib/post-payment/evaluator/anthropic.ts.
+        const blocks = buildSystemBlocks(
+          scope,
+          ctx.blob,
+          memoryBlocks,
+          userProfile,
+        );
+        const systemArr: unknown[] = blocks.common
+          ? [
+              {
+                type: "text",
+                text: blocks.common,
+                cache_control: { type: "ephemeral" },
+              },
+              {
+                type: "text",
+                text: blocks.scopeStatic,
+                cache_control: { type: "ephemeral" },
+              },
+              { type: "text", text: blocks.volatileTail },
+            ]
+          : [{ type: "text", text: blocks.volatileTail }];
+        const cachedTools = tools
+          ? tools.map((t, i) =>
+              i === tools.length - 1
+                ? { ...t, cache_control: { type: "ephemeral" } }
+                : t,
+            )
+          : undefined;
         const sdkStream = anthropic.messages.stream({
           model: MODEL,
           max_tokens: MAX_TOKENS,
-          system: buildSystemPrompt(scope, ctx.blob, memoryBlocks, userProfile),
+          system: systemArr as any,
           messages,
-          ...(tools ? { tools } : {}),
-        });
+          ...(cachedTools ? { tools: cachedTools as any } : {}),
+        } as any);
         sdkStream.on("text", (delta: string) => {
           assistantBuf += delta;
           send({ delta });
@@ -472,7 +538,30 @@ export async function POST(req: NextRequest) {
             },
           });
         });
-        await sdkStream.finalMessage();
+        const finalMsg = await sdkStream.finalMessage();
+
+        // OPT-1 — log cache hit metrics. usage.cache_creation_input_tokens
+        // is what we wrote into cache this call (paid 1.25x rate);
+        // usage.cache_read_input_tokens is what we hit (paid 0.1x rate).
+        // Regular input_tokens is everything not cached. Logging all four
+        // lets us track hit ratio + savings over time. SDK 0.30 doesn't type
+        // these fields, so widen via `any`.
+        try {
+          const u: any = (finalMsg as any)?.usage ?? {};
+          const cacheRead = u.cache_read_input_tokens ?? 0;
+          const cacheWrite = u.cache_creation_input_tokens ?? 0;
+          const inputTok = u.input_tokens ?? 0;
+          const outputTok = u.output_tokens ?? 0;
+          // eslint-disable-next-line no-console
+          console.log(
+            `[ask] scope=${scope.kind} model=${MODEL} ` +
+              `input=${inputTok} cache_create=${cacheWrite} ` +
+              `cache_read=${cacheRead} output=${outputTok} ` +
+              `cache=${cacheRead > 0 ? "HIT" : cacheWrite > 0 ? "WRITE" : "MISS"}`,
+          );
+        } catch {
+          // metric logging is best-effort — never break the response on it.
+        }
 
         // Phase E-12 — persist turns BEFORE closing the stream so we can
         // send the assistant turn id in the final SSE frame. The client uses

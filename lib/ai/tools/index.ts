@@ -38,6 +38,8 @@
 
 import type { Tool as AnthropicTool } from "@anthropic-ai/sdk/resources/messages";
 
+import type { AiScope } from "@/lib/ai/scopes";
+
 import { snoozeCustomerTool } from "./snooze";
 import { pinCustomerTool } from "./pin";
 import { markContactedTodayTool } from "./mark-contacted";
@@ -164,6 +166,105 @@ export const CUSTOMER_360_TOOLS: BeaconTool[] = [
 
 /** Alias for callers that prefer the umbrella naming. */
 export const BEACON_TOOLS = CUSTOMER_360_TOOLS;
+
+/**
+ * Per-scope tool allowlist. Beam's tool definitions are ~7-8K tokens total —
+ * sending all 15 on every turn for every scope is wasteful when most scopes
+ * only meaningfully use 3-6 of them. The whitelist below restricts what the
+ * model SEES per scope, which trims the tools payload by ~50-70% on most
+ * scopes (estimated $15-30/mo savings, zero quality cost — the model can't
+ * call tools it wasn't told about, but the chosen subset is sufficient).
+ *
+ * Rules of thumb when picking a scope's tools:
+ *   - lookup_customer is in every scope so Beam can resolve a name the
+ *     surface didn't preload.
+ *   - mutators (snooze/pin/mark-contacted/add-note) only on customer-360 —
+ *     other scopes don't have the action-card UX to approve them.
+ *   - add_fact_to_brain only on customer-360 — fact writes always target a
+ *     specific customer the AM is looking at.
+ *   - query_customer_book + query_brain are manager cross-book tools; keep
+ *     them off customer-360 + customer-specific scopes to avoid the model
+ *     reaching for "the book" when it should stay on the visible customer.
+ *   - get_full_customer_view is the "tell me everything about X"
+ *     fan-out — useful wherever the model might dig into a specific
+ *     customer (360, book, post-payment, escalation).
+ *
+ * Scopes not in this map fall back to the full registry (backwards-compat).
+ */
+export const SCOPE_TOOL_ALLOWLIST: Partial<Record<AiScope["kind"], BeaconTool[]>> = {
+  inbox: [lookupCustomerTool, readCustomerNotesTool],
+  "customer-360": [
+    lookupCustomerTool,
+    readCustomerBrainTool,
+    addFactToBrainTool,
+    readCustomerNotesTool,
+    getChargebeeBillingTool,
+    getCustomerPerformanceTool,
+    getFullCustomerViewTool,
+    draftEmailToContactTool,
+    draftSlackMessageTool,
+    addNoteTool,
+    markContactedTodayTool,
+    pinCustomerTool,
+    snoozeCustomerTool,
+  ],
+  "customer-book": [
+    lookupCustomerTool,
+    queryCustomerBookTool,
+    queryBrainTool,
+    readCustomerBrainTool,
+    getFullCustomerViewTool,
+    draftEmailToContactTool,
+    draftSlackMessageTool,
+  ],
+  "performance-landing": [lookupCustomerTool, getCustomerPerformanceTool],
+  "performance-report": [
+    lookupCustomerTool,
+    getCustomerPerformanceTool,
+    readCustomerBrainTool,
+    draftEmailToContactTool,
+  ],
+  "escalation-overview": [
+    lookupCustomerTool,
+    readCustomerBrainTool,
+    draftSlackMessageTool,
+    draftEmailToContactTool,
+  ],
+  "post-payment-book": [
+    lookupCustomerTool,
+    readCustomerBrainTool,
+    getFullCustomerViewTool,
+  ],
+  "post-payment-customer": [
+    lookupCustomerTool,
+    readCustomerBrainTool,
+    getFullCustomerViewTool,
+    draftEmailToContactTool,
+  ],
+  "miss-payment-overview": [
+    lookupCustomerTool,
+    queryCustomerBookTool,
+    getChargebeeBillingTool,
+    draftEmailToContactTool,
+    draftSlackMessageTool,
+  ],
+  "negative-keyword-overview": [
+    lookupCustomerTool,
+    readCustomerBrainTool,
+    draftEmailToContactTool,
+    draftSlackMessageTool,
+  ],
+};
+
+/**
+ * Look up the tool subset for a given scope. Falls back to the full
+ * registry for scopes not in the allowlist (so a new scope added without
+ * an allowlist entry keeps the existing behavior — over-permissive but
+ * never broken).
+ */
+export function getToolsForScope(scopeKind: AiScope["kind"]): BeaconTool[] {
+  return SCOPE_TOOL_ALLOWLIST[scopeKind] ?? CUSTOMER_360_TOOLS;
+}
 
 /**
  * Map of tool-name → tool for O(1) lookup during execute. Built lazily so
