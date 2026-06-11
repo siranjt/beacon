@@ -81,6 +81,14 @@ interface Turn {
   role: "user" | "assistant";
   content: string;
   /**
+   * 2026-06-11 — when true, this turn is NOT rendered in the transcript but
+   * still participates in the conversation history sent to the model. Used
+   * for tool-result system traces ("[Beam ran X on customer Y: …]") that the
+   * model needs as context for the continuation but that the AM finds noisy.
+   * Set on the user-role turn that `askWithToolResult` injects.
+   */
+  hidden?: boolean;
+  /**
    * Phase E-12 — assistant turn id from beacon_ai_conversations. Used as
    * the target for thumbs up/down feedback (POST /api/ai/feedback).
    * Undefined for user turns, the streaming-in-progress assistant placeholder,
@@ -425,7 +433,16 @@ export default function AskPanel() {
   const ask = useCallback(
     async (
       question: string,
-      opts?: { extraCitations?: Record<string, unknown> },
+      opts?: {
+        extraCitations?: Record<string, unknown>;
+        /**
+         * 2026-06-11 — when true the synthetic user turn is marked hidden so
+         * the transcript skips rendering it. Used by `askWithToolResult` for
+         * the "[Beam ran X on Y: …]" system traces. The model still sees the
+         * message in history so continuation context is preserved.
+         */
+        hideUserTurn?: boolean;
+      },
     ) => {
       const trimmed = question.trim();
       if (!trimmed || streaming) return;
@@ -468,7 +485,11 @@ export default function AskPanel() {
       }
 
       const history = turns.slice(-MAX_HISTORY_TURNS * 2);
-      const userTurn: Turn = { role: "user", content: trimmed };
+      const userTurn: Turn = {
+        role: "user",
+        content: trimmed,
+        hidden: opts?.hideUserTurn === true,
+      };
       setTurns((prev) => [
         ...prev,
         userTurn,
@@ -1288,7 +1309,17 @@ export default function AskPanel() {
       // Reuse the regular ask path so memory + facts + everything stays
       // consistent. The bracketed prefix signals to Claude this is a
       // system trace, not a fresh AM question.
-      await ask(followUp, extraCitations ? { extraCitations } : undefined);
+      //
+      // 2026-06-11 — pass hideUserTurn:true so the "[Beam ran X on Y: …]"
+      // bubble does NOT render in the transcript. The model still sees it
+      // in conversation history (so it can write a coherent continuation),
+      // but the AM only sees the small green ✓ result pill above and the
+      // assistant's next paragraph below. The dark "Beam ran" envelope was
+      // visually noisy and surfaced internal plumbing.
+      await ask(followUp, {
+        ...(extraCitations ? { extraCitations } : {}),
+        hideUserTurn: true,
+      });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -1649,6 +1680,13 @@ export default function AskPanel() {
               )}
 
               {turns.map((t, i) => {
+                // 2026-06-11 — skip rendering turns flagged hidden. These
+                // are the synthetic "[Beam ran X on Y: …]" user-role traces
+                // that `askWithToolResult` injects so the model has context
+                // for the continuation. The AM doesn't want to see them; the
+                // model still does (they remain in the `turns` array so the
+                // next history slice picks them up).
+                if (t.hidden) return null;
                 // Phase E-17 Wave 3a — parse assistant content for the
                 // `<confidence:...>` marker (stripped from prose, surfaced as
                 // a badge) and for `[cite:KEY]` markers (kept inline, replaced
