@@ -20,18 +20,16 @@
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { loadBrainForPrompt } from "@/lib/brain/retrieval";
 import { retrieveFactsHybrid } from "@/lib/brain/retrieve";
+import { recordCitation } from "@/lib/brain/repo";
 import { logUmbrellaActivity } from "@/lib/activity/log";
 import type { BeaconTool, ToolExecutionContext, ToolResult } from "./index";
 
 export const readCustomerBrainTool: BeaconTool = {
   name: "read_customer_brain",
   description:
-    "Read the Keeper (confirmed canonical facts) for a specific customer. The Keeper holds curated per-customer truth: owner identity (name, decision style), how they were sold (AE, sale date, promise), contract terms (start date, MRR, custom pricing), integration platform, behavioral patterns (payment timing, comms preference, seasonal), and open concerns (latent risks, next-call agenda). Facts are auto-confirmed at bootstrap from BaseSheet + Chargebee for the high-trust subset, and AM-confirmed for everything else. " +
-    "Reach for this tool when the user asks about ANYTHING that might be a stored fact: 'who's the owner', 'when did they sign', 'what's their MRR', 'what platform are they on', 'do they prefer email or phone', 'any latent risks I should know about', 'how was this sold'. Pair with lookup_customer if the user names a customer by name rather than entity_id. " +
-    "TWO retrieval modes:\n" +
-    "  - Pass `question` (a short string of what you're trying to learn) to get the top-5 facts MOST relevant to that question, ranked by semantic + keyword search + cross-attention rerank. Use this when the user's intent is specific ('what platform are they on?', 'do they prefer SMS?', 'why are they at risk?'). This is the precision-focused path — tight, ranked, citation-ready.\n" +
-    "  - Omit `question` to get the full topic-clustered block (up to 40 confirmed facts). Use this when surfacing a general overview ('what do we know about this customer?') or when the user hasn't narrowed down their intent yet.\n" +
-    "Read-only — no approval required. If no Keeper entry exists for the customer, say so plainly — the AM can add facts via the Keeper panel.",
+    "Read the Keeper (curated canonical facts) for one customer — owner identity, contract terms, platform, comms preference, behavioral patterns, latent risks. Read-only.\n" +
+    "Pass `question` for the top-5 most relevant facts (hybrid retrieve + rerank). Omit `question` for the full topic-clustered block (up to 40 facts).\n" +
+    "Trigger phrases: \"who's the owner?\", \"what platform are they on?\", \"when did they sign?\", \"do they prefer email or phone?\", \"any latent risks I should know about?\".",
   input_schema: {
     type: "object",
     properties: {
@@ -108,7 +106,22 @@ export const readCustomerBrainTool: BeaconTool = {
           matched_via: s.matched_via,
           relevance_score: s.rerank_score,
           rrf_score: s.rrf_score,
+          // SMART-K4 — surface parent linkage so the model can (a) see
+          // the relationship in the prompt block and (b) reuse the
+          // parent fact_id when classifying a NEW derived child via
+          // add_fact_to_brain.
+          derived_from: s.fact.derived_from ?? null,
         }));
+
+        // SMART-K1 — bump citation_count on every fact we just returned.
+        // Fire-and-forget: don't await (keeps tool latency unchanged) and
+        // never propagate errors (recordCitation soft-fails internally).
+        // This logs facts as "presented to the model" — a realistic proxy
+        // for "actually cited in the answer"; the model emits cite chips
+        // selectively but always sees this entire set as context.
+        if (facts.length > 0) {
+          void recordCitation(facts.map((f) => f.fact_id));
+        }
 
         void logUmbrellaActivity({
           email: ctx.amEmail,

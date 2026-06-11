@@ -23,7 +23,8 @@ type Channel = (typeof ALLOWED_CHANNELS)[number];
 export const markContactedTodayTool: BeaconTool = {
   name: "mark_contacted_today",
   description:
-    "Mark that the AM contacted this customer today. Use after the AM tells you (or the conversation strongly implies) that an outbound touch just happened or is about to happen — for example 'I just texted Maria', 'About to call them', or 'sent the follow-up email'. Always pick the right `channel` to match how they reached out. Add a 1-line `summary` of what was discussed or attempted (e.g. 'Confirmed onboarding call for Thursday'). The log row shows up on the customer's timeline and in the AM-activity Slack digest. Do not use this for inbound contact from the customer.",
+    "Log an OUTBOUND touch the AM just made (or is about to make). Pick the `channel` matching how they reached out; add a 1-line `summary` of what happened. Do NOT use for inbound contact from the customer.\n" +
+    "Trigger phrases: \"I just texted Maria\", \"about to call them\", \"sent the follow-up email\", \"left them a voicemail\".",
   input_schema: {
     type: "object",
     properties: {

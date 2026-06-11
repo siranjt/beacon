@@ -76,16 +76,19 @@ const ALL_CATEGORIES: ReadonlySet<TopicCategory> = new Set<TopicCategory>([
 export const addFactToBrainTool: BeaconTool = {
   name: "add_fact_to_brain",
   description:
-    "Save a confirmed fact about a customer to the Keeper. Use when the AM tells you to 'save', 'remember', 'note that', 'add a fact', or otherwise commits a piece of customer knowledge to canonical truth. The Keeper is the curated per-customer truth store that Beam grounds on across every scope. " +
-    "You classify the AM's content into (topic_category, topic_subcategory, field_name, value) using this schema:\n" +
+    "Save a confirmed fact about a customer to the Keeper. Classify the AM's free-form content into (topic_category, topic_subcategory, field_name, value) using this schema:\n" +
     describeFieldCatalog() +
-    "\n\nClassification rules:\n" +
-    "1. Pick the subcategory that BEST fits the content semantically. Don't force-fit; if nothing matches well, use field_name='other' under the closest subcategory.\n" +
-    "2. field_name MUST be either one of the named fields for the chosen subcategory OR exactly 'other'. Don't invent field names.\n" +
-    "3. topic_category MUST match the subcategory's category (e.g. 'comms_preference' is always 'behavioral').\n" +
-    "4. value is the AM's content, lightly normalized: full sentences are fine; trim filler words like 'save:' or 'remember that'. Preserve specifics (names, dates, channels).\n" +
-    "5. For 'other' rows, the value should be a complete short sentence that the next AM reading it will understand without context.\n\n" +
-    "Returns: success summary on write, or a conflict error if a different value already exists for this named field (the AM can resend with force=true to overwrite).",
+    "\n\nRules: (1) pick the subcategory that best fits semantically; if nothing matches, use field_name='other' under the closest subcategory. (2) field_name MUST be a named field for the chosen subcategory OR exactly 'other' — don't invent. (3) topic_category MUST match the subcategory's category. (4) `value` is the AM's content, lightly normalized (preserve names/dates/channels; trim 'save:' / 'remember that'). (5) 'other' values should be complete short sentences. On conflict at a named field, returns an error — resend with force=true to overwrite.\n" +
+    "Wave 2c.4 v3 promoted-field examples (prefer these over 'other'): " +
+    "'AE promised free GBP optimization' → identity/sold_by/ae_commitment; " +
+    "'Came from Square before paper booking' → operational/integration/migration_history; " +
+    "'Risk is billing — auto-debit fails' → concerns/latent_risk/risk_category (value='billing'); " +
+    "'Specializes in balayage' → identity/business_profile/service_specialty; " +
+    "'On grandfathered pricing from 2024' → operational/contract/pricing_tier (value='grandfathered'); " +
+    "'Slow months are Jan and Aug' → behavioral/seasonal/slow_months; " +
+    "'Previous AM was Apurvaa' → identity/assignment/prior_am.\n" +
+    "Trigger phrases: \"save: owner prefers WhatsApp\", \"remember they only respond after 6pm\", \"note that the platform is GlossGenius\", \"add a fact: contract renews September\".\n" +
+    "SMART-K4 — If this fact is DERIVED from another fact about the same customer (e.g. an owner_email derived from an existing owner_info, or a preferred_channel derived from an existing comms_preference), pass the PARENT fact's fact_id as `derived_from`. This lets the Keeper auto-pull the parent whenever the derived child is cited, so context never drops. Skip when the fact stands on its own.",
   input_schema: {
     type: "object",
     properties: {
@@ -122,6 +125,12 @@ export const addFactToBrainTool: BeaconTool = {
         description:
           "When true, overwrites an existing differing value at the same (customer, subcategory, named field). Defaults to false. Only use when the AM has explicitly seen the conflict and confirmed they want to overwrite.",
       },
+      derived_from: {
+        type: "string",
+        description:
+          "SMART-K4 — Optional parent fact_id. When set, this fact is recorded as derived from the parent and the parent is auto-pulled whenever the child surfaces in Beam's top-K. The parent MUST be a fact for the SAME customer (cross-customer references are rejected). Pull the parent fact_id from a prior read_customer_brain or query_brain result — never invent UUIDs.",
+        minLength: 8,
+      },
     },
     required: [
       "entity_id",
@@ -144,6 +153,10 @@ export const addFactToBrainTool: BeaconTool = {
       typeof args.field_name === "string" ? args.field_name.trim() : "";
     const value = typeof args.value === "string" ? args.value.trim() : "";
     const force = args.force === true;
+    const derivedFrom =
+      typeof args.derived_from === "string" && args.derived_from.trim().length > 0
+        ? args.derived_from.trim()
+        : null;
 
     if (!entityId) return { ok: false, error: "entity_id is required" };
     if (!value) return { ok: false, error: "value is required" };
@@ -250,6 +263,10 @@ export const addFactToBrainTool: BeaconTool = {
           owning_am_email: ctx.amEmail,
           confirmed_by_email: ctx.amEmail,
           force_semantic_conflict: force,
+          // SMART-K4 — link to parent fact when the model classifies this
+          // as derived. writeBrainFact rejects with a clear error if the
+          // parent points cross-customer or doesn't exist.
+          derived_from: derivedFrom,
         });
       } catch (e) {
         if (e instanceof SemanticConflictError) {
@@ -282,6 +299,7 @@ export const addFactToBrainTool: BeaconTool = {
           field_name: fieldNameRaw,
           force,
           version: written.current_version,
+          derived_from: derivedFrom,
         },
       });
 
@@ -302,6 +320,7 @@ export const addFactToBrainTool: BeaconTool = {
           value,
           version: written.current_version,
           idempotent: false,
+          derived_from: derivedFrom,
         },
       };
     } catch (e) {

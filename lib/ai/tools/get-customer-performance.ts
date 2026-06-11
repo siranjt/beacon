@@ -65,9 +65,8 @@ function describeGbpTrend(
 export const getCustomerPerformanceTool: BeaconTool = {
   name: "get_customer_performance",
   description:
-    "Pull a customer's marketing performance data — Google Business Profile click trend, local SEO keyword rankings, lead source mix, YTD leads, reviews activity. Mirrors the data that powers the Performance Report. " +
-    "Use when the user asks 'how is X performing?', 'has X's GBP dropped?', 'what keywords is X ranking for?', 'how many leads has X had this year?', or any per-customer performance question. " +
-    "READ-ONLY tool — no approval card. Pulls live from Metabase (Aurora db). Trimmed to top 20 keywords and last 12 months to fit context. Does NOT include predicted future leads — predictions are internal-only.",
+    "Pull a customer's marketing performance — GBP profile-click trend (complete months only), top 20 keyword rankings, lead-source mix, YTD leads, review target. Live Metabase pull, read-only. Predicted leads are internal-only and never surfaced.\n" +
+    "Trigger phrases: \"how is Acme performing?\", \"has their GBP dropped?\", \"what keywords are they ranking for?\", \"how many leads YTD?\", \"are leads on track?\".",
   input_schema: {
     type: "object",
     properties: {

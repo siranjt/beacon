@@ -55,6 +55,7 @@ import {
 } from "@/lib/ai/context-loaders";
 import { buildSystemBlocks } from "@/lib/ai/prompts";
 import { getToolsForScope, toAnthropicTools } from "@/lib/ai/tools";
+import { routeTools, type RoutingDecision } from "@/lib/ai/tool-router";
 import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
 // Phase G — Knowledge Base. Each request retrieves top-K relevant docs
 // scoped to the surface; the chunks are injected into CONTEXT and a kb
@@ -418,7 +419,44 @@ export async function POST(req: NextRequest) {
       // call). Scopes without an explicit allowlist entry fall back to the
       // full registry inside getToolsForScope.
       const scopeTools = getToolsForScope(scope.kind);
-      const tools = wantsTools ? toAnthropicTools(scopeTools) : undefined;
+      // SMART-B2 — two-stage tool routing. Before handing the full per-scope
+      // subset to Sonnet, ask Haiku which 1-3 tools the question actually
+      // needs. Trims tool definitions further on rich scopes (customer-360
+      // sends 13; many questions only need 1-2). Soft-fails to the full
+      // scopeTools set on any error — Beam quality never regresses.
+      //
+      // We pay ~300-500ms of Haiku latency here. The SSE stream is already
+      // open + the citations frame has been flushed, so the user sees the
+      // panel start; first token arrives slightly later than before. Net
+      // win because the larger Sonnet prompt would've added comparable wall
+      // time anyway, and the trimmed tool set lowers downstream cost.
+      let routingDecision: RoutingDecision | null = null;
+      let routedTools = scopeTools;
+      if (wantsTools) {
+        try {
+          routingDecision = await routeTools(scope, question, scopeTools);
+          routedTools = routingDecision.tools;
+          // eslint-disable-next-line no-console
+          console.log(
+            `[router] scope=${scope.kind} picked=${routingDecision.tools.length} ` +
+              `from=${routingDecision.candidateCount} ` +
+              `cache=${routingDecision.cacheHit ? "HIT" : "MISS"} ` +
+              `routed=${routingDecision.routed}` +
+              (routingDecision.skipReason
+                ? ` skip=${routingDecision.skipReason}`
+                : ""),
+          );
+        } catch (e) {
+          // Belt + suspenders — routeTools already soft-fails internally.
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[router] unexpected throw — falling back to full scope tools:",
+            e instanceof Error ? e.message : String(e),
+          );
+          routedTools = scopeTools;
+        }
+      }
+      const tools = wantsTools ? toAnthropicTools(routedTools) : undefined;
       // Phase E-17 Wave 3a — emit the citation lookup at stream start so the
       // client can render `[cite:KEY]` chips in deltas as they arrive. Empty
       // lookups (scopes without v1 support) still send the frame so the
@@ -593,6 +631,18 @@ export async function POST(req: NextRequest) {
               // up by turn id and apply confidence adjustments.
               active_fact_ids: activeFactIds,
               scope_key: sKey,
+              // SMART-B2 — capture the two-stage routing decision so we can
+              // audit how aggressively Haiku is trimming tools per scope.
+              // `null` means tools weren't enabled for this scope.
+              tool_routing: routingDecision
+                ? {
+                    routed: routingDecision.routed,
+                    cache_hit: routingDecision.cacheHit,
+                    picked: routingDecision.pickedNames,
+                    candidate_count: routingDecision.candidateCount,
+                    skip_reason: routingDecision.skipReason ?? null,
+                  }
+                : null,
             },
           });
         } catch (e) {

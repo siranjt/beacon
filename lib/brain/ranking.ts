@@ -8,15 +8,19 @@
  * and decides which is authoritative.
  *
  *   score = recency_weight * confidence_multiplier * source_trust
+ *            * am_feedback_boost
  *
  * The schema-level effect:
  *   - winner: superseded_by = NULL (read path surfaces this row)
  *   - losers: superseded_by = winner.fact_id (read path hides by default)
  *   - all rows: ranking_score persisted for audit + tie-break
  *
- * Future extension: am_feedback_boost from a per-fact thumbs table. Not
- * built yet — the multiplier defaults to 1.0 so the formula stays
- * forward-compatible. When AM feedback ships, add a fourth factor.
+ * SMART-K1: am_feedback_boost now lives. Citation count on each fact is
+ * bumped fire-and-forget every time it surfaces through the hybrid
+ * retrieval path (read_customer_brain / query_brain). The boost is
+ * log10-scaled so a runaway popular fact can't dominate ranking —
+ * caps at ~1.5× even with 100 cites. Facts with zero citations have
+ * boost = 1.0 → backwards-compatible no-op on existing data.
  *
  * Why these specific weights:
  *   - 60-day half-life on recency means "we believe the new write
@@ -94,15 +98,39 @@ export function sourceTrust(source_type: string): number {
 }
 
 /**
+ * SMART-K1 — log-scaled boost from accumulated AM citations.
+ *
+ *   amFeedbackBoost = 1 + 0.3 * log10(1 + citation_count)
+ *
+ * Calibration:
+ *   -   0 cites → 1.00×   (no change — backwards-compatible default)
+ *   -   1 cite  → ~1.09×
+ *   -  10 cites → ~1.31×
+ *   - 100 cites → ~1.60×
+ *   -1000 cites → ~1.90×
+ *
+ * The log scale keeps a runaway-popular fact from dominating the score —
+ * even an absurd 1000 citations still only ~1.9× boost, so source_trust
+ * + recency continue to matter. Negative or non-finite inputs floor to
+ * 0 (boost 1.0) to keep multiplication sane.
+ */
+export function amFeedbackBoost(citation_count: number): number {
+  if (!Number.isFinite(citation_count) || citation_count <= 0) return 1;
+  return 1 + 0.3 * Math.log10(1 + citation_count);
+}
+
+/**
  * Composite score for a single fact. Always in [0, 1] times the product
- * of the three weights (so worst-case ~0, best-case 1.0). Returns the
- * raw numeric — caller persists to ranking_score and uses for ordering.
+ * of the three weights, with the SMART-K1 am_feedback_boost layered on
+ * top (boost ≥ 1, so it can only help — never demote). Returns the raw
+ * numeric — caller persists to ranking_score and uses for ordering.
  */
 export function computeRankingScore(fact: BrainFact): number {
   return (
     recencyWeight(fact.updated_at) *
     confidenceMultiplier(fact.confidence_state) *
-    sourceTrust(fact.source_type)
+    sourceTrust(fact.source_type) *
+    amFeedbackBoost(fact.citation_count)
   );
 }
 

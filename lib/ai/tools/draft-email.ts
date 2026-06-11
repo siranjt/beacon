@@ -114,7 +114,8 @@ function buildCustomerSnapshot(c: ScoredCustomerV2 | null): string {
 export const draftEmailToContactTool: BeaconTool = {
   name: "draft_email_to_contact",
   description:
-    "Draft an email to a customer contact in the AM's voice. Use this whenever the user says 'draft an outreach', 'compose an email to them', 'send a check-in', or anything similar that produces an outbound email. Beacon will pick the best contact (default: top HubSpot contact, or pass `contact_email` to target a specific one). The draft references 1-2 specific data points about this customer so it doesn't read like a template. `body_brief` is what you want the email to convey — short prose describing intent, tone, the angle. `subject_brief` is optional; if omitted, Beacon writes one. The AM previews + approves before anything is generated; on approve, Beacon produces the final subject + body and the AM gets Copy + Open-in-Gmail. Beacon does NOT send the email — it stages a draft.",
+    "Draft a customer-facing email in the AM's voice. Picks the top HubSpot contact by default; pass `contact_email` to target a specific recipient. `body_brief` (required, 1-3 sentences) tells Beam intent + tone + angle. The AM previews and approves; Beam never sends — it stages a draft.\n" +
+    "Trigger phrases: \"draft an outreach to Acme\", \"compose an email to the owner\", \"write a check-in to Hannah\", \"send them a follow-up\".",
   input_schema: {
     type: "object",
     properties: {

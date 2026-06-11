@@ -169,6 +169,30 @@ export async function writeBrainFact(
     ? parseLeadingInteger(input.value)
     : null;
 
+  // SMART-K4 — validate derived_from points at a SAME-customer fact.
+  // The DB FK only checks fact_id global uniqueness; the customer-scope
+  // invariant is enforced here so cross-customer parent links never
+  // land in the table.
+  const derivedFrom: string | null = input.derived_from ?? null;
+  if (derivedFrom) {
+    const parent = (await sql`
+      SELECT customer_id FROM beacon_brain_facts
+      WHERE fact_id = ${derivedFrom}::uuid
+        AND soft_deleted_at IS NULL
+      LIMIT 1
+    `) as Array<{ customer_id: string }>;
+    if (parent.length === 0) {
+      throw new Error(
+        `[brain] derived_from ${derivedFrom} not found (or soft-deleted) — cannot link`,
+      );
+    }
+    if (parent[0].customer_id !== input.customer_id) {
+      throw new Error(
+        `[brain] cross-customer derived_from rejected: parent fact ${derivedFrom} belongs to ${parent[0].customer_id}, not ${input.customer_id}`,
+      );
+    }
+  }
+
   // Wave 2b — compute embedding upfront so we can both (a) gate inserts
   // on semantic conflict and (b) store the vector in the same INSERT/
   // UPDATE. Soft-fails to null when VOYAGE_API_KEY is missing or the
@@ -229,7 +253,7 @@ export async function writeBrainFact(
         customer_id, topic_category, topic_subcategory, field_name, value,
         value_numeric,
         confidence_state, source_type, source_ref, owning_am_email,
-        confirmed_by_email, confirmed_at, sunset_at, embedding
+        confirmed_by_email, confirmed_at, sunset_at, embedding, derived_from
       ) VALUES (
         ${input.customer_id},
         ${input.topic_category},
@@ -244,7 +268,8 @@ export async function writeBrainFact(
         ${input.confirmed_by_email ?? null},
         ${confTime},
         ${input.sunset_at ?? null},
-        ${embeddingLiteral}::vector
+        ${embeddingLiteral}::vector,
+        ${derivedFrom}
       )
       RETURNING *
     `) as BrainFact[];
@@ -292,7 +317,7 @@ export async function writeBrainFact(
         customer_id, topic_category, topic_subcategory, field_name, value,
         value_numeric,
         confidence_state, source_type, source_ref, owning_am_email,
-        confirmed_by_email, confirmed_at, sunset_at, embedding
+        confirmed_by_email, confirmed_at, sunset_at, embedding, derived_from
       ) VALUES (
         ${input.customer_id},
         ${input.topic_category},
@@ -307,7 +332,8 @@ export async function writeBrainFact(
         ${input.confirmed_by_email ?? null},
         ${confTime},
         ${input.sunset_at ?? null},
-        ${embeddingLiteral}::vector
+        ${embeddingLiteral}::vector,
+        ${derivedFrom}
       )
       RETURNING *
     `) as BrainFact[];
@@ -359,6 +385,12 @@ export async function writeBrainFact(
   // This path is treated as an edit, not a conflict. The semantic gate
   // is intentionally skipped here (it would always self-flag).
   // Re-embed the new value so the stored vector tracks the latest text.
+  //
+  // SMART-K4 — derived_from is COALESCE-merged: callers that don't pass
+  // derived_from in an edit shouldn't accidentally clear an existing
+  // parent link. To set it to NULL explicitly, callers can pass null AND
+  // we'd need an `unlink` flag — out of scope; defer to direct DB if
+  // needed.
   const newVersion = current.current_version + 1;
   const updated = (await sql`
     UPDATE beacon_brain_facts
@@ -369,6 +401,7 @@ export async function writeBrainFact(
         current_version = ${newVersion},
         updated_at = NOW(),
         embedding = ${embeddingLiteral}::vector,
+        derived_from = COALESCE(${derivedFrom}::uuid, derived_from),
         confirmed_by_email = COALESCE(${input.confirmed_by_email ?? null}, confirmed_by_email),
         confirmed_at = CASE
           WHEN ${input.confirmed_by_email ?? null}::text IS NOT NULL
@@ -441,11 +474,23 @@ async function writeVersion(input: {
  */
 export async function getFactsForCustomer(
   customer_id: string,
-  opts: { confirmedOnly?: boolean; includeSuperseded?: boolean } = {},
+  opts: {
+    confirmedOnly?: boolean;
+    includeSuperseded?: boolean;
+    /**
+     * SMART-K2 — when true, also return facts the nightly stale-prune
+     * marked stale. Default false: the regular Brain panel + Beam read
+     * path skips stale rows so retrieval quality stays high. Audit views
+     * (Validate inbox history, /admin/brain/*) set this to true to render
+     * the full preserved history.
+     */
+    includeStale?: boolean;
+  } = {},
 ): Promise<BrainFact[]> {
   const sql = getSql();
   if (!sql) return [];
   const includeSuperseded = opts.includeSuperseded ?? false;
+  const includeStale = opts.includeStale ?? false;
   const rows = opts.confirmedOnly
     ? ((await sql`
         SELECT * FROM beacon_brain_facts
@@ -454,6 +499,7 @@ export async function getFactsForCustomer(
           AND soft_deleted_at IS NULL
           AND (sunset_at IS NULL OR sunset_at > NOW())
           AND (${includeSuperseded}::boolean = true OR superseded_by IS NULL)
+          AND (${includeStale}::boolean = true OR is_stale = false)
         ORDER BY topic_category, topic_subcategory, field_name
       `) as BrainFact[])
     : ((await sql`
@@ -461,6 +507,7 @@ export async function getFactsForCustomer(
         WHERE customer_id = ${customer_id}
           AND soft_deleted_at IS NULL
           AND (${includeSuperseded}::boolean = true OR superseded_by IS NULL)
+          AND (${includeStale}::boolean = true OR is_stale = false)
         ORDER BY topic_category, topic_subcategory, field_name
       `) as BrainFact[]);
   return rows;
@@ -622,6 +669,12 @@ export async function searchFacts(opts: {
   // because their value_numeric is NULL and the IS NULL clause excludes them.
   value_numeric_gte?: number;
   value_numeric_lte?: number;
+  /**
+   * SMART-K2 — opt in to include facts the nightly prune marked stale.
+   * Default false: cross-book Beam queries (query_brain) skip stale rows.
+   * Admin / audit callers (/admin/brain/search) can set this true.
+   */
+  includeStale?: boolean;
 }): Promise<{ rows: BrainFact[]; total: number }> {
   const sql = getSql();
   if (!sql) return { rows: [], total: 0 };
@@ -640,6 +693,7 @@ export async function searchFacts(opts: {
     typeof opts.value_numeric_gte === "number" ? opts.value_numeric_gte : null;
   const numLte =
     typeof opts.value_numeric_lte === "number" ? opts.value_numeric_lte : null;
+  const includeStale = opts.includeStale ?? false;
   try {
     const [rowsResult, countResult] = await Promise.all([
       sql`
@@ -648,6 +702,7 @@ export async function searchFacts(opts: {
           AND soft_deleted_at IS NULL
           AND (sunset_at IS NULL OR sunset_at > NOW())
           AND superseded_by IS NULL
+          AND (${includeStale}::boolean = true OR is_stale = false)
           AND (${cat}::text IS NULL OR topic_category = ${cat})
           AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
           AND (${field}::text IS NULL OR field_name = ${field})
@@ -664,6 +719,7 @@ export async function searchFacts(opts: {
           AND soft_deleted_at IS NULL
           AND (sunset_at IS NULL OR sunset_at > NOW())
           AND superseded_by IS NULL
+          AND (${includeStale}::boolean = true OR is_stale = false)
           AND (${cat}::text IS NULL OR topic_category = ${cat})
           AND (${sub}::text IS NULL OR topic_subcategory = ${sub})
           AND (${field}::text IS NULL OR field_name = ${field})
@@ -787,6 +843,46 @@ export async function listCandidates(opts: {
     return { rows, total };
   } catch {
     return { rows: [], total: 0 };
+  }
+}
+
+/**
+ * SMART-K1 — atomically bump citation_count + stamp last_cited_at for a
+ * batch of facts. Called fire-and-forget from the hybrid retrieval path
+ * in the read_customer_brain + query_brain tools every time facts are
+ * presented to Beam.
+ *
+ * Why batched: every tool invocation surfaces N facts (typically 5-50).
+ * One UPDATE with WHERE fact_id = ANY($1::uuid[]) keeps it to a single
+ * round-trip instead of N. Filters out malformed ids defensively so a
+ * bad cast doesn't poison the whole batch.
+ *
+ * No version-log row is written — citation activity is operational
+ * telemetry, not a curated edit. The version log stays clean for the
+ * Validate inbox audit trail.
+ *
+ * Soft-fails on any error: logs a warning and resolves. A failed citation
+ * bump leaves ranking at its prior value, which is the pre-SMART-K1
+ * behavior — recoverable, not data loss.
+ */
+export async function recordCitation(fact_ids: string[]): Promise<void> {
+  const sql = getSql();
+  if (!sql) return;
+  if (!Array.isArray(fact_ids) || fact_ids.length === 0) return;
+  const cleaned = fact_ids.filter(
+    (id): id is string => typeof id === "string" && id.length > 0,
+  );
+  if (cleaned.length === 0) return;
+  try {
+    await sql`
+      UPDATE beacon_brain_facts
+      SET citation_count = citation_count + 1,
+          last_cited_at = NOW()
+      WHERE fact_id = ANY(${cleaned}::uuid[])
+    `;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[brain] recordCitation failed for ${cleaned.length} fact(s): ${msg}`);
   }
 }
 

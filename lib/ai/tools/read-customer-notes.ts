@@ -27,9 +27,8 @@ function clipPreview(s: string): string {
 export const readCustomerNotesTool: BeaconTool = {
   name: "read_customer_notes",
   description:
-    "Read the private AM notes saved for a specific customer. Notes are typed by AMs to capture private context that doesn't fit into structured signals (e.g. 'spoke with owner about pricing concerns', 'wife handles billing', 'restructuring barbershop'). Each AM writes their own note per customer — they don't see each other's notes. " +
-    "Role-scoped: when an AM asks, returns ONLY that AM's own note for the customer. When a manager or admin asks, returns notes from EVERY AM who has written one for that customer (sorted newest first). " +
-    "READ-ONLY tool — no approval required. Use when the user asks about saved notes, prior context, or 'what did I/we write about X'. Pair with lookup_customer if the user references a customer by name rather than entity_id.",
+    "Read the private AM notes saved for a customer (free-form context that doesn't fit structured signals). Read-only. AM asker → only their own note. Manager/admin asker → notes from every AM who has written one, newest first.\n" +
+    "Trigger phrases: \"what did I write about Acme?\", \"any notes on this customer?\", \"show me prior context\", \"what did we capture last time?\".",
   input_schema: {
     type: "object",
     properties: {

@@ -13,6 +13,7 @@ import {
   recencyWeight,
   confidenceMultiplier,
   sourceTrust,
+  amFeedbackBoost,
   computeRankingScore,
   resolveCluster,
   RECENCY_HALF_LIFE_DAYS,
@@ -25,6 +26,8 @@ function f(opts: {
   updated_at?: Date | string | null;
   confidence_state?: "confirmed" | "candidate";
   source_type?: string;
+  citation_count?: number;
+  last_cited_at?: string | null;
 }): BrainFact {
   return {
     fact_id: opts.fact_id ?? "test-id",
@@ -50,6 +53,8 @@ function f(opts: {
           : opts.updated_at,
     soft_deleted_at: null,
     value_numeric: null,
+    citation_count: opts.citation_count ?? 0,
+    last_cited_at: opts.last_cited_at ?? null,
   } as BrainFact;
 }
 
@@ -139,6 +144,39 @@ describe("sourceTrust — ordering", () => {
     expect(sourceTrust("beacon_ai_conversation")).toBeGreaterThan(
       sourceTrust("unknown_source"),
     );
+  });
+});
+
+describe("amFeedbackBoost — SMART-K1 citation-driven boost", () => {
+  it("returns 1.0 (no boost) for zero citations", () => {
+    expect(amFeedbackBoost(0)).toBe(1);
+  });
+
+  it("returns 1.0 for negative or non-finite counts (defensive)", () => {
+    expect(amFeedbackBoost(-5)).toBe(1);
+    expect(amFeedbackBoost(NaN)).toBe(1);
+    expect(amFeedbackBoost(Infinity)).toBe(1);
+  });
+
+  it("scales log10 — 10 cites → ~1.31×, 100 cites → ~1.60×", () => {
+    // 1 + 0.3 * log10(1 + 10) = 1 + 0.3 * log10(11) ≈ 1.3125
+    expect(amFeedbackBoost(10)).toBeCloseTo(1.3125, 3);
+    // 1 + 0.3 * log10(101) ≈ 1.6014
+    expect(amFeedbackBoost(100)).toBeCloseTo(1.6014, 3);
+  });
+
+  it("is monotonic non-decreasing as citation_count grows", () => {
+    const counts = [0, 1, 5, 10, 25, 100, 500, 1000];
+    for (let i = 1; i < counts.length; i++) {
+      expect(amFeedbackBoost(counts[i])).toBeGreaterThanOrEqual(
+        amFeedbackBoost(counts[i - 1]),
+      );
+    }
+  });
+
+  it("caps boost at a reasonable ceiling — even 1000 cites stay below 2x", () => {
+    // 1 + 0.3 * log10(1001) ≈ 1.9013 — well below 2x, prevents runaway.
+    expect(amFeedbackBoost(1000)).toBeLessThan(2);
   });
 });
 

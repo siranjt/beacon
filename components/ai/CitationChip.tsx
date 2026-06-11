@@ -297,9 +297,16 @@ export default function CitationChip({ citationKey, entry }: Props) {
  * keyframes here.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const MATCHED_VIA_COLOR: Record<"embedding" | "keyword", string> = {
+const MATCHED_VIA_COLOR: Record<
+  "embedding" | "keyword" | "derived_expansion",
+  string
+> = {
   embedding: C.lapis,
   keyword: C.patina,
+  // SMART-K4 — parent fact auto-pulled because a derived child landed in
+  // top-K. Visually distinct from embedding/keyword (different palette
+  // slot) so the AM can tell the fact wasn't directly ranked.
+  derived_expansion: C.brass,
 };
 
 function ordinalSuffix(n: number): string {
@@ -327,7 +334,7 @@ export function formatProvenanceTrace(p: CitationProvenance): {
   rrfLabel: string;
   rerankLabel: string;
   rerankPct: number | null;
-  matchedVia: Array<"embedding" | "keyword">;
+  matchedVia: Array<"embedding" | "keyword" | "derived_expansion">;
 } {
   const rank = Math.max(1, Math.floor(p.rank || 1));
   const pool = Math.max(rank, Math.floor(p.candidate_pool_size || 0));

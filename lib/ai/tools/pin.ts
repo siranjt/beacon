@@ -18,7 +18,8 @@ import type { BeaconTool, ToolExecutionContext, ToolResult } from "./index";
 export const pinCustomerTool: BeaconTool = {
   name: "pin_customer",
   description:
-    "Pin or unpin a customer. Pinned customers are surfaced at the top of the AM's book and on Monday Briefing as priority follow-ups. Use this when the AM has signalled (in the conversation or via their data) that this customer needs more attention than the score alone suggests — for example a hot lead, a churn-save save in progress, or a manager-flagged escalation. Set `pin: true` to add to the pinned list, `pin: false` to remove. The action is idempotent — pinning an already-pinned customer (or unpinning an unpinned one) is a no-op.",
+    "Pin (`pin: true`) or unpin (`pin: false`) a customer. Pinned customers float to the top of the AM's book + Monday Briefing as priority follow-ups. Use when this customer needs more attention than the score alone suggests. Idempotent.\n" +
+    "Trigger phrases: \"pin Acme to the top\", \"unpin them\", \"keep an eye on this one\", \"surface them for me this week\".",
   input_schema: {
     type: "object",
     properties: {

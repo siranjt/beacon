@@ -639,7 +639,9 @@ function parseInput(args: Record<string, unknown>): QueryInput | { error: string
 export const queryCustomerBookTool: BeaconTool = {
   name: "query_customer_book",
   description:
-    "Run an ad-hoc slice-and-dice query over the active customer book. Use this when the user asks a question that requires aggregating customer-level data along a dimension (AM, pod, tier, lifecycle state, stoplight) with a metric (outbound silence, inbound silence, MRR, app usage, open tickets, missed payments, past-due amount, composite score) that ISN'T already pre-computed in CONTEXT. Examples this tool handles cleanly: 'how many customers haven't we contacted in 30/60/90/120 days, by AM' (metric=outbound_silence, group_by=am, buckets={type:'threshold', threshold_values:[30,60,90,120]}); 'MRR by tier' (metric=mrr, group_by=tier, buckets={type:'sum'}); 'open tickets by pod' (metric=open_tickets, group_by=pod, buckets={type:'threshold', threshold_values:[1,3,5]}); 'customers with composite ≥80 by stoplight' (filter={stoplight:['RED']}, metric=composite_score, group_by=stoplight, buckets={type:'range', ranges:[{label:'80-89', min:80, max:89},{label:'90+', min:90, max:100}]}). READ-ONLY — no mutation. If the answer is already in CONTEXT.outbound_silence_buckets_by_am or CONTEXT.health_summary, DO NOT call this — answer directly. Only call when the slice is off-menu.",
+    "Ad-hoc slice-and-dice over the active customer book — pick a metric (outbound_silence, inbound_silence, mrr, app_usage_30d, open_tickets, missed_payments, past_due_amount, composite_score), a group_by (am, pod, tier, lifecycle_state, stoplight, none), and a bucket spec (threshold = cumulative 'X+'; range = disjoint bands; sum = aggregate). Optional `filter` narrows before grouping. Read-only.\n" +
+    "If the answer is already in CONTEXT.outbound_silence_buckets_by_am or CONTEXT.health_summary, answer directly — only call this for off-menu slices.\n" +
+    "Trigger phrases: \"how many customers haven't we contacted in 30/60/90 days by AM?\", \"MRR by tier\", \"open tickets by pod\", \"composite 80+ by stoplight\".",
   input_schema: {
     type: "object",
     properties: {

@@ -63,9 +63,8 @@ function dollars(cents: number | null | undefined): number {
 export const getChargebeeBillingTool: BeaconTool = {
   name: "get_chargebee_billing",
   description:
-    "Pull a customer's billing state from Chargebee — customer record, subscriptions, last 20 invoices (any status), last 20 transactions. Use when the user asks about billing: 'is X paid up?', 'any failed payments?', 'what's their billing history?', 'why is X disputed?', 'auto-debit status?'. " +
-    "Resolves entity_id → Chargebee customer_id via the snapshot. Hits Chargebee live; rate-limited by the executor. " +
-    "READ-ONLY tool — no approval card. Reach for this whenever billing comes up.",
+    "Pull a customer's live billing state from Chargebee — customer record, subscriptions, last 20 invoices (any status), last 20 transactions. Read-only.\n" +
+    "Trigger phrases: \"are they paid up?\", \"any failed payments?\", \"what's their billing history?\", \"auto-debit status?\", \"why is the invoice overdue?\".",
   input_schema: {
     type: "object",
     properties: {

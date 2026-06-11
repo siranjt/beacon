@@ -78,12 +78,8 @@ function nowMs(): number {
 export const getFullCustomerViewTool: BeaconTool = {
   name: "get_full_customer_view",
   description:
-    "Pull a HOLISTIC bundle for one customer in a single call — Keeper facts, comms perspective, performance summary (YTD leads + GBP click trend + keyword count), open escalations, and notes summary. " +
-    "Use this when the user asks for the FULL picture of a customer ('tell me everything about X', 'brief me on Y', 'give me the full picture of Z', 'walk me through X'). It returns one structured response covering what would otherwise take 4-5 chained read_* tool calls. Faster (one round-trip, parallel sub-loads) and more coherent (single answer informed by every section at once). " +
-    "Two retrieval modes for the Keeper portion:\n" +
-    "  - Pass `question` (a short phrase of what the AM is trying to learn) to get the top-10 most relevant Keeper facts (hybrid retrieval + rerank). Use this when the holistic ask has a specific intent ('brief me on X focusing on churn risk', 'tell me everything about Y especially their billing').\n" +
-    "  - Omit `question` to get the full topic-clustered Keeper block (up to 40 confirmed facts). Use this for an open-ended 'tell me about X'.\n" +
-    "Read-only — no approval required. Every sub-section can independently be null if its loader soft-fails or has no data; the response carries a `meta` block telling you which sections loaded vs failed. Always check `meta.loaded` before claiming a section is empty.",
+    "Pull a holistic bundle for one customer in one call — Keeper facts, comms perspective, performance summary (YTD leads + GBP click trend + keyword count), open escalations, notes summary. Replaces 4-5 chained read_* calls. Pass `question` to scope Keeper retrieval to the top-10 most relevant facts; omit for the full topic-clustered block. Read-only. Each section is independently nullable on soft-fail — always check `meta.loaded` before claiming a section is empty.\n" +
+    "Trigger phrases: \"tell me everything about Acme\", \"brief me on this customer\", \"give me the full picture\", \"walk me through them\".",
   input_schema: {
     type: "object",
     properties: {

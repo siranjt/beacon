@@ -158,6 +158,51 @@ export interface BrainFact {
    * should not access this field directly; query through the helper.
    */
   embedding?: number[] | string | null;
+  /**
+   * SMART-K1 — AM-feedback citation counter. Bumped (fire-and-forget) every
+   * time the fact is presented to Beam through the hybrid retrieval path
+   * (read_customer_brain or query_brain). Drives amFeedbackBoost() in
+   * ranking.ts so frequently-cited facts surface earlier on future
+   * retrievals. Backwards-compat: defaults to 0 on existing rows → boost
+   * 1.0 → no change to ranking until citations accumulate.
+   */
+  citation_count: number;
+  /**
+   * SMART-K1 — wall-clock of the most recent citation bump. NULL when the
+   * fact has never been presented. Currently used for diagnostics + future
+   * "decay stale citations" sweeps; not factored into amFeedbackBoost yet.
+   */
+  last_cited_at: string | null;
+  /**
+   * SMART-K2 — when true, this fact is hidden from default retrieval but
+   * preserved on the row for audit. Set by the daily stale-prune cron
+   * (lib/brain/stale-prune.ts) when a fact has gone untouched for 6+
+   * months AND has zero citations. Defaults to false; existing rows stay
+   * live until the next prune sweep judges them.
+   */
+  is_stale?: boolean;
+  /**
+   * SMART-K2 — wall-clock when is_stale was flipped to true. NULL on live
+   * rows. Kept distinct from updated_at so the prune sweep doesn't drag
+   * every fact's recency score down on every nightly run.
+   */
+  marked_stale_at?: string | null;
+  /**
+   * SMART-K4 — parent fact this row is derived from (same customer scope).
+   * Lets retrieveFactsHybrid auto-pull the parent when a derived child
+   * lands in the top-K, so Beam sees both rows side-by-side and never
+   * cites a child fact without the parent context.
+   *
+   * NULL on every existing row (backwards compatible). Set explicitly by
+   * AMs via the add_fact_to_brain tool when classifying a fact that's
+   * derived from another (e.g. owner_email derived from owner_info,
+   * preferred_channel derived from comms_preference).
+   *
+   * Cross-customer references are rejected at writeBrainFact validation
+   * time. The DB-level FK only enforces fact_id global uniqueness; the
+   * same-customer invariant lives in application code.
+   */
+  derived_from?: string | null;
 }
 
 /** Version log row — append-only history. */
@@ -225,6 +270,13 @@ export interface BrainFactWrite {
    * SemanticConflictError.
    */
   force_semantic_conflict?: boolean;
+  /**
+   * SMART-K4 — parent fact this row is derived from. Must point at a
+   * fact_id under the SAME customer_id; writeBrainFact rejects cross-
+   * customer references. Optional / nullable for backwards compatibility
+   * (most facts have no parent).
+   */
+  derived_from?: string | null;
 }
 
 /**
@@ -263,6 +315,11 @@ export const FIELD_CATALOG: Record<
       "sold_at",
       "sales_promise",
       "time_to_first_value",
+      // Wave 2c.4 (v3) — specific commitments made at sale that CS/AM now
+      // has to deliver. Distinct from sales_promise (which is the headline
+      // pitch); this is the granular "AE said X" that becomes a churn risk
+      // if not honored. Promoted from 'other' (heaviest pattern observed).
+      "ae_commitment",
     ],
   },
   // Wave 1.1 — AM ownership + transition history. The 4 DERIVED fields
@@ -277,6 +334,11 @@ export const FIELD_CATALOG: Record<
       "last_transition_at",
       "transition_reason",
       "customer_relationship_context",
+      // Wave 2c.4 (v3) — last AM before the current one. Distinct from
+      // transition_history (free-form narrative chain); this is the
+      // single most-recent prior AM name for quick lookups. Common
+      // pattern in 'other' when AMs document handoffs.
+      "prior_am",
     ],
   },
   // Wave 1.1 — the actual shape of the business.
@@ -291,6 +353,11 @@ export const FIELD_CATALOG: Record<
       "ownership_structure",
       "business_model_note",
       "aesthetic_market_segment",
+      // Wave 2c.4 (v3) — specific service specialty the shop is known
+      // for (e.g. "balayage", "color correction", "box braids"). Distinct
+      // from service_focus (broad category) — this is the differentiator
+      // that drives the customer's local SEO + word-of-mouth pull.
+      "service_specialty",
     ],
   },
   // operational
@@ -302,11 +369,24 @@ export const FIELD_CATALOG: Record<
       "contract_start",
       "contract_renewal_at",
       "mrr_amount",
+      // Wave 2c.4 (v3) — categorical pricing posture. Common values:
+      // "standard" / "promotional" / "grandfathered" / "discounted".
+      // Lets renewal conversations differentiate "we honored their
+      // launch deal" from "they're paying full freight".
+      "pricing_tier",
     ],
   },
   integration: {
     category: "operational",
-    named_fields: ["platform", "integration_state", "integration_notes"],
+    named_fields: [
+      "platform",
+      "integration_state",
+      "integration_notes",
+      // Wave 2c.4 (v3) — chain of prior booking platforms before Zoca
+      // (e.g. "Square → GlossGenius → Zoca"). Common 'other' pattern when
+      // AMs document migration history during onboarding diagnostics.
+      "migration_history",
+    ],
   },
   feature_usage: {
     category: "operational",
@@ -383,7 +463,16 @@ export const FIELD_CATALOG: Record<
   },
   seasonal: {
     category: "behavioral",
-    named_fields: ["high_season_months", "low_season_notes", "vacation_dates"],
+    named_fields: [
+      "high_season_months",
+      "low_season_notes",
+      "vacation_dates",
+      // Wave 2c.4 (v3) — explicit slow-months list (e.g.
+      // "January, August"). Distinct from low_season_notes (free-form
+      // narrative); this is the discrete list for filtering and
+      // scheduling-aware AI suggestions.
+      "slow_months",
+    ],
   },
   demo_style: {
     category: "behavioral",
@@ -421,7 +510,19 @@ export const FIELD_CATALOG: Record<
   // concerns
   latent_risk: {
     category: "concerns",
-    named_fields: ["risk_description", "risk_severity", "watch_until"],
+    named_fields: [
+      "risk_description",
+      "risk_severity",
+      "watch_until",
+      // Wave 2c.4 (v3) — classification of the risk axis. Common values:
+      // "billing" / "delivery" / "perception" / "relationship". Surfaces
+      // for filterable risk dashboards (e.g. "all billing risks open").
+      "risk_category",
+      // Wave 2c.4 (v3) — date-shaped (YYYY-MM-DD). When the risk was
+      // resolved or stepped down. Lets AMs distinguish closed-out risks
+      // from active ones without soft-deleting the fact.
+      "mitigated_at",
+    ],
   },
   next_call_agenda: {
     category: "concerns",

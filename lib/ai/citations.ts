@@ -72,8 +72,15 @@ export type CitationCategory =
  * existing "source" line without the rerank UI.
  */
 export interface CitationProvenance {
-  /** Which retrieval stages surfaced this fact. */
-  matched_via: Array<"embedding" | "keyword">;
+  /**
+   * Which retrieval stages surfaced this fact.
+   *
+   * SMART-K4 — `derived_expansion` means the fact wasn't ranked by either
+   * stage but was pulled in because a derived child fact in the result
+   * pointed at it via derived_from. The chip renders this as a soft "↑
+   * parent context" badge so the AM knows it landed via auto-pull.
+   */
+  matched_via: Array<"embedding" | "keyword" | "derived_expansion">;
   /** Sum of reciprocal ranks across signals from the RRF merge. */
   rrf_score: number;
   /** Voyage rerank-2.5-lite relevance score, 0-1. Null when rerank skipped/failed. */
@@ -192,7 +199,7 @@ export function buildBrainProvenanceCitations(args: {
     topic_subcategory?: string | null;
     field_name?: string | null;
     value: string;
-    matched_via: Array<"embedding" | "keyword">;
+    matched_via: Array<"embedding" | "keyword" | "derived_expansion">;
     rrf_score: number;
     /** Voyage rerank-2.5-lite score, 0-1. May be null when rerank skipped. */
     relevance_score: number | null;

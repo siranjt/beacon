@@ -19,7 +19,8 @@ const MAX_NOTE_LEN = 4000;
 export const addNoteTool: BeaconTool = {
   name: "add_note",
   description:
-    "Save (or update) the AM's private note on this customer. Use this when the conversation surfaces context worth capturing — owner mood, decision history, pending follow-ups, context the next AM should know. The note is private to this AM and survives across views and devices. There is ONE note per AM-customer pair (not a journal), so when adding new context, draft the FULL replacement body — Beacon will append to the existing note for the AM rather than overwrite blindly. Be specific and dated where it helps (e.g. 'May 26 — owner said they're moving to a new shop in July, holding off on launch until then').",
+    "Save private AM context to the customer's note (owner mood, decision history, pending follow-ups, hand-off context). One note per AM-customer pair — Beam prepends new content to the existing note, so write the new entry, not a full rewrite. Date-prefix time-sensitive entries (e.g. 'May 26 — owner moving shops in July').\n" +
+    "Trigger phrases: \"note that the owner is on vacation\", \"remember they're switching banks\", \"jot down: waiting on legal\", \"capture this for next time\".",
   input_schema: {
     type: "object",
     properties: {

@@ -994,7 +994,7 @@ export default function AskPanel() {
                 topic_subcategory?: string | null;
                 field_name?: string | null;
                 value: string;
-                matched_via: Array<"embedding" | "keyword">;
+                matched_via: Array<"embedding" | "keyword" | "derived_expansion">;
                 rrf_score: number;
                 relevance_score: number | null;
                 confirmed_at?: string | null;
@@ -1202,7 +1202,9 @@ export default function AskPanel() {
               topic_subcategory: r.topic_subcategory,
               field_name: r.field_name,
               value: r.value,
-              matched_via: r.matched_via as Array<"embedding" | "keyword">,
+              matched_via: r.matched_via as Array<
+                "embedding" | "keyword" | "derived_expansion"
+              >,
               rrf_score: r.rrf_score as number,
               relevance_score: r.relevance_score ?? null,
               confirmed_at: r.confirmed_at,

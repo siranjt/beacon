@@ -16,7 +16,8 @@ const ALLOWED_DAYS = [1, 3, 7, 14, 30] as const;
 export const snoozeCustomerTool: BeaconTool = {
   name: "snooze_customer",
   description:
-    "Snooze a customer — temporarily hide them from the AM's default triage filters for a fixed number of days. Use this when the AM has decided no action is needed on this customer right now (e.g. they just heard back from the owner, the customer is on vacation, or they're waiting on a third party). Pick a duration that matches the situation: 1-3 days for an active wait, 7 for a typical 'check back next week', 14 for an established hand-off, 30 for a long-term pause. Always include a one-line `reason` so the AM and their manager can audit later.",
+    "Snooze a customer for 1/3/7/14/30 days — hides them from the AM's default triage filters. Use when no action is needed right now (waiting on owner, on vacation, mid hand-off). Always pass a 1-line `reason` for audit.\n" +
+    "Trigger phrases: \"snooze them for a week\", \"check back next week\", \"owner's on vacation — pause for 7 days\", \"hide them till Monday\".",
   input_schema: {
     type: "object",
     properties: {

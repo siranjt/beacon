@@ -68,7 +68,8 @@ function rank(query: string, c: ScoredCustomerV2): number {
 export const lookupCustomerTool: BeaconTool = {
   name: "lookup_customer",
   description:
-    "Search for a customer by plain-English query when the current scope doesn't already list them. Use this when the user references a customer (by biz name, entity_id prefix, or Chargebee handle) that isn't in CONTEXT — for example on the inbox or post-payment scopes where only a slice of the book is loaded. Returns up to 5 matches with entity_id, bizname, AM, stoplight, composite score, tier, and last-contact date. The model can then chain a follow-up action tool (snooze / pin / mark-contacted / add-note / draft email / draft slack) using one of the returned entity_ids. This is a READ-ONLY tool — it does not need approval and does not change anything. If the user gives a clearly-listed customer in CONTEXT, prefer that over calling lookup_customer.",
+    "Fuzzy search for a customer by bizname, entity_id prefix, or Chargebee handle when they're not already in CONTEXT. Returns up to 5 matches (entity_id, bizname, AM, stoplight, composite, tier, last contact) so you can chain a follow-up action tool. Read-only. If the customer is already listed in CONTEXT, use that instead.\n" +
+    "Trigger phrases: \"look up Acme Salon\", \"find skin and tonic\", \"who's the AM on Maven & Co\".",
   input_schema: {
     type: "object",
     properties: {

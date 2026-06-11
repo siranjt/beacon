@@ -88,6 +88,10 @@
       "schedule": "30 3 * * *"
     },
     {
+      "path": "/api/cron/brain/stale-prune",
+      "schedule": "30 5 * * *"
+    },
+    {
       "path": "/api/cron/negative-keyword/refresh",
       "schedule": "0 */6 * * *"
     }
@@ -174,6 +178,10 @@
       "maxDuration": 120
     },
     "app/(miss-payment)/api/cron/miss-payment-warm/route.ts": {
+      "memory": 1024,
+      "maxDuration": 120
+    },
+    "app/(customer)/api/cron/brain/stale-prune/route.ts": {
       "memory": 1024,
       "maxDuration": 120
     }

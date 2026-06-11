@@ -64,7 +64,8 @@ function buildCustomerSnapshot(c: ScoredCustomerV2 | null): string {
 export const draftSlackMessageTool: BeaconTool = {
   name: "draft_slack_message",
   description:
-    "Draft an internal Slack message about a customer in the AM's voice. Use this whenever the user says 'ping the team', 'drop a note in #am-discussion', 'message the AM channel', or wants an internal heads-up about a customer — NOT a customer-facing email. Slack drafts are terse, lowercase, no formal greetings/closings — that's the convention internally. `channel_hint` is optional and is surfaced in the preview so the AM knows where to paste; Beacon does NOT actually post the message. Returns the draft text + the channel hint. The AM previews + approves, then gets Copy to lift the draft into Slack.",
+    "Draft an INTERNAL Slack message about a customer (terse, lowercase, no greetings — internal convention). NOT customer-facing — use draft_email_to_contact for outbound mail. `channel_hint` is shown in the preview; Beam never posts to Slack — AM copies and pastes.\n" +
+    "Trigger phrases: \"ping the team about Acme\", \"drop a note in #am-discussion\", \"flag this to my manager\", \"heads-up the AM channel\".",
   input_schema: {
     type: "object",
     properties: {

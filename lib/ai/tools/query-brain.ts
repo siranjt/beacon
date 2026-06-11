@@ -20,7 +20,7 @@
  */
 
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
-import { searchFacts } from "@/lib/brain/repo";
+import { searchFacts, recordCitation } from "@/lib/brain/repo";
 import { retrieveFactsHybrid } from "@/lib/brain/retrieve";
 import { FIELD_CATALOG } from "@/lib/brain/types";
 import { logUmbrellaActivity } from "@/lib/activity/log";
@@ -44,21 +44,11 @@ function describeCatalog(): string {
 export const queryBrainTool: BeaconTool = {
   name: "query_brain",
   description:
-    "Cross-book search over the Keeper (per-customer confirmed facts). Use when the manager asks a question that spans MULTIPLE customers and needs Keeper context — examples:\n" +
-    "  - 'Which customers prefer WhatsApp?'\n" +
-    "  - 'Show me all customers on GlossGenius'\n" +
-    "  - 'Who has a latent risk flagged?'\n" +
-    "  - 'Which customers were sold by Ravishankar N?'\n" +
-    "  - 'List everyone where auto-debit history mentions failed transactions'\n\n" +
-    "TWO query modes — pick the one that fits the question:\n\n" +
-    "1. NATURAL-LANGUAGE MODE — pass `query` (a short string describing what you're looking for). Routes through hybrid semantic + keyword search + Voyage rerank. Best for: paraphrase-tolerant questions ('who's frustrated with onboarding', 'customers worried about pricing', 'risk of churn this quarter') where the AM might phrase the fact differently than the value column. Returns the top-50 most relevant facts ranked by relevance score.\n\n" +
-    "2. STRUCTURED-FILTER MODE — pass the structured filters below (topic_category, topic_subcategory, field_name, value_contains). Use when the question maps to a clean schema lookup ('all customers on GlossGenius' → topic_subcategory='operational/platform', value_contains='GlossGenius'). Faster, deterministic, and supports pagination via limit/offset.\n\n" +
+    "Cross-book search over the Keeper (multi-customer confirmed facts). Two modes: pass `query` (natural language) to hit hybrid semantic + keyword + rerank; pass structured filters (topic_category, topic_subcategory, field_name, value_contains) for deterministic schema lookups with pagination. You can combine them (structured filters AND-narrow the hybrid search). At least one input is required. Returns customer_id, entity_id, bizname, am_name + matched fact.\n" +
     "Schema for structured mode:\n" +
     describeCatalog() +
-    "\n\nYou can combine `query` AND structured filters — the structured filters become AND-conditions on the hybrid search (e.g., `query='churn risk'` + `topic_category='concerns'` narrows hybrid search to the concerns category).\n\n" +
-    "At least ONE input is required (either `query`, or one of the structured filters). Cross-book queries with no input would return too many rows.\n\n" +
-    "Returns matching customer rows with: customer_id, entity_id, bizname, am_name, the matched fact (topic, field, value, confirmed_at). Use the rows to compose a table or narrative answer.\n\n" +
-    "Manager + admin only — AMs use read_customer_brain for their own customers. Read-only, auto-approves.",
+    "\n\nManager + admin only — AMs must use read_customer_brain for their own customers. Read-only.\n" +
+    "Trigger phrases: \"which customers prefer WhatsApp?\", \"show me everyone on GlossGenius\", \"who has a latent risk flagged?\", \"customers worried about pricing\", \"which customers were sold by Ravishankar?\".",
   input_schema: {
     type: "object",
     properties: {
@@ -169,7 +159,7 @@ export const queryBrainTool: BeaconTool = {
       let provenanceByFactId: Map<
         string,
         {
-          matched_via: Array<"embedding" | "keyword">;
+          matched_via: Array<"embedding" | "keyword" | "derived_expansion">;
           rrf_score: number;
           rerank_score: number | null;
         }
@@ -202,6 +192,14 @@ export const queryBrainTool: BeaconTool = {
           ]),
         );
         candidatePoolSize = result.candidate_pool_size;
+        // SMART-K1 — bump citation_count on every fact presented to the
+        // model through the hybrid path. Fire-and-forget (don't await,
+        // don't surface errors); the structured search path skips this
+        // because it's a deterministic schema lookup, not a relevance-
+        // ranked answer to a question.
+        if (facts.length > 0) {
+          void recordCitation(facts.map((f) => f.fact_id));
+        }
       } else {
         const out = await searchFacts({
           topic_category,
@@ -303,6 +301,11 @@ export const queryBrainTool: BeaconTool = {
           matched_via: prov?.matched_via ?? null,
           rrf_score: prov?.rrf_score ?? null,
           relevance_score: prov?.rerank_score ?? null,
+          // SMART-K4 — surface parent linkage. Lets the manager see "this
+          // owner_email was derived from owner_info" in the result table,
+          // and lets Beam reuse the parent_id when classifying a new
+          // derived child via add_fact_to_brain.
+          derived_from: f.derived_from ?? null,
         };
       });
 
