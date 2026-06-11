@@ -56,6 +56,10 @@ import {
 import { buildSystemBlocks } from "@/lib/ai/prompts";
 import { getToolsForScope, toAnthropicTools } from "@/lib/ai/tools";
 import { routeTools, type RoutingDecision } from "@/lib/ai/tool-router";
+import {
+  extractEntityIdFromToolInput,
+  shouldAllowToolUse,
+} from "@/lib/ai/bulk-guard";
 import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
 // Phase G — Knowledge Base. Each request retrieves top-K relevant docs
 // scoped to the surface; the chunks are injected into CONTEXT and a kb
@@ -549,28 +553,34 @@ export async function POST(req: NextRequest) {
         // an ActionCard from this and executes ONLY after the AM clicks
         // Approve (separate /api/ai/action/execute endpoint).
         //
-        // FIX E-16.C — enforce a HARD one-tool-per-turn cap. Even when the
-        // prompt says "act on one at a time", Sonnet sometimes emits multiple
-        // tool_use blocks in a single response (e.g. "pin all three"). Letting
-        // them all through would (a) violate the contract the prompt promises
-        // the AM and (b) cause concurrent approve cards that race the
-        // follow-up streaming turn. Cap to the first; tell the AM via a
-        // delta what happened so the conversation reads cleanly.
-        let toolUsesEmitted = 0;
+        // FIX E-16.C (original) — capped each turn at ONE tool_use block to
+        // block "do X to these 5 customers" multi-customer fanouts.
+        //
+        // SMOKE-FIX 2 — narrow the guard to entity scope. The original
+        // count-based cap misfired on legitimate multi-tool-for-one-customer
+        // questions (e.g. "how engaged are they + how are reviews?" → two
+        // reads against the SAME entity_id, both should fire). The new rule:
+        // count DISTINCT entity_ids/customer_ids across this turn's tool
+        // calls. Allow any number of calls if they all target the same
+        // customer; refuse only when calls span MULTIPLE customers (the
+        // genuine bulk-action case the original guard was built for).
+        // Tools without an entity arg (e.g. lookup_customer,
+        // query_customer_book, query_brain) carry no customer scope and are
+        // counted as "scopeless" — they pass freely.
+        const seenEntityIds = new Set<string>();
         sdkStream.on("contentBlock", (block: ContentBlock) => {
           if (block.type !== "tool_use") return;
-          if (toolUsesEmitted >= 1) {
-            // Note: we don't have a clean way to send "this is a system
-            // note from Beacon, not a model token" — surfacing via the same
-            // delta channel keeps the UX coherent. The AI will see it on
-            // its next turn (as part of the conversation transcript) and
-            // adjust naturally.
+          const callEntityId = extractEntityIdFromToolInput(block.input);
+          if (!shouldAllowToolUse(seenEntityIds, callEntityId)) {
+            // Surfacing via the same delta channel keeps the UX coherent. The
+            // model will see this on its next turn (as part of the
+            // conversation transcript) and adjust naturally.
             const skipped = `\n\n_(Beacon: I can only act on one customer at a time. Skipping the rest — start with this one, then ask me again for the next.)_`;
             assistantBuf += skipped;
             send({ delta: skipped });
             return;
           }
-          toolUsesEmitted += 1;
+          if (callEntityId) seenEntityIds.add(callEntityId);
           send({
             tool_use: {
               id: block.id,

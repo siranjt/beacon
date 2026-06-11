@@ -37,14 +37,26 @@ type ReviewRow = {
  * SQL — FROM reviews.reviews WHERE entity_id = :eid AND
  * created_at >= NOW() - :days days. Ordered desc.
  *
- * `rating` is a 1-5 integer (some rows may be NULL when only a comment
- * is left). `comment` may be NULL.
+ * Schema gotchas (verified 2026-06-11):
+ *   - `rating` is a USER-DEFINED enum with text values
+ *     ZERO/ONE/TWO/THREE/FOUR/FIVE (may be NULL). We map to integer 0-5
+ *     in SQL so the existing toNum() coercion still works.
+ *   - The comment column is `review_text` (character varying), NOT `comment`.
+ *   - `entity_id` is `uuid` so we cast the bind param.
  */
 const SQL_REVIEWS = `
 SELECT
   id::text AS id,
-  rating,
-  comment,
+  CASE rating::text
+    WHEN 'ZERO'  THEN 0
+    WHEN 'ONE'   THEN 1
+    WHEN 'TWO'   THEN 2
+    WHEN 'THREE' THEN 3
+    WHEN 'FOUR'  THEN 4
+    WHEN 'FIVE'  THEN 5
+    ELSE NULL
+  END AS rating,
+  review_text AS comment,
   reviewer_name,
   created_at::text AS created_at
 FROM reviews.reviews

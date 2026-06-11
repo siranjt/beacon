@@ -44,6 +44,13 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
  *   Review-Click-SendInviteSingle → review invite sent
  *   Reviews-Click-ReviewReplyAI   → review reply
  *   Reviews-Done-ReviewReply     → review reply completed
+ *
+ * Schema gotcha: `mixpanelzocaappdata.export` is FLAT (one column per
+ * Mixpanel property — NOT a `properties` JSONB column). The join key
+ * `locationEntityId` is a real text column. It must be double-quoted
+ * because Postgres folds unquoted identifiers to lowercase. Both `event`
+ * (text) and `"time"` (timestamptz) are real columns; `"time"` is quoted
+ * because it shadows the SQL reserved word. (Verified 2026-06-11.)
  */
 const SQL_MIXPANEL_ACTIVITY = `
 SELECT
@@ -66,7 +73,7 @@ SELECT
   MAX("time") FILTER (WHERE event = 'App/Site Opened') AS last_app_open_at,
   MAX("time") AS last_event_at
 FROM mixpanelzocaappdata.export
-WHERE properties->>'locationEntityId' = {{entity_id}}
+WHERE "locationEntityId" = {{entity_id}}
   AND "time" >= NOW() - ({{window_days}}::int * INTERVAL '1 day')
 `;
 
