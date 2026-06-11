@@ -26,9 +26,11 @@ import { useCompareSelection } from "@/lib/customer/hooks/use-compare-selection"
 // Phase E-15.4 — pin / snooze chrome extracted for file-size hygiene.
 import { PinButton, SnoozeMenu, SnoozedBanner } from "./V2CardChrome";
 import CallOutcomeControls from "./CallOutcomeControls";
-import V2TierFeedback from "./V2TierFeedback";
-// SV-10 — Shadow Verdict chip (renders nothing when customer.shadow_verdict is null).
-import V2ShadowVerdictChip from "./V2ShadowVerdictChip";
+// V2TierFeedback + V2ShadowVerdictChip retired 2026-06-10 with SV cron
+// takedown. Imports commented to silence unused-import lint; revive both
+// at once if Shadow Verdict ever comes back.
+// import V2TierFeedback from "./V2TierFeedback";
+// import V2ShadowVerdictChip from "./V2ShadowVerdictChip";
 // Phase E-15.4b — chip pile extracted.
 import {
   FlagChip,
@@ -554,16 +556,17 @@ function V2CustomerCardInner({
             >
               ↗ Open detail
             </a>
-          {/* SV-10 — Shadow Verdict chip. Surfaces the latest LLM tier next
-              to the engine's stoplight so AMs see Beacon AI's call at a
-              glance. Renders nothing when no SV row exists for this entity
-              (early shadow window, LLM run failed, or table not populated). */}
+          {/* SV-10 — Shadow Verdict chip. RETIRED 2026-06-10 — the SV cron
+              was disabled to cut Anthropic spend (~$162/mo). DB tables +
+              component code preserved for easy revival; render path
+              commented out so AMs don't see stale verdicts.
           {customer.shadow_verdict && (
             <V2ShadowVerdictChip
               shadowVerdict={customer.shadow_verdict}
               engineStoplight={s.stoplight}
             />
           )}
+          */}
           {/* Phase E-11 — signal-freshness chip. Tells AMs "this customer just
               joined, their signals haven't caught up — empty stats are by design,
               not a problem with the customer". Renders alongside / instead of
@@ -1198,14 +1201,15 @@ function V2CustomerCardInner({
                   }
                 }}
               />
-              {/* SV-5 — AM tier accuracy feedback (✓ / ✗). One vote per
-                  (entity, AM, calendar day). Captures whether the tier
-                  Beacon shows feels right in the field, feeding the
-                  shadow-verdict comparison. */}
+              {/* SV-5 — AM tier accuracy feedback (✓ / ✗). RETIRED 2026-06-10
+                  alongside SV-10. Only consumer (shadow-verdict comparison)
+                  is offline. Re-enable if we want tier feedback independent
+                  of Shadow Verdict.
               <V2TierFeedback
                 entityId={customer.entity_id}
                 stoplight={s.stoplight}
               />
+              */}
             </div>
           )}
           {actionState.kind === "error" && (

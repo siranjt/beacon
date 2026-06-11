@@ -214,16 +214,10 @@ export default async function LauncherPage() {
               >
                 Admin · Beam calibration
               </Link>
-              <Link
-                href="/admin/shadow-verdict"
-                style={{
-                  color: "var(--zoca-text-2)",
-                  textDecoration: "none",
-                  borderBottom: "1px dotted var(--zoca-text-3)",
-                }}
-              >
-                Admin · Shadow verdict
-              </Link>
+              {/* Admin · Shadow verdict — retired 2026-06-10 with SV cron
+                  takedown. Page still works for historical viewing if you
+                  navigate manually to /admin/shadow-verdict; just removed
+                  from the launcher so AMs don't land on a frozen dashboard. */}
               <Link
                 href="/admin/brain/rerank-compare"
                 style={{
