@@ -21,6 +21,7 @@ import { suggestForScope } from "@/lib/ai/suggest";
 import type { AiScope } from "@/lib/ai/scopes";
 import { logUmbrellaActivity } from "@/lib/activity/log";
 import { getRoleForEmail } from "@/lib/customer/config";
+import { getCacheStats } from "@/lib/ai/context-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,7 +72,25 @@ export async function POST(req: NextRequest) {
   }
 
   const amName = session.user?.am_name ?? null;
-  const result = await suggestForScope(body.scope, email, amName);
+
+  // OPT-5 — support `?bypassCache=1` for an explicit "refresh suggestions"
+  // UX path. Default flow uses the 30-min server cache to absorb the
+  // page-mount thrash from SuggestedActions across 10 surfaces.
+  const bypassCache = req.nextUrl.searchParams.get("bypassCache") === "1";
+
+  // Snapshot stats BEFORE the call so we can derive whether the wrapped
+  // getCachedContext above served from cache (hits delta == 1) or ran the
+  // Haiku loader (misses delta == 1). The wrapper itself doesn't surface
+  // hit/miss directly; this is the cheapest way to log it.
+  const statsBefore = getCacheStats();
+  const result = await suggestForScope(body.scope, email, amName, { bypassCache });
+  const statsAfter = getCacheStats();
+  const cacheHit = statsAfter.hits > statsBefore.hits;
+  console.log(
+    `[suggest] scope=${body.scope.kind} email=${email} cache=${cacheHit ? "HIT" : "MISS"}${
+      bypassCache ? " (bypass)" : ""
+    }`,
+  );
 
   // Telemetry only fires when we have actual suggestions to show.
   if (result.actions.length > 0) {

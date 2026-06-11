@@ -42,6 +42,8 @@ import {
 } from "./context-loaders";
 import { listFactsForUser, renderFactsForPrompt } from "./facts";
 import { getRoleForEmail } from "@/lib/customer/config";
+import { getCachedContext, makeCacheKey } from "./context-cache";
+import { todaySnapshotDate } from "@/lib/customer/pipeline-state";
 
 const MODEL = process.env.ANTHROPIC_SUGGEST_MODEL ?? "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 1500;
@@ -279,10 +281,35 @@ async function loadContextFor(
   }
 }
 
+/**
+ * OPT-5 — TTL cache window. 30min is short enough that fresh context lands
+ * within a single AM session but long enough to absorb the page-mount thrash
+ * the audit found (10 surfaces, every nav triggers SuggestedActions →
+ * /api/ai/suggest → Haiku). Stage A invalidates the "suggest" prefix when a
+ * new snapshot lands so we don't serve yesterday's recommendations.
+ */
+const SUGGEST_CACHE_TTL_MS = 30 * 60 * 1000;
+
+/** Stable key prefix used by invalidatePrefix("suggest") from refresh.ts. */
+export const SUGGEST_CACHE_PREFIX = "suggest";
+
+function scopeIdentity(scope: AiScope): { entity_id?: string; cb_customer_id?: string; am_filter?: string } {
+  switch (scope.kind) {
+    case "customer-360":
+    case "performance-report":
+      return { entity_id: scope.entityId };
+    case "post-payment-customer":
+      return { cb_customer_id: scope.cbCustomerId };
+    default:
+      return {};
+  }
+}
+
 export async function suggestForScope(
   scope: AiScope,
   email: string,
   sessionAmName: string | null = null,
+  opts: { bypassCache?: boolean } = {},
 ): Promise<SuggestResult> {
   if (scope.kind === "hidden") {
     return {
@@ -303,6 +330,46 @@ export async function suggestForScope(
   }
 
   const role = getRoleForEmail(email);
+
+  // OPT-5 — server-side memoization keyed on (scope-kind, identity, email,
+  // role, snapshot_date). Role is included because AM-filtered scopes
+  // (inbox/customer-book) load different blobs based on the caller's role.
+  // Snapshot date is included so a new daily snapshot naturally rotates the
+  // key without needing to wait out the TTL. The explicit invalidatePrefix
+  // call from Stage A is the belt over this suspenders.
+  const cacheKey = makeCacheKey(SUGGEST_CACHE_PREFIX, {
+    scope: scope.kind,
+    email,
+    role: role ?? "anon",
+    am: role === "am" ? sessionAmName ?? "" : "",
+    snapshot_date: todaySnapshotDate(),
+    ...scopeIdentity(scope),
+  });
+
+  try {
+    return await getCachedContext(
+      cacheKey,
+      () => computeSuggestion(scope, email, sessionAmName, role),
+      { ttlMs: SUGGEST_CACHE_TTL_MS, bypassCache: opts.bypassCache },
+    );
+  } catch (e) {
+    // OPT-5 — soft-fail: if the cache primitive somehow misbehaves, fall
+    // through to a live call so the user still sees suggestions. The cache
+    // is best-effort; correctness comes first.
+    console.warn(
+      "[ai/suggest] cache wrapper failed, falling back to live call:",
+      e instanceof Error ? e.message : String(e),
+    );
+    return computeSuggestion(scope, email, sessionAmName, role);
+  }
+}
+
+async function computeSuggestion(
+  scope: AiScope,
+  email: string,
+  sessionAmName: string | null,
+  role: "admin" | "manager" | "am" | null,
+): Promise<SuggestResult> {
   const ctx = await loadContextFor(scope, { am_name: sessionAmName, role }).catch(
     () => null,
   );

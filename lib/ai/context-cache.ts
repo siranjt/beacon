@@ -180,6 +180,10 @@ export function invalidateBeamContextCaches(): number {
   removed += invalidatePrefix("customer-360");
   removed += invalidatePrefix("customer-book");
   removed += invalidatePrefix("post-payment-book");
+  // OPT-5 — /api/ai/suggest is now memoized under the "suggest" prefix
+  // (see lib/ai/suggest.ts → SUGGEST_CACHE_PREFIX). New snapshot data
+  // should also rotate proactive recommendations.
+  removed += invalidatePrefix("suggest");
   return removed;
 }
 

@@ -11,6 +11,12 @@
  * Comfortably within the 90s composeSnapshot maxDuration.
  *
  * Cost: ~$0.001 per call × 100 RED × daily = ~$3/month.
+ *
+ * NOTE (OPT-7): caller (composeSnapshot in refresh.ts) now gates this to a
+ * single run per UTC day instead of every hourly compose tick. Before that
+ * gate landed, the hourly cron meant 24× the cost (~$70/month). If you wire
+ * a new caller for this function, mind the gate or re-implement equivalent
+ * idempotency — Haiku is cheap but not free.
  */
 
 import type { SnapshotV2, ScoredCustomerV2 } from "./types";

@@ -15,7 +15,7 @@ import { pgConfigured } from "./config";
  * Vercel Hobby's 60s timeout.
  */
 
-export type PipelineStage = "A" | "B" | "B2" | "C" | "D";
+export type PipelineStage = "A" | "B" | "B2" | "C" | "D" | "ENRICH";
 
 let _sql: NeonQueryFunction<false, false> | null = null;
 function getSql(): NeonQueryFunction<false, false> | null {
@@ -39,7 +39,7 @@ async function ensureStageConstraint(): Promise<void> {
   if (!sql) return;
   try {
     await sql`ALTER TABLE pipeline_state DROP CONSTRAINT IF EXISTS pipeline_state_stage_check`;
-    await sql`ALTER TABLE pipeline_state ADD CONSTRAINT pipeline_state_stage_check CHECK (stage IN ('A', 'B', 'B2', 'C', 'D'))`;
+    await sql`ALTER TABLE pipeline_state ADD CONSTRAINT pipeline_state_stage_check CHECK (stage IN ('A', 'B', 'B2', 'C', 'D', 'ENRICH'))`;
     _stageConstraintReady = true;
   } catch (e) {
     console.warn("[pipeline-state] could not expand stage CHECK constraint:", e);

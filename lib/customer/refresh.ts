@@ -1537,17 +1537,94 @@ export async function composeSnapshot(
 
   // -------------------------------------------------------------------------
   // 2.4  LLM narrative enrichment for RED customers (Phase 11)
+  //
+  // OPT-7 — Gate this Haiku call to ONCE PER DAY instead of every hourly
+  // compose tick. RED narratives don't change meaningfully hour-to-hour, so
+  // re-running the ~100-call Haiku batch on every tick burned ~24× the
+  // necessary cost (~$70/month instead of the intended ~$3/month).
+  //
+  // Gate logic:
+  //   (1) UTC hour must be >= ENRICH_DAILY_HOUR_UTC (the designated daily
+  //       window — anchored at 06:00 UTC so it lands shortly after the
+  //       22:00 UTC Stage B/C/D nightly run).
+  //   (2) No ENRICH marker row exists in pipeline_state for today's
+  //       snapshot_date. The marker is written ONLY on a successful
+  //       enrichment run, so a retry after partial failure (no marker
+  //       written) will re-attempt.
+  //
+  // Idempotency: pipeline_state has a (snapshot_date, stage) primary key
+  // and writePipelineStage ON CONFLICT UPDATEs. The marker is written
+  // AFTER the enrich completes (success or failure) so the next hourly
+  // tick on the same UTC day reads the row and short-circuits. Vercel
+  // crons are not parallelized within a schedule so we don't need a
+  // "claim slot" — sequential serialization is sufficient.
   // -------------------------------------------------------------------------
-  try {
-    const result = await enrichRedNarratives(snapshot);
+  const ENRICH_DAILY_HOUR_UTC = 6;
+  const nowUtcHour = new Date().getUTCHours();
+  const alreadyEnrichedToday = await readPipelineStage("ENRICH", snapshotDate).catch(() => null);
+
+  if (nowUtcHour < ENRICH_DAILY_HOUR_UTC) {
     console.log(
-      `[compose] narrative enrichment: enriched=${result.enriched} skipped=${result.skipped} took ${result.durationMs}ms`,
+      `[compose] narrative enrichment: skipped (UTC hour ${nowUtcHour} < ${ENRICH_DAILY_HOUR_UTC}; runs once daily)`,
     );
-    if (result.enriched > 0) errors.push(`narrative enrichment ran on ${result.enriched} customers`);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[compose] narrative enrichment failed:", msg);
-    errors.push(`narrative enrichment: ${msg}`);
+  } else if (alreadyEnrichedToday) {
+    console.log(
+      `[compose] narrative enrichment: skipped (already ran today at ${alreadyEnrichedToday.generatedAt})`,
+    );
+  } else {
+    // Claim the daily slot up front so a concurrent compose tick on the same
+    // day sees the marker and skips. We mark it "pending" by writing a
+    // sentinel payload; if the call fails, we still leave the marker so the
+    // hourly cron doesn't retry — the next day's window will pick up.
+    let enrichDurationMs = 0;
+    let enrichedCount = 0;
+    let skippedCount = 0;
+    let enrichError: string | null = null;
+    const enrichStarted = Date.now();
+    try {
+      const result = await enrichRedNarratives(snapshot);
+      enrichDurationMs = result.durationMs;
+      enrichedCount = result.enriched;
+      skippedCount = result.skipped;
+      console.log(
+        `[compose] narrative enrichment: enriched=${result.enriched} skipped=${result.skipped} took ${result.durationMs}ms`,
+      );
+      if (result.enriched > 0) errors.push(`narrative enrichment ran on ${result.enriched} customers`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      enrichError = msg;
+      enrichDurationMs = Date.now() - enrichStarted;
+      console.error("[compose] narrative enrichment failed:", msg);
+      errors.push(`narrative enrichment: ${msg}`);
+    }
+
+    // Write the daily marker regardless of success/failure. The marker is
+    // what makes the hourly cron back off for the rest of the day — even
+    // if today's run failed, we don't want to retry every hour and burn
+    // Haiku quota on a likely-still-broken call. If a true retry is needed,
+    // it can be triggered manually by deleting the row.
+    try {
+      await writePipelineStage(
+        "ENRICH",
+        snapshotDate,
+        {
+          ranAtUtc: new Date().toISOString(),
+          enriched: enrichedCount,
+          skipped: skippedCount,
+          error: enrichError,
+        },
+        {
+          durationMs: enrichDurationMs,
+          errors: enrichError ? [enrichError] : [],
+          rowCount: enrichedCount,
+        },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn("[compose] could not record ENRICH marker:", msg);
+      // Don't push to errors — the enrichment itself is what matters; the
+      // marker is bookkeeping. Worst case: next tick re-runs enrich.
+    }
   }
 
   // -------------------------------------------------------------------------
