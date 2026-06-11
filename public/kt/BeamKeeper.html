@@ -7,35 +7,43 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <style>
 /* ============================================================
-   BEACON — Cinematic narrative · v6
-   A story-driven scroll. Lighthouse. Storm. Flame. Beam. Keeper.
+   BEACON — Cinematic narrative · v7
+   Luxury product page treatment. Pagani / haute-horlogerie reference.
+   Same story arc, oversized display type, hero subjects, single warm accent.
    ============================================================ */
 :root {
-  /* Storm-night palette (extends Watchfire into the cinematic register) */
+  /* Storm-night palette */
   --night-deep:   #06101f;
   --night-mid:    #0a1428;
   --night-soft:   #1a2840;
+  --night-abyss:  #020308;
   --sea:          #0d1a2b;
   --sea-shimmer:  rgba(255, 245, 214, 0.07);
   --rock-dark:    #1a1612;
   --rock-mid:     #2c2620;
   --rock-edge:    #443a30;
-  --stone-shaft: #3a3530;
-  --stone-light: #5a4a3a;
+  --stone-shaft:  #3a3530;
+  --stone-light:  #5a4a3a;
   --stone-mortar: #1f1c18;
-  --stripe-red:  #6b2820;
-  --stripe-cream:#d8c9a8;
-  --lantern-amber: #ffd47a;
-  --lantern-glass: #2a2014;
+  --stripe-red:   #6b2820;
+  --stripe-cream: #d8c9a8;
+  --lantern-amber:#ffd47a;
+  --lantern-glass:#2a2014;
 
-  /* Flame & beam (existing Watchfire) */
+  /* Flame & beam */
   --char: #2B1F14;
   --ember: #C8431D;
   --brass: #D9A441;
+  --brass-soft: rgba(217, 164, 65, 0.55);
+  --brass-ghost: rgba(217, 164, 65, 0.18);
   --gold:  #FBBF24;
   --cream: #FFF5D6;
-  --lapis: #1A2F4A;
   --parchment: #FBF8F1;
+
+  /* Watch chapter — magenta warmth */
+  --magenta-deep:  #1a0a18;
+  --magenta-glow:  rgba(196, 76, 168, 0.32);
+  --magenta-edge:  rgba(196, 76, 168, 0.16);
 
   /* Keeper figure */
   --cloak-dark:  #0e0c0a;
@@ -53,108 +61,122 @@
   /* Easings */
   --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-soft:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.22, 1.4, 0.36, 1);
   --ease-snap:  cubic-bezier(0.65, 0, 0.35, 1);
-
-  /* Scroll handles */
-  --scroll-y: 0px;
-  --chapter-progress: 0;
 }
 
 *,*::before,*::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: var(--night-deep); color: var(--ink-bright); }
+html, body { margin: 0; padding: 0; background: var(--night-abyss); color: var(--ink-bright); }
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", system-ui, sans-serif;
   font-size: 17px;
-  line-height: 1.65;
+  line-height: 1.6;
   overflow-x: hidden;
 }
 
 /* ============================================================
-   Typography
+   TYPOGRAPHIC STACK — v7
+   Display sans (italic, heavy): Beacon · Beam · The Watch
+   Display serif (italic): Flame · Keeper · Epilogue
+   Micro-chrome: monospace small-caps brass
    ============================================================ */
-.serif { font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif; }
+.serif       { font-family: "GT Sectra Display", "Playfair Display", "Cormorant Garamond", Georgia, "Iowan Old Style", serif; }
+.display-sans{ font-family: "Editorial New", "Inter Display", "Inter", system-ui, sans-serif; font-style: italic; font-weight: 800; letter-spacing: -0.03em; }
+.display-serif{ font-family: "GT Sectra Display", "Playfair Display", "Cormorant Garamond", Georgia, serif; font-style: italic; font-weight: 500; letter-spacing: -0.012em; }
+.mono        { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace; }
 
-.chapter-numeral {
-  font-family: Georgia, serif;
-  font-style: italic;
-  font-weight: 400;
-  font-size: 14px;
-  letter-spacing: 0.42em;
+/* Eyebrow tag — small caps brass, the hallmark of a luxury brief */
+.eyebrow {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--brass);
-  opacity: 0.85;
-  display: inline-block;
-  position: relative;
-  padding-left: 56px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  opacity: 0.92;
 }
-.chapter-numeral::before {
+.eyebrow::before {
   content: '';
-  position: absolute;
-  left: 0; top: 50%;
-  width: 40px;
+  display: inline-block;
+  width: 28px;
   height: 1px;
-  background: linear-gradient(to right, transparent, var(--brass) 50%, transparent);
+  background: var(--brass);
+  opacity: 0.7;
 }
 
-.chapter-title {
-  font-family: Georgia, serif;
-  font-weight: 400;
-  font-size: clamp(40px, 7vw, 78px);
-  line-height: 1.05;
-  letter-spacing: -0.012em;
-  color: var(--ink-bright);
-  margin: 18px 0 24px;
-  max-width: 18ch;
-}
-.chapter-title em {
+/* Roman numeral chapter index — corner chrome */
+.corner-index {
+  position: absolute;
+  top: 28px;
+  left: 32px;
+  z-index: 20;
+  pointer-events: none;
+  font-family: "GT Sectra Display", Georgia, serif;
   font-style: italic;
+  font-size: 22px;
   color: var(--brass);
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 700ms var(--ease-glide), transform 700ms var(--ease-glide);
+}
+.chapter.is-active .corner-index { opacity: 0.95; transform: translateY(0); }
+.corner-index::after {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 1px;
+  margin-top: 8px;
+  background: linear-gradient(to right, var(--brass), transparent);
 }
 
-.chapter-lede {
-  font-family: Georgia, serif;
-  font-style: italic;
-  font-weight: 400;
-  font-size: clamp(20px, 2.2vw, 26px);
-  line-height: 1.5;
-  color: var(--ink-soft);
-  max-width: 34ch;
-  margin: 0 0 28px;
+/* Spec ticker — right rail micro-chrome (Pagani 01/02/03) */
+.spec-ticker {
+  position: absolute;
+  top: 28px;
+  right: 32px;
+  z-index: 20;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: right;
 }
-
-.chapter-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
-  font-size: 17px;
-  line-height: 1.7;
-  color: var(--ink-soft);
-  max-width: 48ch;
-}
-.chapter-body p + p { margin-top: 14px; }
-.chapter-body strong { color: var(--ink-bright); font-weight: 600; }
-.chapter-body code {
+.spec-ticker__item {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.86em;
-  padding: 2px 7px;
-  background: rgba(217, 164, 65, 0.10);
-  border: 1px solid rgba(217, 164, 65, 0.20);
-  border-radius: 4px;
-  color: var(--brass);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  opacity: 0;
+  transform: translateX(8px);
+  transition: opacity 600ms var(--ease-glide), transform 600ms var(--ease-glide), color 600ms var(--ease-glide);
 }
+.spec-ticker__item .spec-ticker__idx {
+  color: var(--brass);
+  margin-right: 8px;
+}
+.chapter.is-active .spec-ticker__item:nth-child(1) { opacity: 1; transform: translateX(0); transition-delay: 200ms; color: var(--ink-bright); }
+.chapter.is-active .spec-ticker__item:nth-child(2) { opacity: 0.85; transform: translateX(0); transition-delay: 500ms; }
+.chapter.is-active .spec-ticker__item:nth-child(3) { opacity: 0.65; transform: translateX(0); transition-delay: 800ms; }
 
 /* ============================================================
    Page chrome — scroll progress + nav
    ============================================================ */
 .scroll-progress {
   position: fixed; top: 0; left: 0; right: 0;
-  height: 2px;
-  background: rgba(255, 245, 214, 0.06);
+  height: 1px;
+  background: rgba(255, 245, 214, 0.04);
   z-index: 100;
 }
 .scroll-progress__bar {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, transparent, var(--ember) 25%, var(--brass) 60%, var(--cream));
+  background: linear-gradient(90deg, transparent, var(--brass) 60%, var(--cream));
   box-shadow: 0 0 12px rgba(217, 164, 65, 0.5);
   transition: width 80ms linear;
 }
@@ -162,28 +184,28 @@ body {
 .top-nav {
   position: fixed; top: 0; left: 0; right: 0;
   z-index: 90;
-  padding: 22px 32px;
+  padding: 18px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   pointer-events: none;
+  mix-blend-mode: difference;
 }
-.top-nav__brand, .top-nav__chapter {
+.top-nav__brand {
   pointer-events: auto;
-  font-family: Georgia, serif;
-  font-size: 13px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
   letter-spacing: 0.32em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  opacity: 0.7;
-  transition: opacity 400ms var(--ease-glide);
+  opacity: 0.85;
 }
 .top-nav__brand-flame {
   display: inline-block;
-  width: 6px; height: 14px;
+  width: 5px; height: 12px;
   background: radial-gradient(ellipse at 50% 60%, var(--cream), var(--brass) 40%, var(--ember) 75%, transparent);
   border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
-  vertical-align: -2px;
+  vertical-align: -1px;
   margin-right: 10px;
   animation: brand-flicker 2.4s ease-in-out infinite;
   filter: drop-shadow(0 0 4px rgba(217, 164, 65, 0.6));
@@ -193,7 +215,30 @@ body {
   35%      { transform: scaleY(1.08) scaleX(0.94); opacity: 0.92; }
   65%      { transform: scaleY(0.95) scaleX(1.05); opacity: 0.96; }
 }
-.top-nav__chapter { font-style: italic; }
+.top-nav__chapter {
+  pointer-events: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+  opacity: 0.85;
+}
+
+/* Cursor-follow accent dot (carried over) */
+.cursor-glow {
+  position: fixed;
+  width: 480px; height: 480px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(217, 164, 65, 0.06) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  transition: opacity 400ms var(--ease-glide);
+  left: 50%; top: 50%;
+}
 
 /* ============================================================
    THE SCENE — sticky cinematic stage
@@ -204,11 +249,13 @@ body {
   height: 100vh;
   width: 100%;
   overflow: hidden;
-  background: linear-gradient(180deg,
-    var(--night-deep) 0%,
-    var(--night-mid) 35%,
-    var(--night-soft) 70%,
-    var(--sea) 100%);
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 35%, rgba(217, 164, 65, 0.08), transparent 60%),
+    linear-gradient(180deg,
+      var(--night-abyss) 0%,
+      var(--night-deep) 30%,
+      var(--night-mid) 60%,
+      var(--sea) 100%);
   z-index: 1;
 }
 .stage__inner {
@@ -217,34 +264,41 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 1.2s var(--ease-glide), filter 1.2s var(--ease-glide);
+  transition: transform 1.4s var(--ease-glide), filter 1.4s var(--ease-glide);
   transform: translateY(0) scale(1);
 }
-/* Camera moves per chapter (driven by JS data-chapter on .stage-wrap) */
+/* Camera moves per chapter — bigger amplitude per brief */
 .stage-wrap[data-chapter="0"] .stage__inner { transform: translateY(4vh) scale(1.02); filter: brightness(0.85); }
-.stage-wrap[data-chapter="1"] .stage__inner { transform: translateY(0) scale(1); filter: brightness(1); }
-.stage-wrap[data-chapter="2"] .stage__inner { transform: translateY(-22vh) scale(1.55); filter: brightness(1.1); }
-.stage-wrap[data-chapter="3"] .stage__inner { transform: translateY(-12vh) scale(1.18); filter: brightness(1.05); }
-.stage-wrap[data-chapter="4"] .stage__inner { transform: translateY(14vh) scale(1.12); filter: brightness(1); }
-.stage-wrap[data-chapter="5"] .stage__inner { transform: translateY(2vh) scale(0.95); filter: brightness(1); }
-.stage-wrap[data-chapter="6"] .stage__inner { transform: translateY(-2vh) scale(0.92); filter: brightness(1.08); }
+.stage-wrap[data-chapter="1"] .stage__inner { transform: translateY(0) scale(1.04); filter: brightness(1.02); }
+.stage-wrap[data-chapter="2"] .stage__inner { transform: translateY(-26vh) scale(1.8); filter: brightness(1.18); }
+.stage-wrap[data-chapter="3"] .stage__inner { transform: translateY(-14vh) scale(1.22); filter: brightness(1.05); }
+.stage-wrap[data-chapter="4"] .stage__inner { transform: translateY(16vh) scale(1.22); filter: brightness(1); }
+.stage-wrap[data-chapter="5"] .stage__inner { transform: translateY(2vh) scale(0.88); filter: brightness(1); }
+.stage-wrap[data-chapter="6"] .stage__inner { transform: translateY(-4vh) scale(0.86); filter: brightness(1.1); }
 .stage-wrap[data-chapter="7"] .stage__inner { transform: translateY(0) scale(1); filter: brightness(1); }
 
 .stage__svg {
-  width: min(900px, 92vw);
-  height: 92vh;
-  max-height: 900px;
+  width: min(920px, 92vw);
+  height: 94vh;
+  max-height: 940px;
   display: block;
 }
 
-/* Vignette overlay */
+/* Vignette */
 .stage::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 45%, rgba(6, 16, 31, 0.65) 100%);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(2, 3, 8, 0.78) 100%);
   pointer-events: none;
   z-index: 5;
+}
+
+/* Chapter V — magenta radial swap on stage */
+.stage-wrap[data-chapter="5"] .stage {
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 45%, var(--magenta-glow), transparent 65%),
+    linear-gradient(180deg, var(--magenta-deep) 0%, var(--night-abyss) 70%);
 }
 
 /* ============================================================
@@ -274,7 +328,7 @@ body {
 }
 
 /* ============================================================
-   THE BEAM (rotating cone of light)
+   THE BEAM
    ============================================================ */
 .beam-layer {
   position: absolute;
@@ -320,7 +374,7 @@ body {
 }
 
 /* ============================================================
-   CINEMATIC TEXT OVERLAY — sits over the scene
+   CHAPTER STACK
    ============================================================ */
 .chapter-stack {
   position: relative;
@@ -341,7 +395,7 @@ body {
 .chapter__content {
   position: relative;
   z-index: 2;
-  max-width: 520px;
+  max-width: 640px;
   opacity: 0;
   transform: translateY(36px);
   transition: opacity 1100ms var(--ease-glide), transform 1100ms var(--ease-glide);
@@ -351,33 +405,113 @@ body {
   transform: translateY(0);
 }
 .chapter--center .chapter__content { text-align: center; }
-.chapter--center .chapter-title,
-.chapter--center .chapter-lede,
+.chapter--center .eyebrow { justify-content: center; }
+
+/* ============================================================
+   HERO TYPOGRAPHY — the luxury product page treatment
+   Massive italic display, fills the viewport, char-by-char reveal
+   ============================================================ */
+.hero-word {
+  font-size: clamp(96px, 18vw, 280px);
+  line-height: 0.86;
+  letter-spacing: -0.04em;
+  margin: 18px 0 12px;
+  color: var(--ink-bright);
+  display: block;
+  position: relative;
+  pointer-events: none;
+}
+.hero-word.is-sans  { font-family: "Editorial New", "Inter Display", "Inter", system-ui, sans-serif; font-style: italic; font-weight: 800; }
+.hero-word.is-serif { font-family: "GT Sectra Display", "Playfair Display", "Cormorant Garamond", Georgia, serif; font-style: italic; font-weight: 500; letter-spacing: -0.02em; }
+
+.hero-word .ch {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(36px) scale(0.96);
+  transition: opacity 700ms var(--ease-spring), transform 800ms var(--ease-spring);
+}
+.chapter.is-active .hero-word .ch { opacity: 1; transform: translateY(0) scale(1); }
+
+/* Stagger up to ~14 chars per word */
+.chapter.is-active .hero-word .ch:nth-child(1)  { transition-delay: 360ms; }
+.chapter.is-active .hero-word .ch:nth-child(2)  { transition-delay: 420ms; }
+.chapter.is-active .hero-word .ch:nth-child(3)  { transition-delay: 480ms; }
+.chapter.is-active .hero-word .ch:nth-child(4)  { transition-delay: 540ms; }
+.chapter.is-active .hero-word .ch:nth-child(5)  { transition-delay: 600ms; }
+.chapter.is-active .hero-word .ch:nth-child(6)  { transition-delay: 660ms; }
+.chapter.is-active .hero-word .ch:nth-child(7)  { transition-delay: 720ms; }
+.chapter.is-active .hero-word .ch:nth-child(8)  { transition-delay: 780ms; }
+.chapter.is-active .hero-word .ch:nth-child(9)  { transition-delay: 840ms; }
+.chapter.is-active .hero-word .ch:nth-child(10) { transition-delay: 900ms; }
+.chapter.is-active .hero-word .ch:nth-child(n+11) { transition-delay: 960ms; }
+
+/* Chapter-specific hero glow */
+.hero-word.flame  { text-shadow: 0 0 80px rgba(217, 164, 65, 0.45), 0 0 16px rgba(255, 245, 214, 0.18); color: var(--cream); }
+.hero-word.beam   { text-shadow: 0 0 60px rgba(255, 245, 214, 0.22); }
+.hero-word.keeper { color: var(--cream); text-shadow: 0 2px 40px rgba(0,0,0,0.8), 0 0 4px rgba(217, 164, 65, 0.18); }
+.hero-word.watch-l1 { color: var(--brass); }
+.hero-word.watch-l2 { color: var(--cream); margin-top: -28px; }
+
+/* The chapter lede — short, italic serif */
+.chapter-lede {
+  font-family: "GT Sectra Display", "Playfair Display", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(20px, 2.2vw, 28px);
+  line-height: 1.45;
+  color: var(--ink-soft);
+  max-width: 38ch;
+  margin: 26px 0 28px;
+  letter-spacing: -0.002em;
+}
+.chapter--center .chapter-lede { margin-left: auto; margin-right: auto; }
+
+.chapter-body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  max-width: 50ch;
+}
+.chapter-body p + p { margin-top: 14px; }
+.chapter-body strong { color: var(--ink-bright); font-weight: 600; }
+.chapter-body code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.86em;
+  padding: 2px 7px;
+  background: rgba(217, 164, 65, 0.10);
+  border: 1px solid var(--brass-ghost);
+  border-radius: 4px;
+  color: var(--brass);
+}
 .chapter--center .chapter-body { margin-left: auto; margin-right: auto; }
 
 /* ============================================================
-   PROLOGUE — first viewport
+   PROLOGUE
    ============================================================ */
 .prologue-caption {
-  font-family: Georgia, serif;
+  font-family: "GT Sectra Display", Georgia, serif;
   font-style: italic;
-  font-size: clamp(18px, 2vw, 22px);
+  font-size: clamp(22px, 2.4vw, 30px);
   color: var(--ink-soft);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   opacity: 0;
   transform: translateY(20px);
-  animation: prologue-fade 2.4s var(--ease-glide) 2.8s forwards;
+  animation: prologue-fade 2.4s var(--ease-glide) 2.4s forwards;
   text-shadow: 0 1px 18px rgba(0,0,0,0.8);
+  max-width: 28ch;
+  margin: 0 auto;
+  line-height: 1.4;
 }
 .prologue-tagline {
-  font-family: Georgia, serif;
-  font-size: 13px;
-  letter-spacing: 0.5em;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.42em;
   text-transform: uppercase;
   color: var(--brass);
   opacity: 0;
-  animation: prologue-fade 2s var(--ease-glide) 4.5s forwards;
-  margin-top: 36px;
+  animation: prologue-fade 2s var(--ease-glide) 3.8s forwards;
+  margin-top: 42px;
   display: block;
 }
 .prologue-scroll {
@@ -385,9 +519,8 @@ body {
   bottom: 6vh;
   left: 50%;
   transform: translateX(-50%);
-  font-family: Georgia, serif;
-  font-style: italic;
-  font-size: 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
   letter-spacing: 0.4em;
   color: var(--ink-mute);
   text-transform: uppercase;
@@ -410,60 +543,402 @@ body {
 }
 
 /* ============================================================
-   PRODUCT CONTENT BLOCKS — folded inside chapters
+   EXPLODED VIEW — Chapter V watch reference
+   Stage A → B → C → D stacked vertically, thin lines to labels
    ============================================================ */
-.fold {
-  margin-top: 36px;
-  padding: 22px;
-  background: rgba(20, 30, 50, 0.55);
-  border: 1px solid rgba(217, 164, 65, 0.18);
-  border-radius: 14px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+.exploded {
+  position: relative;
+  margin: 56px auto 0;
+  max-width: 880px;
+  padding: 24px 0;
 }
-.fold__label {
-  font-family: Georgia, serif;
-  font-style: italic;
-  font-size: 12px;
-  letter-spacing: 0.32em;
+.exploded__stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 360px) 1fr;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 32px;
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 1100ms var(--ease-glide), transform 1100ms var(--ease-glide);
+}
+.is-exploded-in .exploded__stage:nth-child(1) { transition-delay: 100ms; opacity: 1; transform: translateY(0); }
+.is-exploded-in .exploded__stage:nth-child(2) { transition-delay: 280ms; opacity: 1; transform: translateY(0); }
+.is-exploded-in .exploded__stage:nth-child(3) { transition-delay: 460ms; opacity: 1; transform: translateY(0); }
+.is-exploded-in .exploded__stage:nth-child(4) { transition-delay: 640ms; opacity: 1; transform: translateY(0); }
+
+.exploded__component {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 110px;
+}
+.exploded__component svg { display: block; height: 100%; width: auto; max-width: 100%; }
+
+.exploded__label {
+  grid-column: 3;
+  text-align: left;
+  padding-left: 14px;
+  position: relative;
+  border-left: 1px solid var(--brass-ghost);
+}
+.exploded__label::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 18px;
+  height: 1px;
+  background: var(--brass);
+  opacity: 0.7;
+}
+.exploded__label-stage {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--brass);
-  margin: 0 0 14px;
-  opacity: 0.85;
+  display: block;
+  margin-bottom: 6px;
 }
-.fold ul { margin: 0; padding: 0 0 0 18px; }
-.fold li { margin-bottom: 10px; color: var(--ink-soft); font-size: 15.5px; line-height: 1.55; }
-.fold li strong { color: var(--ink-bright); }
+.exploded__label-name {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--ink-bright);
+  line-height: 1.15;
+  margin: 0 0 4px;
+}
+.exploded__label-sub {
+  font-size: 12.5px;
+  color: var(--ink-mute);
+  line-height: 1.5;
+  margin: 0;
+}
+.exploded__caption {
+  grid-column: 1;
+  text-align: right;
+  padding-right: 14px;
+  border-right: 1px solid var(--brass-ghost);
+  position: relative;
+}
+.exploded__caption::before {
+  content: '';
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  width: 18px;
+  height: 1px;
+  background: var(--brass);
+  opacity: 0.7;
+}
+.exploded__caption-num {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 36px;
+  color: var(--brass);
+  display: block;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.exploded__caption-sub {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
 
-.fold--queries { max-width: 720px; }
-.query-card {
-  padding: 18px 20px;
-  background: rgba(10, 20, 40, 0.55);
-  border: 1px solid rgba(217, 164, 65, 0.15);
-  border-radius: 12px;
-  margin-bottom: 14px;
+/* ============================================================
+   SPEC SHEET — Chapter V — Pagani panel treatment
+   ============================================================ */
+.spec-sheet {
+  margin-top: 72px;
+  padding: 40px 36px;
+  background: linear-gradient(180deg, rgba(10, 20, 40, 0.55), rgba(2, 3, 8, 0.6));
+  border-top: 1px solid var(--brass-ghost);
+  border-bottom: 1px solid var(--brass-ghost);
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
   text-align: left;
 }
-.query-card__scope {
-  display: inline-block;
-  font-family: Georgia, serif;
+.spec-sheet__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--brass-ghost);
+  padding-bottom: 14px;
+  margin-bottom: 28px;
+}
+.spec-sheet__title {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0;
+}
+.spec-sheet__index {
+  font-family: "GT Sectra Display", Georgia, serif;
   font-style: italic;
-  font-size: 12px;
+  font-size: 14px;
+  color: var(--ink-mute);
+}
+.spec-sheet__section {
+  margin-bottom: 36px;
+}
+.spec-sheet__section:last-child { margin-bottom: 0; }
+.spec-sheet__section-label {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--brass);
-  margin: 0 0 10px;
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.query-card__q {
-  font-family: Georgia, serif;
-  font-size: 16px;
-  line-height: 1.5;
+.spec-sheet__section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--brass-ghost), transparent);
+}
+
+/* big-number spec callouts */
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 28px;
+}
+.spec-cell__num {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 44px;
+  color: var(--brass);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.spec-cell__num small { font-size: 18px; color: var(--ink-mute); margin-left: 4px; font-style: italic; }
+.spec-cell__lbl {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* Wave triptych */
+.wave-triptych {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+}
+.wave-triptych__col {
+  padding: 0 22px;
+  border-right: 1px solid var(--brass-ghost);
+}
+.wave-triptych__col:last-child { border-right: none; }
+.wave-triptych__col:first-child { padding-left: 0; }
+.wave-triptych__num {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--brass);
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.wave-triptych__title {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 18px;
   color: var(--ink-bright);
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  line-height: 1.25;
 }
-.query-card__a {
-  font-size: 14.5px;
+.wave-triptych__body {
+  font-size: 13.5px;
   line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+/* Trust hierarchy bars — refined */
+.trust-bar {
+  display: grid;
+  grid-template-columns: 160px 1fr 50px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.trust-bar__name {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.trust-bar__track {
+  height: 2px;
+  background: rgba(255, 245, 214, 0.06);
+  position: relative;
+}
+.trust-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ember), var(--brass));
+  width: 0%;
+  transition: width 1.4s var(--ease-glide);
+  box-shadow: 0 0 8px rgba(217, 164, 65, 0.4);
+}
+.trust-bar.is-in .trust-bar__fill { width: var(--target); }
+.trust-bar__val {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--brass);
+  text-align: right;
+}
+
+/* Taxonomy row — single-line */
+.tax-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--brass-ghost);
+  align-items: baseline;
+}
+.tax-row:last-child { border-bottom: none; }
+.tax-row__name {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-bright);
+}
+.tax-row__subs {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--ink-mute);
+  line-height: 1.5;
+}
+
+/* Cache rows */
+.cache-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 80px;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.cache-row__lbl {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.cache-row__lbl-sub { display: block; font-size: 9.5px; color: var(--ink-mute); margin-top: 2px; letter-spacing: 0.04em; }
+.cache-row__track {
+  height: 6px;
+  background: rgba(255, 245, 214, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cache-row__fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--ember), var(--brass));
+  transition: width 1.2s var(--ease-glide);
+}
+.cache-row.is-in.is-cold .cache-row__fill { width: 100%; }
+.cache-row.is-in.is-hot .cache-row__fill { width: 20%; }
+.cache-row__time { font-family: ui-monospace, monospace; font-size: 11px; color: var(--brass); text-align: right; }
+
+/* Shipped list — refined row treatment */
+.shipped-list { margin-top: 12px; }
+.shipped-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--brass-ghost);
+  align-items: baseline;
+}
+.shipped-row:last-child { border-bottom: none; }
+.shipped-row__tag {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.shipped-row__title {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-bright);
+  margin: 0 0 4px;
+}
+.shipped-row__body { font-size: 13px; line-height: 1.5; color: var(--ink-soft); margin: 0; }
+
+.spec-sheet__footer {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--brass-ghost);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+  text-align: center;
+}
+
+/* ============================================================
+   CHAPTER III — exploded mini-callouts for queries
+   ============================================================ */
+.query-callouts {
+  margin-top: 60px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px 36px;
+  max-width: 880px;
+}
+.query-callout {
+  position: relative;
+  padding-left: 18px;
+  border-left: 1px solid var(--brass-ghost);
+}
+.query-callout::before {
+  content: '';
+  position: absolute;
+  left: -1px; top: 0;
+  width: 1px; height: 24px;
+  background: var(--brass);
+}
+.query-callout__scope {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+  display: block;
+  margin-bottom: 6px;
+}
+.query-callout__q {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-bright);
+  line-height: 1.4;
+  margin: 0 0 6px;
+}
+.query-callout__a {
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--ink-soft);
   margin: 0;
 }
@@ -471,232 +946,140 @@ body {
   display: inline-block;
   padding: 1px 6px;
   margin: 0 2px;
-  background: rgba(217, 164, 65, 0.12);
-  border: 1px solid rgba(217, 164, 65, 0.3);
-  border-radius: 4px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 11px;
-  color: var(--brass);
-}
-
-/* Taxonomy grid */
-.tax-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-.tax-card {
-  padding: 14px 12px;
-  background: rgba(10, 20, 40, 0.6);
-  border: 1px solid rgba(217, 164, 65, 0.16);
-  border-radius: 10px;
-  text-align: left;
-}
-.tax-card__icon { color: var(--brass); font-size: 18px; margin-bottom: 8px; }
-.tax-card__name { font-family: Georgia, serif; font-size: 15px; color: var(--ink-bright); margin: 0 0 4px; }
-.tax-card__subs { font-size: 11.5px; color: var(--ink-mute); line-height: 1.45; margin: 0; }
-
-/* Trust hierarchy bars */
-.trust-bars { margin-top: 16px; }
-.trust-bar {
-  display: grid;
-  grid-template-columns: 160px 1fr 50px;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.trust-bar__name { font-size: 13px; color: var(--ink-soft); }
-.trust-bar__track {
-  height: 6px;
-  background: rgba(255, 245, 214, 0.08);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.trust-bar__fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--ember), var(--brass));
-  width: 0%;
-  transition: width 1.4s var(--ease-glide);
-}
-.trust-bar.is-in .trust-bar__fill { width: var(--target); }
-.trust-bar__val { font-family: ui-monospace, monospace; font-size: 12px; color: var(--brass); text-align: right; }
-
-/* Shipped grid */
-.shipped-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-.shipped-card {
-  padding: 16px;
-  background: rgba(10, 20, 40, 0.6);
-  border: 1px solid rgba(217, 164, 65, 0.18);
-  border-radius: 12px;
-  position: relative;
-  transition: transform 400ms var(--ease-glide), border-color 400ms var(--ease-glide);
-}
-.shipped-card:hover { transform: translateY(-2px); border-color: rgba(217, 164, 65, 0.45); }
-.shipped-card__tag {
-  display: inline-block;
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--brass);
   background: rgba(217, 164, 65, 0.10);
-  padding: 2px 7px;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  border: 1px solid var(--brass-ghost);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  color: var(--brass);
 }
-.shipped-card__title {
-  font-family: Georgia, serif;
-  font-size: 15.5px;
-  line-height: 1.3;
-  color: var(--ink-bright);
-  margin: 0 0 8px;
-}
-.shipped-card__body { font-size: 13px; line-height: 1.55; color: var(--ink-soft); margin: 0; }
 
-/* Wave timeline */
-.wave-timeline {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin: 22px 0 8px;
-  position: relative;
-  padding: 12px 0;
+/* Tool list — Chapter III ledger */
+.tool-ledger {
+  margin-top: 56px;
+  padding: 22px 28px;
+  border-top: 1px solid var(--brass-ghost);
+  border-bottom: 1px solid var(--brass-ghost);
+  max-width: 880px;
 }
-.wave-timeline__node {
-  flex: 1;
-  text-align: center;
-  position: relative;
+.tool-ledger__head {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0 0 16px;
 }
-.wave-timeline__dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--brass);
-  margin: 0 auto 6px;
-  box-shadow: 0 0 8px rgba(217, 164, 65, 0.6);
-  position: relative;
-  z-index: 2;
+.tool-ledger__list {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 30px;
 }
-.wave-timeline__node:not(:last-child)::after {
+.tool-ledger__list li {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+  position: relative;
+  padding-left: 18px;
+}
+.tool-ledger__list li::before {
   content: '';
   position: absolute;
-  top: 18px;
-  left: 50%;
-  right: -50%;
-  height: 1px;
-  background: linear-gradient(to right, rgba(217, 164, 65, 0.5), rgba(217, 164, 65, 0.15));
-  z-index: 1;
+  left: 0; top: 8px;
+  width: 8px; height: 1px;
+  background: var(--brass);
 }
-.wave-timeline__lbl {
-  font-family: Georgia, serif;
+.tool-ledger__list strong { color: var(--brass); font-weight: 500; }
+.tool-ledger__foot {
+  margin-top: 18px;
+  font-family: "GT Sectra Display", Georgia, serif;
   font-style: italic;
-  font-size: 11px;
+  font-size: 13.5px;
   color: var(--ink-mute);
-  display: block;
 }
 
-/* Architecture schematic styling */
-.arch-wrap {
-  margin-top: 16px;
-  background: rgba(10, 20, 40, 0.6);
-  border: 1px solid rgba(217, 164, 65, 0.18);
-  border-radius: 14px;
-  padding: 18px;
+/* ============================================================
+   CHAPTER IV — Keeper inset blocks
+   ============================================================ */
+.keeper-block {
+  margin-top: 48px;
+  max-width: 620px;
 }
-.arch-wrap svg { width: 100%; height: auto; display: block; }
-.arch-node-fill { fill: rgba(255, 245, 214, 0.04); stroke: rgba(217, 164, 65, 0.4); stroke-width: 1.5; }
-.arch-node-fill--keeper { fill: rgba(26, 47, 74, 0.4); stroke: rgba(155, 175, 215, 0.5); }
-.arch-node-fill--voyage { fill: rgba(107, 79, 187, 0.18); stroke: rgba(150, 130, 220, 0.45); }
-.arch-node-fill--anth   { fill: rgba(200, 67, 29, 0.14); stroke: rgba(220, 130, 95, 0.45); }
-.arch-text { fill: var(--ink-bright); font-family: Georgia, serif; font-size: 13px; text-anchor: middle; }
-.arch-sub  { fill: var(--ink-mute); font-family: -apple-system, sans-serif; font-size: 10px; text-anchor: middle; }
-.arch-path { stroke: rgba(217, 164, 65, 0.35); stroke-width: 1.5; fill: none; stroke-dasharray: 4 4; }
-.arch-flow { fill: var(--brass); filter: drop-shadow(0 0 4px var(--brass)); }
-.arch-flow-anim { animation: flow-pulse 3s ease-in-out infinite; }
-@keyframes flow-pulse {
-  0%, 100% { opacity: 0.4; }
-  50%      { opacity: 1; }
-}
-
-/* Cache rows */
-.cache-row {
-  display: grid;
-  grid-template-columns: 130px 1fr 80px;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.cache-row__lbl { font-size: 13px; color: var(--ink-soft); }
-.cache-row__lbl-sub { display: block; font-size: 11px; color: var(--ink-mute); }
-.cache-row__track {
-  height: 14px;
-  background: rgba(255, 245, 214, 0.06);
-  border-radius: 7px;
-  overflow: hidden;
-}
-.cache-row__fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--ember), var(--brass));
-  display: flex; align-items: center; padding: 0 8px;
-  font-size: 11px;
-  color: var(--night-deep);
-  font-weight: 600;
-  white-space: nowrap;
-  transition: width 1.2s var(--ease-glide);
-}
-.cache-row.is-in.is-cold .cache-row__fill { width: 100%; }
-.cache-row.is-in.is-hot .cache-row__fill { width: 20%; }
-.cache-row__time { font-family: ui-monospace, monospace; font-size: 12px; color: var(--brass); text-align: right; }
-.cache-row.is-hot .cache-row__time { color: var(--gold); }
-
-/* Stat row */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
-}
-.stat {
-  text-align: center;
-  padding: 14px;
-  background: rgba(10, 20, 40, 0.55);
-  border: 1px solid rgba(217, 164, 65, 0.15);
-  border-radius: 10px;
-}
-.stat__num {
-  font-family: Georgia, serif;
-  font-size: 30px;
+.keeper-block__head {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: var(--brass);
-  line-height: 1;
-  margin-bottom: 6px;
-}
-.stat__lbl { font-size: 11.5px; color: var(--ink-mute); letter-spacing: 0.06em; text-transform: uppercase; }
-
-/* Roadmap rows */
-.roadmap-row {
-  display: grid;
-  grid-template-columns: 38px 1fr;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
   gap: 14px;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(217, 164, 65, 0.12);
 }
-.roadmap-row:last-child { border-bottom: none; }
-.roadmap-row__num {
-  font-family: Georgia, serif;
+.keeper-block__head::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--brass-ghost), transparent);
+}
+.keeper-block__lede {
+  font-family: "GT Sectra Display", Georgia, serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+  line-height: 1.5;
+}
+.keeper-block__list {
+  list-style: none;
+  margin: 0; padding: 0;
+}
+.keeper-block__list li {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--brass-ghost);
+}
+.keeper-block__list li:last-child { border-bottom: none; }
+.keeper-block__list strong { color: var(--ink-bright); font-weight: 500; }
+
+/* ============================================================
+   CHAPTER VI — horizon compass headings
+   ============================================================ */
+.horizon-list {
+  margin-top: 48px;
+  max-width: 720px;
+}
+.horizon-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--brass-ghost);
+  align-items: baseline;
+}
+.horizon-row__bearing {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--brass);
+}
+.horizon-row__title {
+  font-family: "GT Sectra Display", Georgia, serif;
   font-style: italic;
   font-size: 22px;
-  color: var(--brass);
+  color: var(--ink-bright);
+  margin: 0 0 6px;
+  line-height: 1.2;
 }
-.roadmap-row__title { font-family: Georgia, serif; font-size: 16px; color: var(--ink-bright); margin: 0 0 4px; }
-.roadmap-row__desc { font-size: 13.5px; color: var(--ink-soft); margin: 0; line-height: 1.55; }
+.horizon-row__desc { font-size: 13.5px; color: var(--ink-soft); line-height: 1.55; margin: 0; }
 
-/* Epilogue */
+/* ============================================================
+   EPILOGUE
+   ============================================================ */
 .epilogue {
   min-height: 100vh;
   display: flex;
@@ -707,25 +1090,27 @@ body {
   position: relative;
   z-index: 10;
   padding: 14vh 7vw;
+  background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(217, 164, 65, 0.08), transparent 70%), linear-gradient(180deg, var(--sea) 0%, var(--night-abyss) 100%);
 }
 .epilogue__line {
-  font-family: Georgia, serif;
+  font-family: "GT Sectra Display", Georgia, serif;
   font-style: italic;
-  font-size: clamp(28px, 4vw, 44px);
+  font-size: clamp(34px, 5vw, 56px);
   color: var(--cream);
-  line-height: 1.4;
+  line-height: 1.35;
   margin: 0;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.012em;
   text-shadow: 0 2px 30px rgba(217, 164, 65, 0.35);
+  max-width: 22ch;
 }
 .epilogue__sig {
-  margin-top: 36px;
-  font-family: Georgia, serif;
-  font-size: 12px;
-  letter-spacing: 0.5em;
+  margin-top: 56px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.42em;
   text-transform: uppercase;
   color: var(--brass);
-  opacity: 0.8;
+  opacity: 0.85;
 }
 .epilogue__flame {
   display: inline-block;
@@ -733,13 +1118,13 @@ body {
   background: radial-gradient(ellipse at 50% 60%, var(--cream), var(--brass) 40%, var(--ember) 75%, transparent);
   border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
   vertical-align: -3px;
-  margin-right: 14px;
+  margin-right: 12px;
   animation: brand-flicker 2.4s ease-in-out infinite;
   filter: drop-shadow(0 0 8px rgba(217, 164, 65, 0.8));
 }
 
 /* ============================================================
-   The lighthouse SVG — animated layers
+   LIGHTHOUSE SVG animations
    ============================================================ */
 .flame-flicker-1 { animation: flame-1 2.2s ease-in-out infinite; transform-origin: 50% 100%; }
 .flame-flicker-2 { animation: flame-2 1.7s ease-in-out infinite; transform-origin: 50% 100%; }
@@ -759,10 +1144,7 @@ body {
   50%      { transform: scaleY(1.25) translateY(-2px); opacity: 1; }
 }
 
-.keeper-cloak {
-  animation: cloak-sway 6s ease-in-out infinite;
-  transform-origin: 50% 0%;
-}
+.keeper-cloak { animation: cloak-sway 6s ease-in-out infinite; transform-origin: 50% 0%; }
 @keyframes cloak-sway {
   0%, 100% { transform: skewX(0deg); }
   50%      { transform: skewX(0.8deg); }
@@ -781,7 +1163,13 @@ body {
   50%      { opacity: 0.7; }
 }
 
-/* Keeper reveals only at Chapter IV+ */
+/* Reflection shimmer under hero subjects */
+.reflection { animation: reflection-pulse 8s ease-in-out infinite; }
+@keyframes reflection-pulse {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.42; }
+}
+
 .keeper-group { opacity: 0; transition: opacity 1.6s var(--ease-glide); }
 .stage-wrap[data-chapter="4"] .keeper-group,
 .stage-wrap[data-chapter="5"] .keeper-group,
@@ -794,10 +1182,13 @@ body {
 .stage-wrap[data-chapter="6"] .keeper-detail,
 .stage-wrap[data-chapter="7"] .keeper-detail { opacity: 1; }
 
-/* Flame intensifies at Chapter II */
+/* Keeper side-light (warm rim from above on Chapter IV) */
+.keeper-rim { opacity: 0; transition: opacity 1.4s var(--ease-glide); }
+.stage-wrap[data-chapter="4"] .keeper-rim { opacity: 1; }
+
 .flame-glow { transition: filter 1s var(--ease-glide), opacity 1s var(--ease-glide); }
-.stage-wrap[data-chapter="2"] .flame-glow { filter: drop-shadow(0 0 24px rgba(217, 164, 65, 0.9)) brightness(1.3); }
-.stage-wrap[data-chapter="5"] .flame-glow { filter: drop-shadow(0 0 18px rgba(217, 164, 65, 0.85)) brightness(1.2); }
+.stage-wrap[data-chapter="2"] .flame-glow { filter: drop-shadow(0 0 28px rgba(217, 164, 65, 0.95)) brightness(1.35); }
+.stage-wrap[data-chapter="5"] .flame-glow { filter: drop-shadow(0 0 22px rgba(217, 164, 65, 0.85)) brightness(1.2); }
 
 /* ============================================================
    Reduced motion
@@ -814,7 +1205,11 @@ body {
   .stage__inner { transform: none !important; filter: none !important; }
   .chapter__content { opacity: 1; transform: none; }
   .prologue-caption, .prologue-tagline, .prologue-scroll { opacity: 1; transform: none; animation: none; }
-  .keeper-group, .keeper-detail { opacity: 1; }
+  .keeper-group, .keeper-detail, .keeper-rim { opacity: 1; }
+  .hero-word .ch { opacity: 1; transform: none; }
+  .exploded__stage { opacity: 1; transform: none; }
+  .corner-index, .spec-ticker__item { opacity: 1; transform: none; }
+  .cursor-glow { display: none; }
 }
 
 /* ============================================================
@@ -823,17 +1218,33 @@ body {
 @media (max-width: 760px) {
   .chapter { padding: 12vh 5vw 8vh; }
   .chapter__content { max-width: 100%; }
-  .top-nav { padding: 16px 20px; }
+  .top-nav { padding: 14px 18px; }
   .top-nav__chapter { display: none; }
   .stage__svg { width: 96vw; height: 70vh; }
-  .stage-wrap[data-chapter="2"] .stage__inner { transform: translateY(-14vh) scale(1.3); }
-  .stage-wrap[data-chapter="3"] .stage__inner { transform: translateY(-8vh) scale(1.1); }
-  .stage-wrap[data-chapter="4"] .stage__inner { transform: translateY(8vh) scale(1.05); }
-  .shipped-grid { grid-template-columns: 1fr 1fr; }
-  .tax-grid { grid-template-columns: 1fr 1fr; }
-  .wave-timeline__lbl { font-size: 9px; }
-  .cache-row { grid-template-columns: 100px 1fr 60px; }
-  .trust-bar { grid-template-columns: 110px 1fr 36px; }
+  .stage-wrap[data-chapter="2"] .stage__inner { transform: translateY(-14vh) scale(1.5); }
+  .stage-wrap[data-chapter="3"] .stage__inner { transform: translateY(-8vh) scale(1.12); }
+  .stage-wrap[data-chapter="4"] .stage__inner { transform: translateY(8vh) scale(1.08); }
+  .corner-index { font-size: 16px; top: 16px; left: 18px; }
+  .spec-ticker { top: 16px; right: 18px; }
+  .spec-ticker__item { font-size: 9px; }
+  .hero-word { font-size: clamp(64px, 22vw, 140px); }
+  .exploded__stage { grid-template-columns: 1fr; gap: 10px; padding: 8px 0; }
+  .exploded__component, .exploded__label, .exploded__caption { grid-column: 1; text-align: left; padding: 0; border: none; }
+  .exploded__caption { display: flex; align-items: baseline; gap: 12px; }
+  .exploded__caption::before, .exploded__label::before { display: none; }
+  .exploded__label { border-top: 1px solid var(--brass-ghost); padding-top: 8px; }
+  .spec-sheet { padding: 24px 18px; }
+  .wave-triptych { grid-template-columns: 1fr; }
+  .wave-triptych__col { border-right: none; border-bottom: 1px solid var(--brass-ghost); padding: 16px 0; }
+  .wave-triptych__col:last-child { border-bottom: none; }
+  .spec-cell__num { font-size: 32px; }
+  .tax-row { grid-template-columns: 1fr; gap: 4px; }
+  .tool-ledger__list { grid-template-columns: 1fr; }
+  .query-callouts { grid-template-columns: 1fr; }
+  .horizon-row { grid-template-columns: 1fr; gap: 4px; }
+  .cache-row { grid-template-columns: 110px 1fr 60px; }
+  .trust-bar { grid-template-columns: 120px 1fr 40px; }
+  .shipped-row { grid-template-columns: 1fr; gap: 4px; }
 }
 </style>
 </head>
@@ -842,14 +1253,17 @@ body {
 <!-- Scroll progress -->
 <div class="scroll-progress" aria-hidden="true"><div class="scroll-progress__bar" id="scroll-progress-bar"></div></div>
 
+<!-- Cursor accent -->
+<div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+
 <!-- Top nav -->
 <nav class="top-nav" aria-label="document chrome">
-  <div class="top-nav__brand"><span class="top-nav__brand-flame" aria-hidden="true"></span>Beacon</div>
+  <div class="top-nav__brand"><span class="top-nav__brand-flame" aria-hidden="true"></span>Beacon &nbsp;·&nbsp; A story</div>
   <div class="top-nav__chapter" id="chapter-indicator">Prologue</div>
 </nav>
 
 <!-- ============================================================
-     STAGE WRAPPER — contains the sticky scene + all chapters
+     STAGE WRAPPER
      ============================================================ -->
 <div class="stage-wrap" data-chapter="0" id="stage-wrap">
 
@@ -857,30 +1271,27 @@ body {
   <div class="stage" aria-hidden="true">
     <div class="stage__inner">
 
-      <!-- The beam (rotating cone, layered behind rain) -->
+      <!-- The beam -->
       <div class="beam-layer">
         <div class="beam-cone"><div class="beam-cone__inner"></div></div>
       </div>
 
-      <!-- Rain (procedurally generated by JS) -->
+      <!-- Rain -->
       <div class="rain" id="rain-layer"></div>
 
       <!-- The lighthouse scene -->
       <svg class="stage__svg" viewBox="0 0 600 900" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet" aria-label="A lighthouse on a stormy night, with the Keeper standing watch at its base.">
         <defs>
-          <!-- Storm sky gradient -->
           <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"  stop-color="#06101f"/>
-            <stop offset="40%" stop-color="#0a1428"/>
+            <stop offset="0%"  stop-color="#020308"/>
+            <stop offset="40%" stop-color="#06101f"/>
             <stop offset="80%" stop-color="#1a2840"/>
           </linearGradient>
-          <!-- Sea gradient -->
           <linearGradient id="sea-grad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#1a2840"/>
             <stop offset="50%" stop-color="#0d1a2b"/>
-            <stop offset="100%" stop-color="#06101f"/>
+            <stop offset="100%" stop-color="#020308"/>
           </linearGradient>
-          <!-- Lighthouse stone gradient -->
           <linearGradient id="stone-grad" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%"  stop-color="#1f1c18"/>
             <stop offset="30%" stop-color="#3a3530"/>
@@ -888,36 +1299,36 @@ body {
             <stop offset="80%" stop-color="#3a3530"/>
             <stop offset="100%" stop-color="#1a1612"/>
           </linearGradient>
-          <!-- Lantern glow -->
           <radialGradient id="lantern-glow" cx="0.5" cy="0.5" r="0.5">
             <stop offset="0%"  stop-color="#FFF5D6" stop-opacity="1"/>
             <stop offset="40%" stop-color="#D9A441" stop-opacity="0.85"/>
             <stop offset="75%" stop-color="#C8431D" stop-opacity="0.3"/>
             <stop offset="100%" stop-color="#C8431D" stop-opacity="0"/>
           </radialGradient>
-          <!-- Flame gradient -->
           <radialGradient id="flame-grad" cx="0.5" cy="0.7" r="0.5">
             <stop offset="0%"  stop-color="#FFF5D6"/>
             <stop offset="35%" stop-color="#FBBF24"/>
             <stop offset="70%" stop-color="#D9A441"/>
             <stop offset="100%" stop-color="#C8431D" stop-opacity="0"/>
           </radialGradient>
-          <!-- Cloak gradient (lit side from above) -->
           <linearGradient id="cloak-grad" x1="0" y1="0" x2="1" y2="0.4">
             <stop offset="0%"  stop-color="#0e0c0a"/>
             <stop offset="55%" stop-color="#1a1410"/>
             <stop offset="80%" stop-color="#3a2a1a"/>
             <stop offset="100%" stop-color="#6a3a20"/>
           </linearGradient>
-          <!-- Rock gradient -->
           <linearGradient id="rock-grad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#2c2620"/>
             <stop offset="100%" stop-color="#0e0c0a"/>
           </linearGradient>
-          <!-- Sea shimmer -->
-          <filter id="shimmer" x="-10%" y="-10%" width="120%" height="120%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.02 0.04" numOctaves="2" seed="3"/>
-            <feDisplacementMap in="SourceGraphic" scale="2"/>
+          <radialGradient id="keeper-rim-glow" cx="0.5" cy="0" r="0.7">
+            <stop offset="0%" stop-color="#FFD47A" stop-opacity="0.45"/>
+            <stop offset="55%" stop-color="#C8431D" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="#C8431D" stop-opacity="0"/>
+          </radialGradient>
+          <!-- Reflection blur -->
+          <filter id="reflection-blur" x="-10%" y="-10%" width="120%" height="120%">
+            <feGaussianBlur stdDeviation="2.5"/>
           </filter>
         </defs>
 
@@ -925,23 +1336,22 @@ body {
         <rect x="0" y="0" width="600" height="700" fill="url(#sky-grad)"/>
 
         <!-- Drifting clouds -->
-        <g class="cloud-drift-1" opacity="0.35">
+        <g class="cloud-drift-1" opacity="0.32">
           <ellipse cx="120" cy="100" rx="120" ry="22" fill="#1a2840"/>
           <ellipse cx="200" cy="130" rx="90" ry="18" fill="#1a2840"/>
         </g>
-        <g class="cloud-drift-2" opacity="0.28">
+        <g class="cloud-drift-2" opacity="0.25">
           <ellipse cx="400" cy="180" rx="140" ry="24" fill="#0a1428"/>
           <ellipse cx="320" cy="210" rx="110" ry="20" fill="#0a1428"/>
         </g>
 
-        <!-- Distant horizon stars (sparse, dim) -->
+        <!-- Stars -->
         <circle cx="80"  cy="60"  r="0.6" fill="#fff" opacity="0.4"/>
         <circle cx="520" cy="80"  r="0.5" fill="#fff" opacity="0.35"/>
         <circle cx="460" cy="40"  r="0.7" fill="#fff" opacity="0.5"/>
 
-        <!-- SEA at horizon -->
+        <!-- SEA -->
         <rect x="0" y="680" width="600" height="220" fill="url(#sea-grad)"/>
-        <!-- Wave shimmer streaks -->
         <g class="sea-shimmer">
           <path d="M0 700 Q 100 696 200 700 T 400 700 T 600 700" stroke="#FFF5D6" stroke-width="0.5" fill="none" opacity="0.18"/>
           <path d="M0 720 Q 120 716 240 720 T 480 720 T 600 720" stroke="#FFF5D6" stroke-width="0.5" fill="none" opacity="0.14"/>
@@ -949,42 +1359,44 @@ body {
           <path d="M0 790 Q 140 786 280 790 T 560 790 T 600 790" stroke="#FFF5D6" stroke-width="0.4" fill="none" opacity="0.08"/>
         </g>
 
-        <!-- Distant lighthouse silhouette in BG for depth -->
+        <!-- Distant lighthouse -->
         <g opacity="0.18">
           <rect x="50" y="610" width="6" height="70" fill="#0a1428"/>
           <polygon points="48,610 56,610 53,600" fill="#0a1428"/>
         </g>
 
-        <!-- CLIFF / ROCKY OUTCROP -->
+        <!-- LIGHTHOUSE REFLECTION on water (subtle, inverted, blurred) -->
+        <g class="reflection" transform="translate(290, 1380) scale(1, -1)" opacity="0.32" filter="url(#reflection-blur)">
+          <path d="M -50 690 L -42 670 L 42 670 L 50 690 Z" fill="#3a3530"/>
+          <path d="M -38 660 L -28 360 L 28 360 L 38 660 Z" fill="#2a2520"/>
+          <rect x="-44" y="345" width="88" height="16" fill="#2a2520"/>
+          <rect x="-30" y="290" width="60" height="44" fill="#2a2014"/>
+          <circle cx="0" cy="305" r="40" fill="#D9A441" opacity="0.4"/>
+        </g>
+
+        <!-- CLIFF -->
         <path d="M0 760
                  L 60 720 L 110 740 L 150 705 L 200 730 L 240 690 L 290 700 L 330 670 L 370 690 L 410 700 L 460 710 L 510 700 L 560 720 L 600 730
                  L 600 900 L 0 900 Z"
               fill="url(#rock-grad)"/>
-        <!-- Rock highlight edges -->
         <path d="M150 705 L 200 730 M 240 690 L 290 700 M 330 670 L 370 690"
               stroke="#443a30" stroke-width="1" fill="none" opacity="0.5"/>
 
         <!-- ====== THE LIGHTHOUSE ====== -->
         <g transform="translate(290, 0)">
 
-          <!-- Base flare (wider at bottom) -->
           <path d="M -50 690 L -42 670 L 42 670 L 50 690 Z" fill="url(#stone-grad)"/>
           <rect x="-44" y="660" width="88" height="14" fill="#1f1c18"/>
 
-          <!-- Main shaft (tapered) -->
-          <path d="M -38 660
-                   L -28 360
-                   L 28 360
-                   L 38 660 Z"
-                fill="url(#stone-grad)"/>
+          <path d="M -38 660 L -28 360 L 28 360 L 38 660 Z" fill="url(#stone-grad)"/>
 
-          <!-- Horizontal stripe bands (red/cream traditional) -->
+          <!-- Stripes -->
           <path d="M -36 620 L 36 620 L 37.4 660 L -37.4 660 Z" fill="#6b2820" opacity="0.78"/>
           <path d="M -33 540 L 33 540 L 34.4 580 L -34.4 580 Z" fill="#d8c9a8" opacity="0.62"/>
           <path d="M -30 460 L 30 460 L 31.4 500 L -31.4 500 Z" fill="#6b2820" opacity="0.74"/>
           <path d="M -28 380 L 28 380 L 28.8 420 L -28.8 420 Z" fill="#d8c9a8" opacity="0.55"/>
 
-          <!-- Mortar lines (subtle horizontal strokes) -->
+          <!-- Mortar -->
           <g stroke="#1a1612" stroke-width="0.4" opacity="0.5">
             <line x1="-34" y1="600" x2="34" y2="600"/>
             <line x1="-32" y1="560" x2="32" y2="560"/>
@@ -993,15 +1405,14 @@ body {
             <line x1="-29" y1="400" x2="29" y2="400"/>
           </g>
 
-          <!-- Small windows down the shaft -->
+          <!-- Windows -->
           <rect x="-4" y="500" width="8" height="14" fill="#1f1c18" stroke="#5a4a3a" stroke-width="0.5"/>
           <rect x="-4" y="430" width="8" height="14" fill="#FFF5D6" opacity="0.18" stroke="#5a4a3a" stroke-width="0.5"/>
           <rect x="-4" y="380" width="8" height="14" fill="#1f1c18" stroke="#5a4a3a" stroke-width="0.5"/>
 
-          <!-- Gallery / railed walkway above the shaft -->
+          <!-- Gallery -->
           <rect x="-44" y="345" width="88" height="16" fill="#2a2520"/>
           <rect x="-44" y="345" width="88" height="4" fill="#1a1612"/>
-          <!-- Railing -->
           <line x1="-42" y1="334" x2="42" y2="334" stroke="#3a3530" stroke-width="1.2"/>
           <g stroke="#2a2520" stroke-width="1">
             <line x1="-38" y1="345" x2="-38" y2="334"/>
@@ -1013,41 +1424,29 @@ body {
             <line x1="38"  y1="345" x2="38"  y2="334"/>
           </g>
 
-          <!-- Lantern room (the lantern shell) -->
+          <!-- Lantern -->
           <g class="flame-glow">
-            <!-- Outer lantern glow halo -->
             <circle cx="0" cy="305" r="80" fill="url(#lantern-glow)" opacity="0.55"/>
-
-            <!-- Lantern frame base -->
             <rect x="-30" y="290" width="60" height="44" fill="#2a2014" stroke="#5a4a3a" stroke-width="1"/>
-            <!-- Glass panes -->
             <rect x="-26" y="294" width="14" height="36" fill="#3a2a1a" opacity="0.85"/>
             <rect x="-10" y="294" width="20" height="36" fill="#FFD47A" opacity="0.55"/>
             <rect x="12"  y="294" width="14" height="36" fill="#3a2a1a" opacity="0.85"/>
-            <!-- Vertical lantern bars -->
             <line x1="-12" y1="290" x2="-12" y2="334" stroke="#1a1410" stroke-width="1.2"/>
             <line x1="12"  y1="290" x2="12"  y2="334" stroke="#1a1410" stroke-width="1.2"/>
 
-            <!-- The flame — multi-layer -->
             <g transform="translate(0, 318)">
-              <!-- outer glow -->
               <ellipse class="flame-flicker-3" cx="0" cy="-10" rx="22" ry="28" fill="url(#flame-grad)" opacity="0.5"/>
-              <!-- mid flame -->
               <path class="flame-flicker-1"
                     d="M 0 0 C -10 -10 -12 -22 -4 -32 C -1 -28 0 -22 0 -22 C 0 -22 1 -30 4 -34 C 12 -22 10 -10 0 0 Z"
                     fill="url(#flame-grad)"/>
-              <!-- hot core -->
               <path class="flame-flicker-2"
                     d="M 0 -2 C -5 -8 -6 -16 -2 -22 C 0 -20 0 -16 0 -16 C 0 -16 1 -22 3 -24 C 6 -18 5 -10 0 -2 Z"
                     fill="#FFF5D6"/>
-              <!-- crown spark -->
               <circle class="flame-flicker-3" cx="0" cy="-30" r="1.5" fill="#FFF5D6" opacity="0.9"/>
             </g>
 
-            <!-- Lantern dome / cap -->
             <path d="M -32 290 L -32 280 Q -32 270 -22 268 L 22 268 Q 32 270 32 280 L 32 290 Z"
                   fill="#2a2014" stroke="#5a4a3a" stroke-width="1"/>
-            <!-- Spire -->
             <polygon points="-12,268 12,268 0,244" fill="#2a2014" stroke="#5a4a3a" stroke-width="0.8"/>
             <line x1="0" y1="244" x2="0" y2="230" stroke="#5a4a3a" stroke-width="1.2"/>
             <circle cx="0" cy="230" r="2" fill="#5a4a3a"/>
@@ -1058,12 +1457,12 @@ body {
         <!-- ====== THE KEEPER ====== -->
         <g class="keeper-group" transform="translate(360, 700)">
 
-          <!-- Subtle ground shadow / glow from above -->
+          <!-- Warm rim-light halo from above (only on Chapter IV) -->
+          <ellipse class="keeper-rim" cx="0" cy="-20" rx="56" ry="120" fill="url(#keeper-rim-glow)" opacity="0.55"/>
+
           <ellipse cx="0" cy="92" rx="34" ry="6" fill="#000" opacity="0.5"/>
 
-          <!-- Cloak body (long, fur-lined silhouette) -->
           <g class="keeper-cloak">
-            <!-- Outer cloak shape (sweeping) -->
             <path d="M -28 0
                      C -38 8 -42 30 -38 60
                      L -34 92
@@ -1075,30 +1474,23 @@ body {
                      C -18 -14 -24 -8 -28 0 Z"
                   fill="url(#cloak-grad)"/>
 
-            <!-- Fur trim along hood -->
             <path d="M -22 -10 Q -14 -16 -6 -16 L 6 -16 Q 14 -16 22 -10"
                   stroke="#2a221b" stroke-width="3" fill="none" opacity="0.85"/>
             <path d="M -22 -10 Q -14 -16 -6 -16 L 6 -16 Q 14 -16 22 -10"
                   stroke="#3a2a20" stroke-width="1.4" fill="none" opacity="0.6"/>
 
-            <!-- Hood shadow over face -->
             <ellipse cx="0" cy="-6" rx="11" ry="10" fill="#0e0c0a"/>
-            <!-- Lit cheekbone (warm tinge from flame above) -->
             <path d="M 4 -4 Q 8 -2 6 4 Q 4 6 1 4 Z" fill="#6a3a20" opacity="0.85" class="keeper-detail"/>
 
-            <!-- Cloak fold (centerline) -->
             <path d="M 0 -10 L 0 92" stroke="#0a0805" stroke-width="0.6" opacity="0.6"/>
 
-            <!-- Sword on hip (subtle hilt + scabbard) -->
             <g class="keeper-detail">
               <line x1="22" y1="36" x2="34" y2="86" stroke="#1a1410" stroke-width="3" stroke-linecap="round"/>
               <line x1="22" y1="36" x2="34" y2="86" stroke="#3a3530" stroke-width="1" stroke-linecap="round"/>
-              <!-- Pommel -->
               <circle cx="20" cy="32" r="2.5" fill="#9aa0a8" opacity="0.85"/>
               <rect x="17" y="33" width="6" height="1.6" fill="#9aa0a8" opacity="0.75"/>
             </g>
 
-            <!-- Fur shoulder texture (dashed strokes) -->
             <g class="keeper-detail" opacity="0.5" stroke="#2a221b" stroke-width="0.7" fill="none">
               <path d="M -26 4 L -22 8"/>
               <path d="M -24 12 L -20 16"/>
@@ -1114,338 +1506,414 @@ body {
   </div>
 
   <!-- ============================================================
-       CHAPTER STACK — text scrolls past the sticky stage
+       CHAPTER STACK
        ============================================================ -->
   <div class="chapter-stack">
 
     <!-- PROLOGUE -->
     <section class="chapter chapter--center" data-chapter-id="0" id="prologue">
       <div class="chapter__content" style="opacity: 1; transform: none;">
-        <p class="prologue-caption">A story of light, memory, and the watch.</p>
-        <span class="prologue-tagline">Beacon</span>
+        <p class="prologue-caption">A story of light, memory,<br>and the watch.</p>
+        <span class="prologue-tagline">— Beacon · MMXXVI</span>
       </div>
       <div class="prologue-scroll">Scroll</div>
     </section>
 
     <!-- CHAPTER I — THE BEACON -->
     <section class="chapter chapter--left" data-chapter-id="1">
+      <span class="corner-index">I.</span>
+      <div class="spec-ticker" aria-hidden="true">
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">01</span>STONE</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">02</span>STORM</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">03</span>STAND</span>
+      </div>
       <div class="chapter__content">
-        <span class="chapter-numeral">Chapter I</span>
-        <h2 class="chapter-title">The <em>Beacon</em>.</h2>
+        <span class="eyebrow">The Fixed Point</span>
+        <h2 class="hero-word is-sans" data-hero-text="Beacon"></h2>
         <p class="chapter-lede">A fixed point that doesn't move when the world does.</p>
         <div class="chapter-body">
-          <p>The harbor is old. The stones are weathered. The storm tonight is the same storm as a hundred years before, and the lighthouse has stood through every one of them.</p>
-          <p>Every great work needs a beacon. A place that holds. A frame the rest of the system rests against when the wind picks up.</p>
-          <p><strong>Beacon is the platform</strong> — six umbrella agents woven into one. Customer. Performance. Escalation. Post-Payment. Miss-Payment. Negative Keyword. One launcher. One sign-in. One ground that doesn't shift.</p>
+          <p>The harbor is old. The stones are weathered. The storm tonight is the same storm as a hundred years before — and the lighthouse has stood through every one of them.</p>
+          <p><strong>Beacon is the platform.</strong> Six umbrella agents woven into one. Customer · Performance · Escalation · Post-Payment · Miss-Payment · Negative Keyword. One launcher. One sign-in. One ground that doesn't shift.</p>
         </div>
       </div>
     </section>
 
     <!-- CHAPTER II — THE FLAME -->
     <section class="chapter chapter--right" data-chapter-id="2">
+      <span class="corner-index">II.</span>
+      <div class="spec-ticker" aria-hidden="true">
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">01</span>SOURCE</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">02</span>FLICKER</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">03</span>BEARING</span>
+      </div>
       <div class="chapter__content">
-        <span class="chapter-numeral">Chapter II</span>
-        <h2 class="chapter-title">The <em>flame</em>.</h2>
+        <span class="eyebrow">The Source</span>
+        <h2 class="hero-word is-serif flame" data-hero-text="Flame"></h2>
         <p class="chapter-lede">Small. Patient. Watchful.</p>
         <div class="chapter-body">
           <p>Atop the beacon burns a flame. It moves with the wind. It bends. It flickers. It does not go out.</p>
           <p>The flame is what makes a beacon a beacon. Without it, there is only stone — a tall building on a cliff, telling no one anything.</p>
-          <p>The flame doesn't speak. It doesn't decide. It is the source. It is the thing that turns weather into warning, dark into bearing.</p>
+          <p>The flame doesn't speak. It doesn't decide. It is the source — the thing that turns weather into warning, dark into bearing.</p>
         </div>
       </div>
     </section>
 
     <!-- CHAPTER III — THE BEAM -->
     <section class="chapter chapter--left" data-chapter-id="3">
+      <span class="corner-index">III.</span>
+      <div class="spec-ticker" aria-hidden="true">
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">01</span>SWEEP</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">02</span>REVEAL</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">03</span>MOVE ON</span>
+      </div>
       <div class="chapter__content">
-        <span class="chapter-numeral">Chapter III</span>
-        <h2 class="chapter-title">The <em>beam</em>.</h2>
+        <span class="eyebrow">The Reveal</span>
+        <h2 class="hero-word is-sans beam" data-hero-text="Beam"></h2>
         <p class="chapter-lede">It does not decide. It does not remember. It reveals.</p>
         <div class="chapter-body">
-          <p>From the flame comes the beam. A sweeping cone of warm light, cutting across the rain, falling on the rocks, the sea, the cliffs — illuminating, for one moment, what the dark was hiding.</p>
-          <p>Then it moves on.</p>
-          <p>Ask <strong>Beam</strong> a question, and it shows you what it sees, the moment you ask. It does not pretend to remember. It does not pretend to judge. It reveals — clean, fast, cited.</p>
+          <p>From the flame comes the beam — a sweeping cone of warm light, cutting across the rain, falling on the rocks, the sea, the cliffs. Illuminating, for one moment, what the dark was hiding. Then it moves on.</p>
+          <p>Ask <strong>Beam</strong> a question, and it shows you what it sees, the moment you ask. Clean, fast, cited.</p>
         </div>
 
-        <div class="fold fold--queries">
-          <p class="fold__label">Where the beam falls — six surfaces, six shapes of question</p>
-
-          <div class="query-card">
-            <p class="query-card__scope">Customer 360</p>
-            <p class="query-card__q">What platform are they on, and when did they migrate?</p>
-            <p class="query-card__a">They're on <strong>GlossGenius</strong>, migrated from Square in <strong>March 2025</strong>. Owner cited better calendar UX. <span class="cite-chip">K:integration</span> <span class="cite-chip">K:contract</span></p>
+        <div class="query-callouts">
+          <div class="query-callout">
+            <span class="query-callout__scope">Customer 360</span>
+            <p class="query-callout__q">"What platform are they on, and when did they migrate?"</p>
+            <p class="query-callout__a">On <strong>GlossGenius</strong>, migrated from Square in <strong>March 2025</strong>. Owner cited better calendar UX. <span class="cite-chip">K:integration</span> <span class="cite-chip">K:contract</span></p>
           </div>
-
-          <div class="query-card">
-            <p class="query-card__scope">Customer Book</p>
-            <p class="query-card__q">Who in my book has a latent risk flagged in the last 30 days?</p>
-            <p class="query-card__a">Three customers: <strong>Pearl Salon</strong> (pricing concerns), <strong>Hair Inc</strong> (staff churn), <strong>ISH Studio</strong> (silent for 21d). <span class="cite-chip">K:concerns</span></p>
+          <div class="query-callout">
+            <span class="query-callout__scope">Customer Book</span>
+            <p class="query-callout__q">"Who in my book has a latent risk flagged in the last 30 days?"</p>
+            <p class="query-callout__a">Three: <strong>Pearl Salon</strong> (pricing), <strong>Hair Inc</strong> (staff churn), <strong>ISH Studio</strong> (silent 21d). <span class="cite-chip">K:concerns</span></p>
           </div>
-
-          <div class="query-card">
-            <p class="query-card__scope">Performance</p>
-            <p class="query-card__q">Why has this customer's lead trajectory flattened since April?</p>
-            <p class="query-card__a">GBP profile-clicks fell <strong>34%</strong> after a category change on Apr 18. Reviews stalled — only 2 in 60 days. Recommend a fresh GBP audit. <span class="cite-chip">P:gbp</span> <span class="cite-chip">P:reviews</span></p>
+          <div class="query-callout">
+            <span class="query-callout__scope">Performance</span>
+            <p class="query-callout__q">"Why has this customer's lead trajectory flattened since April?"</p>
+            <p class="query-callout__a">GBP profile-clicks fell <strong>34%</strong> after a category change on Apr 18. Reviews stalled — only 2 in 60 days. <span class="cite-chip">P:gbp</span> <span class="cite-chip">P:reviews</span></p>
           </div>
-
-          <div class="query-card">
-            <p class="query-card__scope">Email draft</p>
-            <p class="query-card__q">Draft a check-in email for Pearl Salon — silent for 14 days.</p>
-            <p class="query-card__a"><strong>Subject:</strong> Quick check-in on your Pearl Salon dashboard. <em>Hi Maria, noticed traffic's held steady but bookings dipped — curious how the spring menu is landing. Want to hop on a quick call?</em></p>
+          <div class="query-callout">
+            <span class="query-callout__scope">Email Draft</span>
+            <p class="query-callout__q">"Draft a check-in email for Pearl Salon — silent 14 days."</p>
+            <p class="query-callout__a"><em>Hi Maria, noticed traffic's held steady but bookings dipped — curious how the spring menu is landing. Want to hop on a quick call?</em></p>
           </div>
-
-          <div class="query-card">
-            <p class="query-card__scope">Miss-Payment</p>
-            <p class="query-card__q">Who's on auto-pay-off and has missed two cycles?</p>
-            <p class="query-card__a">Two: <strong>Hair Inc</strong> ($840 unpaid Mar + Apr) and <strong>Threadwork</strong> ($230 unpaid Apr). Both with manual-toggle history. <span class="cite-chip">B:invoices</span></p>
+          <div class="query-callout">
+            <span class="query-callout__scope">Miss-Payment</span>
+            <p class="query-callout__q">"Who's on auto-pay-off and missed two cycles?"</p>
+            <p class="query-callout__a">Two: <strong>Hair Inc</strong> ($840 unpaid Mar+Apr) and <strong>Threadwork</strong> ($230 unpaid Apr). Both with manual-toggle history. <span class="cite-chip">B:invoices</span></p>
           </div>
-
-          <div class="query-card">
-            <p class="query-card__scope">Escalation</p>
-            <p class="query-card__q">Summarize all open Linear tickets for this customer.</p>
-            <p class="query-card__a">Three open: <strong>BCN-1842</strong> (HubSpot sync delay, 4d), <strong>BCN-1901</strong> (review widget CSS, 2d), <strong>BCN-1923</strong> (calendar sync timezone, today). <span class="cite-chip">E:tickets</span></p>
+          <div class="query-callout">
+            <span class="query-callout__scope">Escalation</span>
+            <p class="query-callout__q">"Summarize all open Linear tickets for this customer."</p>
+            <p class="query-callout__a">Three open: <strong>BCN-1842</strong> (HubSpot sync, 4d), <strong>BCN-1901</strong> (review widget CSS, 2d), <strong>BCN-1923</strong> (calendar sync timezone, today). <span class="cite-chip">E:tickets</span></p>
           </div>
         </div>
 
-        <div class="fold">
-          <p class="fold__label">What Beam carries — eight tools, always grounded</p>
-          <ul>
-            <li><strong>lookup_customer</strong> — find by name or handle</li>
-            <li><strong>query_customer_book</strong> — aggregate the book</li>
-            <li><strong>read_customer_notes</strong> — surface AM scratchpad</li>
-            <li><strong>read_customer_brain</strong> — read Keeper facts</li>
-            <li><strong>add_fact_to_brain</strong> — write a Keeper fact</li>
-            <li><strong>query_brain</strong> — cross-book Keeper search</li>
-            <li><strong>draft_email</strong> · <strong>draft_slack</strong> — customer-ready copy</li>
-            <li><strong>get_full_customer_view</strong> — one parallel fetch, five lanes, replaces a chain of four</li>
+        <div class="tool-ledger">
+          <p class="tool-ledger__head">— What the Beam Carries · Eight Tools, Always Grounded</p>
+          <ul class="tool-ledger__list">
+            <li><strong>lookup_customer</strong> &nbsp; find by name or handle</li>
+            <li><strong>query_customer_book</strong> &nbsp; aggregate the book</li>
+            <li><strong>read_customer_notes</strong> &nbsp; AM scratchpad</li>
+            <li><strong>read_customer_brain</strong> &nbsp; read Keeper facts</li>
+            <li><strong>add_fact_to_brain</strong> &nbsp; write a Keeper fact</li>
+            <li><strong>query_brain</strong> &nbsp; cross-book Keeper search</li>
+            <li><strong>draft_email</strong> &nbsp;·&nbsp; <strong>draft_slack</strong></li>
+            <li><strong>get_full_customer_view</strong> &nbsp; one parallel fetch</li>
           </ul>
-          <p style="margin-top: 14px; font-size: 13px; color: var(--ink-mute); font-style: italic;">Available on Customer 360, Customer Book, Performance, Escalation, Post-Payment, Miss-Payment, and Negative Keyword. The same beam, falling across seven different rooms.</p>
+          <p class="tool-ledger__foot">Available on Customer 360, Customer Book, Performance, Escalation, Post-Payment, Miss-Payment, Negative Keyword. The same beam, falling across seven rooms.</p>
         </div>
       </div>
     </section>
 
     <!-- CHAPTER IV — THE KEEPER -->
     <section class="chapter chapter--left" data-chapter-id="4">
+      <span class="corner-index">IV.</span>
+      <div class="spec-ticker" aria-hidden="true">
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">01</span>CLOAK</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">02</span>BLADE</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">03</span>WATCH</span>
+      </div>
       <div class="chapter__content">
-        <span class="chapter-numeral">Chapter IV</span>
-        <h2 class="chapter-title">The <em>Keeper</em>.</h2>
-        <p class="chapter-lede">A beam without a keeper is just light pointing nowhere.</p>
+        <span class="eyebrow">The One Who Stands Watch</span>
+        <h2 class="hero-word is-serif keeper" data-hero-text="Keeper"></h2>
+        <p class="chapter-lede">A beam without a Keeper is just light pointing nowhere.</p>
         <div class="chapter-body">
-          <p>Pan down. At the base of the lighthouse, half in shadow, half in the warm glow of the flame above — a figure. A long cloak, fur-lined against the rain. A sword at the hip. The hood drawn against the wind.</p>
-          <p>The Keeper is not the beacon. Not the flame. Not the beam. The Keeper is <strong>the one who safeguards them all</strong>.</p>
+          <p>Pan down. At the base of the lighthouse — half in shadow, half in the warm glow of the flame above — a figure. A long cloak, fur-lined against the rain. A sword at the hip. The hood drawn against the wind.</p>
+          <p>The Keeper is not the beacon. Not the flame. Not the beam. <strong>The Keeper is the one who safeguards them all.</strong></p>
           <p>Without the Keeper, the flame would die in the first storm. The beam would forget what it last revealed. The story would be lost between sweeps.</p>
-          <p>The Keeper tends. The Keeper remembers. The Keeper stands watch.</p>
         </div>
 
-        <div class="fold">
-          <p class="fold__label">What the Keeper holds — five categories, twenty subcategories, forever</p>
-          <div class="tax-grid">
-            <div class="tax-card"><div class="tax-card__icon"><i class="ti ti-id-badge"></i></div><p class="tax-card__name">Identity</p><p class="tax-card__subs">owner_info · decision_makers · sold_by · business_profile</p></div>
-            <div class="tax-card"><div class="tax-card__icon"><i class="ti ti-settings"></i></div><p class="tax-card__name">Operational</p><p class="tax-card__subs">contract · integration · platform · billing_setup</p></div>
-            <div class="tax-card"><div class="tax-card__icon"><i class="ti ti-mood-smile"></i></div><p class="tax-card__name">Behavioral</p><p class="tax-card__subs">comms_preference · payment_timing · seasonal · cadence · sentiment</p></div>
-            <div class="tax-card"><div class="tax-card__icon"><i class="ti ti-alert-triangle"></i></div><p class="tax-card__name">Concerns</p><p class="tax-card__subs">latent_risk · next_call_agenda · open_issues</p></div>
-            <div class="tax-card"><div class="tax-card__icon"><i class="ti ti-users-group"></i></div><p class="tax-card__name">Relationship</p><p class="tax-card__subs">assignment · pod · transition_history</p></div>
+        <div class="keeper-block">
+          <p class="keeper-block__head">— What the Keeper Holds</p>
+          <p class="keeper-block__lede">Five categories. Twenty subcategories. Every fact sourced, timestamped, version-logged, soft-deleted — never lost. 1,269 facts backfilled across 927 active customers, from six trust tiers.</p>
+          <div>
+            <div class="tax-row"><span class="tax-row__name">Identity</span><span class="tax-row__subs">owner_info &nbsp;·&nbsp; decision_makers &nbsp;·&nbsp; sold_by &nbsp;·&nbsp; business_profile</span></div>
+            <div class="tax-row"><span class="tax-row__name">Operational</span><span class="tax-row__subs">contract &nbsp;·&nbsp; integration &nbsp;·&nbsp; platform &nbsp;·&nbsp; billing_setup</span></div>
+            <div class="tax-row"><span class="tax-row__name">Behavioral</span><span class="tax-row__subs">comms_preference &nbsp;·&nbsp; payment_timing &nbsp;·&nbsp; seasonal &nbsp;·&nbsp; cadence &nbsp;·&nbsp; sentiment</span></div>
+            <div class="tax-row"><span class="tax-row__name">Concerns</span><span class="tax-row__subs">latent_risk &nbsp;·&nbsp; next_call_agenda &nbsp;·&nbsp; open_issues</span></div>
+            <div class="tax-row"><span class="tax-row__name">Relationship</span><span class="tax-row__subs">assignment &nbsp;·&nbsp; pod &nbsp;·&nbsp; transition_history</span></div>
           </div>
-          <p style="margin-top: 14px; font-size: 13px; color: var(--ink-mute); font-style: italic;">Every fact sourced. Timestamped. Version-logged. Soft-deleted, never lost. 1,269 facts backfilled across 927 active customers, from six trust tiers.</p>
         </div>
 
-        <div class="fold">
-          <p class="fold__label">How the Keeper decides what's true — when two facts collide</p>
-          <p style="font-family: Georgia, serif; font-style: italic; color: var(--ink-soft); margin: 0 0 16px;">Math picks the winner. Recency × Confidence × Source Trust. Deterministic. Auditable. No LLM in the loop. Losers don't die — they stay, marked <code>superseded_by</code>, so the history is preserved.</p>
-          <div class="trust-bars">
+        <div class="keeper-block">
+          <p class="keeper-block__head">— How the Keeper Decides What's True</p>
+          <p class="keeper-block__lede">When two facts collide, math picks the winner. <strong style="color:var(--brass)">Recency × Confidence × Source Trust.</strong> Deterministic. Auditable. No LLM in the loop. Losers stay, marked <code>superseded_by</code>.</p>
+          <div>
             <div class="trust-bar" data-trust style="--target: 100%;"><span class="trust-bar__name">BaseSheet</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">1.00</span></div>
             <div class="trust-bar" data-trust style="--target: 100%;"><span class="trust-bar__name">Chargebee</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">1.00</span></div>
-            <div class="trust-bar" data-trust style="--target: 95%;"><span class="trust-bar__name">AM-typed (manual)</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.95</span></div>
-            <div class="trust-bar" data-trust style="--target: 75%;"><span class="trust-bar__name">Customer note</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.75</span></div>
-            <div class="trust-bar" data-trust style="--target: 65%;"><span class="trust-bar__name">Haiku extracted</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.65</span></div>
-            <div class="trust-bar" data-trust style="--target: 55%;"><span class="trust-bar__name">Beam conversation</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.55</span></div>
+            <div class="trust-bar" data-trust style="--target: 95%;"><span class="trust-bar__name">AM-Typed</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.95</span></div>
+            <div class="trust-bar" data-trust style="--target: 75%;"><span class="trust-bar__name">Customer Note</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.75</span></div>
+            <div class="trust-bar" data-trust style="--target: 65%;"><span class="trust-bar__name">Haiku Extract</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.65</span></div>
+            <div class="trust-bar" data-trust style="--target: 55%;"><span class="trust-bar__name">Beam Convo</span><div class="trust-bar__track"><div class="trust-bar__fill"></div></div><span class="trust-bar__val">0.55</span></div>
           </div>
-          <p style="margin-top: 14px; font-size: 13px; color: var(--ink-mute); font-style: italic;">Recency uses a 60-day half-life. A 90-day-old BaseSheet fact decays to 0.35× and loses to a 3-day-old manual write at 0.97×.</p>
+          <p style="margin-top: 14px; font-size: 12.5px; color: var(--ink-mute); font-style: italic;">60-day half-life. A 90-day-old BaseSheet fact decays to 0.35× and loses to a 3-day-old manual write at 0.97×.</p>
         </div>
 
-        <div class="fold">
-          <p class="fold__label">What the Keeper does when the candidates come in — the Validate inbox</p>
-          <ul>
-            <li><strong>Haiku-extracted candidates</strong> land in a triage queue at <code>/admin/brain/validate</code>. AMs confirm, edit, reject, reclassify. Source quotes shown alongside every candidate.</li>
-            <li><strong>Reject-rate dashboard</strong> at <code>/admin/brain/reject-rate</code>. Confirm / refine / reject / pending across 7d / 30d / all-time, per AM. Auto-callout when any window exceeds 30%.</li>
-            <li><strong>derived_from</strong> relationships. When a parent fact gets superseded, every child fact derived from it is flagged for re-evaluation. Provenance follows the data.</li>
-            <li><strong>Auto-prune stale facts.</strong> Anything older than its category's stale-horizon is quietly archived. The watch keeps moving forward.</li>
+        <div class="keeper-block">
+          <p class="keeper-block__head">— The Validate Inbox</p>
+          <ul class="keeper-block__list">
+            <li><strong>Haiku-extracted candidates</strong> land in a triage queue at <code>/admin/brain/validate</code>. AMs confirm, edit, reject, reclassify. Source quotes shown alongside.</li>
+            <li><strong>Reject-rate dashboard</strong> at <code>/admin/brain/reject-rate</code> — confirm / refine / reject / pending across 7d / 30d / all-time, per AM. Auto-callout above 30%.</li>
+            <li><strong>derived_from relationships.</strong> When a parent fact is superseded, every child fact derived from it is flagged. Provenance follows the data.</li>
+            <li><strong>Auto-prune stale facts.</strong> Anything past its category's stale-horizon is quietly archived. The watch moves forward.</li>
           </ul>
         </div>
       </div>
     </section>
 
     <!-- CHAPTER V — THE WATCH -->
-    <section class="chapter chapter--center" data-chapter-id="5">
-      <div class="chapter__content">
-        <span class="chapter-numeral">Chapter V</span>
-        <h2 class="chapter-title">The <em>watch</em>.</h2>
+    <section class="chapter chapter--center" data-chapter-id="5" id="watch-chapter">
+      <span class="corner-index" style="left: 50%; transform: translateX(-50%); text-align: center;">V.</span>
+      <div class="spec-ticker" aria-hidden="true">
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">01</span>STONE</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">02</span>FLAME</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">03</span>BEAM &middot; WATCH</span>
+      </div>
+      <div class="chapter__content" style="max-width: 980px;">
+        <span class="eyebrow">Limited to one architecture · A working lighthouse</span>
+        <h2 class="hero-word is-sans watch-l1" data-hero-text="The"></h2>
+        <h2 class="hero-word is-serif watch-l2" data-hero-text="Watch"></h2>
         <p class="chapter-lede">Beam gives answers. Keeper holds truth. Neither matters alone.</p>
         <div class="chapter-body">
-          <p>The flame above the harbor and the figure below have always been one thing. The beam without the Keeper goes dark by morning. The Keeper without the beam stands watch over an empty cliff.</p>
-          <p>This is how the watch works.</p>
+          <p>The flame above the harbor and the figure below have always been one thing. The beam without the Keeper goes dark by morning. The Keeper without the beam stands watch over an empty cliff. <strong>This is how the watch works.</strong></p>
         </div>
 
-        <div class="fold" style="max-width: 760px;">
-          <p class="fold__label">How the lighthouse works — the architecture, one diagram</p>
-          <div class="arch-wrap">
-            <svg viewBox="0 0 880 430" xmlns="http://www.w3.org/2000/svg" aria-label="Beacon architecture flow">
-              <!-- AM question (top) -->
-              <rect class="arch-node-fill" x="340" y="18" width="200" height="46" rx="12"/>
-              <text class="arch-text" x="440" y="40">AM question</text>
-              <text class="arch-sub"  x="440" y="55">"What platform are they on?"</text>
+        <!-- EXPLODED VIEW — the architecture as a watch movement -->
+        <div class="exploded" id="exploded" aria-label="Exploded architecture view">
 
-              <path class="arch-path" d="M440 64 V108"/>
-              <circle class="arch-flow arch-flow-anim" cx="440" cy="86" r="3.5"/>
-
-              <!-- Beam orchestrator -->
-              <rect class="arch-node-fill" x="320" y="108" width="240" height="62" rx="14" style="stroke-width: 2;"/>
-              <text class="arch-text" x="440" y="134" style="font-size: 14px;">Beam</text>
-              <text class="arch-sub"  x="440" y="152">orchestrator · 8 tools · context cache</text>
-
-              <!-- Four fan-out paths -->
-              <path class="arch-path" d="M360 170 Q260 200 160 240"/>
-              <path class="arch-path" d="M400 170 Q380 200 360 240"/>
-              <path class="arch-path" d="M480 170 Q500 200 520 240"/>
-              <path class="arch-path" d="M520 170 Q620 200 720 240"/>
-
-              <circle class="arch-flow arch-flow-anim" cx="260" cy="200" r="3.5" style="animation-delay: 0s;"/>
-              <circle class="arch-flow arch-flow-anim" cx="380" cy="200" r="3.5" style="animation-delay: 0.7s;"/>
-              <circle class="arch-flow arch-flow-anim" cx="500" cy="200" r="3.5" style="animation-delay: 1.4s;"/>
-              <circle class="arch-flow arch-flow-anim" cx="620" cy="200" r="3.5" style="animation-delay: 2.1s;"/>
-
-              <!-- Lane nodes -->
-              <rect class="arch-node-fill arch-node-fill--keeper" x="60" y="240" width="200" height="62" rx="12"/>
-              <text class="arch-text" x="160" y="266">Keeper</text>
-              <text class="arch-sub"  x="160" y="282">pgvector + tsvector + RRF</text>
-              <text class="arch-sub"  x="160" y="296">deterministic ranking</text>
-
-              <rect class="arch-node-fill" x="280" y="240" width="160" height="62" rx="12"/>
-              <text class="arch-text" x="360" y="266">Snapshot</text>
-              <text class="arch-sub"  x="360" y="282">Postgres + cache</text>
-              <text class="arch-sub"  x="360" y="296">5-min TTL · auto-invalidates</text>
-
-              <rect class="arch-node-fill arch-node-fill--voyage" x="460" y="240" width="160" height="62" rx="12"/>
-              <text class="arch-text" x="540" y="266">Voyage AI</text>
-              <text class="arch-sub"  x="540" y="282">voyage-3-lite embed</text>
-              <text class="arch-sub"  x="540" y="296">rerank-2.5-lite</text>
-
-              <rect class="arch-node-fill arch-node-fill--anth" x="640" y="240" width="180" height="62" rx="12"/>
-              <text class="arch-text" x="730" y="266">Anthropic Claude</text>
-              <text class="arch-sub"  x="730" y="282">Sonnet 4 · tool use</text>
-              <text class="arch-sub"  x="730" y="296">streaming SSE</text>
-
-              <!-- Converging back -->
-              <path class="arch-path" d="M160 302 Q260 345 400 365"/>
-              <path class="arch-path" d="M360 302 Q380 345 420 365"/>
-              <path class="arch-path" d="M540 302 Q500 345 460 365"/>
-              <path class="arch-path" d="M730 302 Q620 345 480 365"/>
-
-              <!-- Cited answer -->
-              <rect class="arch-node-fill" x="320" y="365" width="240" height="48" rx="12"/>
-              <text class="arch-text" x="440" y="388">Cited answer</text>
-              <text class="arch-sub"  x="440" y="404">+ provenance trace + confidence</text>
-            </svg>
-          </div>
-          <p style="margin-top: 16px; font-size: 13px; color: var(--ink-mute); font-style: italic;">A typical Customer 360 question takes 2–4 seconds end-to-end. Cold cache: 620ms of context fan-out. Hot cache: 120ms. The longest path is always Anthropic's streaming. Everything else runs parallel against it.</p>
-        </div>
-
-        <div class="fold" style="max-width: 760px;">
-          <p class="fold__label">Three waves that built the watch</p>
-
-          <div class="wave-timeline">
-            <div class="wave-timeline__node"><div class="wave-timeline__dot"></div><span class="wave-timeline__lbl">Wave 1<br>Hybrid retrieval</span></div>
-            <div class="wave-timeline__node"><div class="wave-timeline__dot"></div><span class="wave-timeline__lbl">Wave 2<br>Conflict resolution</span></div>
-            <div class="wave-timeline__node"><div class="wave-timeline__dot"></div><span class="wave-timeline__lbl">Wave 3<br>Caching</span></div>
-          </div>
-
-          <ul style="margin-top: 18px;">
-            <li><strong>Wave 1 — How the Keeper hears.</strong> pgvector cosine (top 50) and tsvector match (top 50) run in parallel, fused by RRF (k = 60), reranked by Voyage rerank-2.5-lite. The right 5 of ~40 candidates land in Beam's context. Pure embeddings miss exact-token matches; pure keywords miss paraphrases. Hybrid does both.</li>
-            <li><strong>Wave 2 — How the Keeper decides.</strong> When two facts collide, deterministic ranking picks the winner using the trust hierarchy above. Losers stay in the audit log via <code>superseded_by</code>. Beam only sees the winner by default. No LLM in the loop. Auditable.</li>
-            <li><strong>Wave 3 — How the watch stays fast.</strong> Heavy context loaders (Customer 360, Customer Book, Post-Payment Book) cache their blobs for 5 minutes. Stage A refresh busts the cache the moment new data lands. AMs feel the snap on every follow-up question.</li>
-          </ul>
-
-          <div style="margin-top: 18px;">
-            <div class="cache-row is-cold" data-cache>
-              <div class="cache-row__lbl">First turn<span class="cache-row__lbl-sub">cold cache</span></div>
-              <div class="cache-row__track"><div class="cache-row__fill">loading context</div></div>
-              <div class="cache-row__time">~620ms</div>
+          <div class="exploded__stage">
+            <div class="exploded__caption">
+              <span class="exploded__caption-num">A</span>
+              <span class="exploded__caption-sub">The Question</span>
             </div>
-            <div class="cache-row is-hot" data-cache>
-              <div class="cache-row__lbl">Second turn<span class="cache-row__lbl-sub">cache hit</span></div>
-              <div class="cache-row__track"><div class="cache-row__fill">cached</div></div>
-              <div class="cache-row__time">~120ms</div>
+            <div class="exploded__component">
+              <svg viewBox="0 0 280 90" xmlns="http://www.w3.org/2000/svg">
+                <rect x="40" y="20" width="200" height="50" rx="14" fill="rgba(255,245,214,0.04)" stroke="var(--brass)" stroke-width="1"/>
+                <text x="140" y="44" fill="#f4ede0" font-family="GT Sectra Display, Georgia, serif" font-style="italic" font-size="14" text-anchor="middle">AM Question</text>
+                <text x="140" y="60" fill="#7d7468" font-family="ui-monospace, monospace" font-size="9" text-anchor="middle">"WHAT PLATFORM ARE THEY ON?"</text>
+              </svg>
+            </div>
+            <div class="exploded__label">
+              <span class="exploded__label-stage">Stage A · Input</span>
+              <p class="exploded__label-name">The Question</p>
+              <p class="exploded__label-sub">An AM, mid-call, asks one specific thing.</p>
             </div>
           </div>
-          <p style="margin-top: 12px; text-align: center; font-size: 13px; color: var(--ink-mute);"><strong style="color: var(--brass);">500ms saved</strong> per consecutive turn on the same customer. Over an AM's morning triage, that's seconds back per minute.</p>
+
+          <div class="exploded__stage">
+            <div class="exploded__caption">
+              <span class="exploded__caption-num">B</span>
+              <span class="exploded__caption-sub">The Orchestrator</span>
+            </div>
+            <div class="exploded__component">
+              <svg viewBox="0 0 280 90" xmlns="http://www.w3.org/2000/svg">
+                <rect x="40" y="14" width="200" height="62" rx="16" fill="rgba(217,164,65,0.06)" stroke="var(--brass)" stroke-width="1.4"/>
+                <text x="140" y="38" fill="#D9A441" font-family="Editorial New, Inter, sans-serif" font-style="italic" font-weight="800" font-size="20" text-anchor="middle" letter-spacing="-0.02em">Beam</text>
+                <text x="140" y="56" fill="#c9bfae" font-family="ui-monospace, monospace" font-size="9" text-anchor="middle">8 TOOLS · CONTEXT CACHE · SSE</text>
+                <line x1="60" y1="64" x2="220" y2="64" stroke="var(--brass)" stroke-width="0.5" opacity="0.3"/>
+                <text x="140" y="73" fill="#7d7468" font-family="ui-monospace, monospace" font-size="8" text-anchor="middle">CLAUDE SONNET 4 · TOOL USE</text>
+              </svg>
+            </div>
+            <div class="exploded__label">
+              <span class="exploded__label-stage">Stage B · Flame</span>
+              <p class="exploded__label-name">Beam Orchestrator</p>
+              <p class="exploded__label-sub">8 tools · context cache · streaming SSE. The decisive caliber.</p>
+            </div>
+          </div>
+
+          <div class="exploded__stage">
+            <div class="exploded__caption">
+              <span class="exploded__caption-num">C</span>
+              <span class="exploded__caption-sub">The Lanes</span>
+            </div>
+            <div class="exploded__component">
+              <svg viewBox="0 0 280 90" xmlns="http://www.w3.org/2000/svg">
+                <g font-family="ui-monospace, monospace" font-size="9" text-anchor="middle">
+                  <rect x="10" y="20" width="58" height="50" rx="8" fill="rgba(26,47,74,0.4)" stroke="rgba(155,175,215,0.5)" stroke-width="0.8"/>
+                  <text x="39" y="40" fill="#f4ede0" font-family="GT Sectra Display, Georgia, serif" font-style="italic" font-size="11">Keeper</text>
+                  <text x="39" y="54" fill="#7d7468" font-size="7">PGVECTOR</text>
+                  <text x="39" y="63" fill="#7d7468" font-size="7">+ RRF</text>
+
+                  <rect x="76" y="20" width="58" height="50" rx="8" fill="rgba(255,245,214,0.04)" stroke="var(--brass)" stroke-width="0.8"/>
+                  <text x="105" y="40" fill="#f4ede0" font-family="GT Sectra Display, Georgia, serif" font-style="italic" font-size="11">Snap</text>
+                  <text x="105" y="54" fill="#7d7468" font-size="7">POSTGRES</text>
+                  <text x="105" y="63" fill="#7d7468" font-size="7">5-MIN TTL</text>
+
+                  <rect x="142" y="20" width="58" height="50" rx="8" fill="rgba(107,79,187,0.18)" stroke="rgba(150,130,220,0.5)" stroke-width="0.8"/>
+                  <text x="171" y="40" fill="#f4ede0" font-family="GT Sectra Display, Georgia, serif" font-style="italic" font-size="11">Voyage</text>
+                  <text x="171" y="54" fill="#7d7468" font-size="7">EMBED</text>
+                  <text x="171" y="63" fill="#7d7468" font-size="7">RERANK 2.5</text>
+
+                  <rect x="208" y="20" width="62" height="50" rx="8" fill="rgba(200,67,29,0.14)" stroke="rgba(220,130,95,0.5)" stroke-width="0.8"/>
+                  <text x="239" y="40" fill="#f4ede0" font-family="GT Sectra Display, Georgia, serif" font-style="italic" font-size="11">Claude</text>
+                  <text x="239" y="54" fill="#7d7468" font-size="7">SONNET 4</text>
+                  <text x="239" y="63" fill="#7d7468" font-size="7">SSE</text>
+                </g>
+              </svg>
+            </div>
+            <div class="exploded__label">
+              <span class="exploded__label-stage">Stage C · Beam</span>
+              <p class="exploded__label-name">Four Parallel Lanes</p>
+              <p class="exploded__label-sub">Keeper retrieval · Snapshot · Voyage rerank · Anthropic streaming.</p>
+            </div>
+          </div>
+
+          <div class="exploded__stage">
+            <div class="exploded__caption">
+              <span class="exploded__caption-num">D</span>
+              <span class="exploded__caption-sub">The Cited Answer</span>
+            </div>
+            <div class="exploded__component">
+              <svg viewBox="0 0 280 90" xmlns="http://www.w3.org/2000/svg">
+                <rect x="40" y="22" width="200" height="46" rx="14" fill="rgba(255,245,214,0.04)" stroke="var(--brass)" stroke-width="1"/>
+                <text x="140" y="44" fill="#f4ede0" font-family="GT Sectra Display, Georgia, serif" font-style="italic" font-size="14" text-anchor="middle">Cited Answer</text>
+                <text x="140" y="60" fill="#7d7468" font-family="ui-monospace, monospace" font-size="9" text-anchor="middle">+ PROVENANCE TRACE + CONFIDENCE</text>
+              </svg>
+            </div>
+            <div class="exploded__label">
+              <span class="exploded__label-stage">Stage D · Watch</span>
+              <p class="exploded__label-name">A Cited Answer</p>
+              <p class="exploded__label-sub">2–4s end-to-end. Cold cache ~620ms. Hot ~120ms.</p>
+            </div>
+          </div>
+
         </div>
 
-        <div class="fold" style="max-width: 760px;">
-          <p class="fold__label">Today's drop — eight wins from one watch</p>
-          <div class="shipped-grid">
-            <div class="shipped-card"><span class="shipped-card__tag">SV-10</span><h3 class="shipped-card__title">Shadow Verdict on every card</h3><p class="shipped-card__body">Haiku second-opinion now ships visible alongside the engine's stoplight on every V2CustomerCard.</p></div>
-            <div class="shipped-card"><span class="shipped-card__tag">Wave 2c.1</span><h3 class="shipped-card__title">Keeper panel, polished</h3><p class="shipped-card__body">Category icons, age chips, source-trust badges, expand-in-place version history.</p></div>
-            <div class="shipped-card"><span class="shipped-card__tag">W1.5</span><h3 class="shipped-card__title">Reject-rate dashboard</h3><p class="shipped-card__body">Confirm / refine / reject / pending across 7d / 30d / all-time, per AM. Auto-callout above 30%.</p></div>
-            <div class="shipped-card"><span class="shipped-card__tag">Tool</span><h3 class="shipped-card__title">get_full_customer_view</h3><p class="shipped-card__body">A single Beam tool bundling Keeper, comms, perf, escalations, notes in one parallel fetch.</p></div>
-            <div class="shipped-card"><span class="shipped-card__tag">Calibration</span><h3 class="shipped-card__title">Confidence calibration</h3><p class="shipped-card__body">Every thumbs vote records the tier Beam reported. Per-tier hit rate + calibration curve.</p></div>
-            <div class="shipped-card"><span class="shipped-card__tag">Taxonomy v2</span><h3 class="shipped-card__title">cadence + sentiment slots</h3><p class="shipped-card__body">Two new structured behavioral subcategories. <code>rebook_window_weeks</code>, <code>signal_substance</code>.</p></div>
-            <div class="shipped-card"><span class="shipped-card__tag">Rerank A/B</span><h3 class="shipped-card__title">Voyage A/B harness</h3><p class="shipped-card__body">Same RRF candidate pool, reranked by both lite and full. Side-by-side top-K + Spearman.</p></div>
-            <div class="shipped-card"><span class="shipped-card__tag">Trace</span><h3 class="shipped-card__title">Cite-chip "why" trace</h3><p class="shipped-card__body">Click any cite chip: matched_via badges, RRF score, rerank score bar, pool position. Trust-building.</p></div>
+        <!-- SPEC SHEET — the Pagani panel -->
+        <div class="spec-sheet">
+          <div class="spec-sheet__head">
+            <p class="spec-sheet__title">Specifications · The Watch · Mvt. K-2026</p>
+            <span class="spec-sheet__index">Ref. Beacon / Beam / Keeper</span>
           </div>
-          <p style="margin-top: 14px; text-align: center; font-size: 12px; color: var(--brass); letter-spacing: 0.16em; text-transform: uppercase;">typecheck clean &nbsp;·&nbsp; lint clean &nbsp;·&nbsp; 92 / 92 tests pass &nbsp;·&nbsp; live in prod</p>
+
+          <div class="spec-sheet__section">
+            <p class="spec-sheet__section-label">Headline Movement</p>
+            <div class="spec-grid">
+              <div class="spec-cell"><div class="spec-cell__num">~$1<small>/mo</small></div><div class="spec-cell__lbl">Total monthly cost</div></div>
+              <div class="spec-cell"><div class="spec-cell__num">200M</div><div class="spec-cell__lbl">Voyage free-tier tokens</div></div>
+              <div class="spec-cell"><div class="spec-cell__num">85%</div><div class="spec-cell__lbl">Prompt-token reduction</div></div>
+              <div class="spec-cell"><div class="spec-cell__num">500ms</div><div class="spec-cell__lbl">Saved per cached turn</div></div>
+            </div>
+          </div>
+
+          <div class="spec-sheet__section">
+            <p class="spec-sheet__section-label">Three Waves That Built the Watch</p>
+            <div class="wave-triptych">
+              <div class="wave-triptych__col">
+                <div class="wave-triptych__num">— Wave I</div>
+                <p class="wave-triptych__title">How the Keeper hears</p>
+                <p class="wave-triptych__body">pgvector cosine (top 50) and tsvector match (top 50) run in parallel, fused by RRF (k=60), reranked by Voyage rerank-2.5-lite. The right 5 of ~40 candidates land in Beam's context. Hybrid catches what either alone misses.</p>
+              </div>
+              <div class="wave-triptych__col">
+                <div class="wave-triptych__num">— Wave II</div>
+                <p class="wave-triptych__title">How the Keeper decides</p>
+                <p class="wave-triptych__body">When two facts collide, deterministic ranking picks the winner using the trust hierarchy. Losers stay in the audit log via <code>superseded_by</code>. Beam only sees the winner by default. No LLM in the loop. Auditable.</p>
+              </div>
+              <div class="wave-triptych__col">
+                <div class="wave-triptych__num">— Wave III</div>
+                <p class="wave-triptych__title">How the watch stays fast</p>
+                <p class="wave-triptych__body">Heavy context loaders cache their blobs for 5 minutes. Stage A refresh busts the cache the moment new data lands. AMs feel the snap on every follow-up question.</p>
+              </div>
+            </div>
+
+            <div style="margin-top: 28px; max-width: 540px;">
+              <div class="cache-row is-cold" data-cache>
+                <div class="cache-row__lbl">First Turn<span class="cache-row__lbl-sub">— cold cache</span></div>
+                <div class="cache-row__track"><div class="cache-row__fill"></div></div>
+                <div class="cache-row__time">~620ms</div>
+              </div>
+              <div class="cache-row is-hot" data-cache>
+                <div class="cache-row__lbl">Second Turn<span class="cache-row__lbl-sub">— cache hit</span></div>
+                <div class="cache-row__track"><div class="cache-row__fill"></div></div>
+                <div class="cache-row__time">~120ms</div>
+              </div>
+              <p style="margin-top: 10px; font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brass);">— 500ms saved per consecutive turn</p>
+            </div>
+          </div>
+
+          <div class="spec-sheet__section">
+            <p class="spec-sheet__section-label">Today's Drop · Eight Wins From One Watch</p>
+            <div class="shipped-list">
+              <div class="shipped-row"><span class="shipped-row__tag">SV-10</span><div><h3 class="shipped-row__title">Shadow Verdict on every card</h3><p class="shipped-row__body">Haiku second-opinion now ships visible alongside the engine's stoplight on every V2CustomerCard.</p></div></div>
+              <div class="shipped-row"><span class="shipped-row__tag">Wave 2c.1</span><div><h3 class="shipped-row__title">Keeper panel, polished</h3><p class="shipped-row__body">Category icons, age chips, source-trust badges, expand-in-place version history.</p></div></div>
+              <div class="shipped-row"><span class="shipped-row__tag">W1.5</span><div><h3 class="shipped-row__title">Reject-rate dashboard</h3><p class="shipped-row__body">Confirm / refine / reject / pending across 7d / 30d / all-time, per AM. Auto-callout above 30%.</p></div></div>
+              <div class="shipped-row"><span class="shipped-row__tag">Tool</span><div><h3 class="shipped-row__title">get_full_customer_view</h3><p class="shipped-row__body">A single Beam tool bundling Keeper, comms, perf, escalations, notes in one parallel fetch.</p></div></div>
+              <div class="shipped-row"><span class="shipped-row__tag">Calib.</span><div><h3 class="shipped-row__title">Confidence calibration</h3><p class="shipped-row__body">Every thumbs vote records the tier Beam reported. Per-tier hit rate + calibration curve.</p></div></div>
+              <div class="shipped-row"><span class="shipped-row__tag">Tax v2</span><div><h3 class="shipped-row__title">cadence + sentiment slots</h3><p class="shipped-row__body">Two new structured behavioral subcategories. <code>rebook_window_weeks</code>, <code>signal_substance</code>.</p></div></div>
+              <div class="shipped-row"><span class="shipped-row__tag">A/B</span><div><h3 class="shipped-row__title">Voyage A/B harness</h3><p class="shipped-row__body">Same RRF candidate pool, reranked by both lite and full. Side-by-side top-K + Spearman.</p></div></div>
+              <div class="shipped-row"><span class="shipped-row__tag">Trace</span><div><h3 class="shipped-row__title">Cite-chip "why" trace</h3><p class="shipped-row__body">Click any cite chip: matched_via badges, RRF score, rerank score bar, pool position.</p></div></div>
+            </div>
+          </div>
+
+          <p class="spec-sheet__footer">— typecheck clean &nbsp;·&nbsp; lint clean &nbsp;·&nbsp; 92 / 92 tests pass &nbsp;·&nbsp; live in prod —</p>
         </div>
 
-        <div class="fold" style="max-width: 760px;">
-          <p class="fold__label">The cost of the watch</p>
-          <div class="stats">
-            <div class="stat"><div class="stat__num">~$1<span style="font-size: 14px; color: var(--ink-mute);">/mo</span></div><div class="stat__lbl">Total monthly cost</div></div>
-            <div class="stat"><div class="stat__num">200M</div><div class="stat__lbl">Voyage free tier tokens</div></div>
-            <div class="stat"><div class="stat__num">85%</div><div class="stat__lbl">Prompt-token reduction</div></div>
-            <div class="stat"><div class="stat__num">500ms</div><div class="stat__lbl">Saved per cached turn</div></div>
-          </div>
-          <p style="margin-top: 14px; font-size: 13px; color: var(--ink-mute); font-style: italic; text-align: center;">The whole intelligence layer fits inside a small monthly budget — and most of it stays under the free tier.</p>
-        </div>
       </div>
     </section>
 
     <!-- CHAPTER VI — WHAT'S COMING -->
     <section class="chapter chapter--right" data-chapter-id="6">
+      <span class="corner-index">VI.</span>
+      <div class="spec-ticker" aria-hidden="true">
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">01</span>NORTH</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">02</span>EAST</span>
+        <span class="spec-ticker__item"><span class="spec-ticker__idx">03</span>HORIZON</span>
+      </div>
       <div class="chapter__content">
-        <span class="chapter-numeral">Chapter VI</span>
-        <h2 class="chapter-title">What's <em>coming</em>.</h2>
+        <span class="eyebrow">The Horizon</span>
+        <h2 class="hero-word is-serif" data-hero-text="What's Next"></h2>
         <p class="chapter-lede">The watch goes on. New flames to light. New storms to weather.</p>
         <div class="chapter-body">
           <p>Tonight's watch closed the visible backlog. The roadmap from here moves outward — to native windows, nightly judgment, deeper observation, fewer round-trips against primary storage.</p>
         </div>
 
-        <div class="fold">
-          <p class="fold__label">Ranked by leverage</p>
-          <div class="roadmap-row">
-            <div class="roadmap-row__num">I</div>
+        <div class="horizon-list">
+          <div class="horizon-row">
+            <span class="horizon-row__bearing">N · 000°</span>
             <div>
-              <p class="roadmap-row__title">Beacon Mac app via Tauri</p>
-              <p class="roadmap-row__desc">Tauri wrapper around the Next.js frontend, Vercel backend unchanged. TestFlight distribution, native window controls, system tray, native notifications when a customer flips RED.</p>
+              <h3 class="horizon-row__title">Beacon Mac app via Tauri</h3>
+              <p class="horizon-row__desc">Tauri wrapper around the Next.js frontend, Vercel backend unchanged. TestFlight, native window controls, system tray, native notifications when a customer flips RED.</p>
             </div>
           </div>
-          <div class="roadmap-row">
-            <div class="roadmap-row__num">II</div>
+          <div class="horizon-row">
+            <span class="horizon-row__bearing">NE · 045°</span>
             <div>
-              <p class="roadmap-row__title">Eval harness ship</p>
-              <p class="roadmap-row__desc">Wave 3c built the scaffold but never shipped it. Stand up the nightly judge run with the Tier 1 + Tier 2 cases. Weekly report card on Beam quality regressions per scope.</p>
+              <h3 class="horizon-row__title">Eval harness ship</h3>
+              <p class="horizon-row__desc">Wave 3c built the scaffold but never shipped it. Stand up the nightly judge run with Tier 1 + Tier 2 cases. Weekly report card on Beam quality regressions per scope.</p>
             </div>
           </div>
-          <div class="roadmap-row">
-            <div class="roadmap-row__num">III</div>
+          <div class="horizon-row">
+            <span class="horizon-row__bearing">E · 090°</span>
             <div>
-              <p class="roadmap-row__title">Cross-scope synthesis usage analytics</p>
-              <p class="roadmap-row__desc">Measure how often Beam picks <code>get_full_customer_view</code> vs chaining 4–5 smaller tool calls. Tells us if the prompt teaching landed.</p>
+              <h3 class="horizon-row__title">Cross-scope synthesis analytics</h3>
+              <p class="horizon-row__desc">Measure how often Beam picks <code>get_full_customer_view</code> vs chaining 4–5 smaller calls. Tells us if the prompt teaching landed.</p>
             </div>
           </div>
-          <div class="roadmap-row">
-            <div class="roadmap-row__num">IV</div>
+          <div class="horizon-row">
+            <span class="horizon-row__bearing">SE · 135°</span>
             <div>
-              <p class="roadmap-row__title">Keeper read-replica for cost</p>
-              <p class="roadmap-row__desc">Heavy Beam usage routes through Wave-3's in-memory cache, but every cold miss still hits primary Postgres. Standing up a read-replica cuts primary load by ~80%.</p>
+              <h3 class="horizon-row__title">Keeper read-replica</h3>
+              <p class="horizon-row__desc">Heavy Beam usage routes through Wave 3's in-memory cache, but every cold miss still hits primary Postgres. A read-replica cuts primary load by ~80%.</p>
             </div>
           </div>
         </div>
@@ -1456,16 +1924,17 @@ body {
 </div>
 
 <!-- ============================================================
-     EPILOGUE — close the scene
+     EPILOGUE
      ============================================================ -->
-<section class="chapter epilogue" data-chapter-id="7" style="background: linear-gradient(180deg, var(--sea) 0%, var(--night-mid) 100%); position: relative;">
+<section class="chapter epilogue" data-chapter-id="7">
+  <span class="eyebrow" style="margin-bottom: 36px;">Fin · The Watch Continues</span>
   <p class="epilogue__line">
     <span class="epilogue__flame" aria-hidden="true"></span>
     The flame still burns.<br>
     The beam still sweeps.<br>
     The Keeper still stands.
   </p>
-  <p class="epilogue__sig">Built for the watch.</p>
+  <p class="epilogue__sig">— Built for the watch —</p>
 </section>
 
 <!-- ============================================================
@@ -1476,7 +1945,23 @@ body {
   const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ============================================================
-  // RAIN — procedurally generate ~50 lines
+  // HERO TYPOGRAPHY — char-by-char split
+  // ============================================================
+  document.querySelectorAll('.hero-word[data-hero-text]').forEach(el => {
+    const txt = el.getAttribute('data-hero-text') || '';
+    const frag = document.createDocumentFragment();
+    [...txt].forEach((c) => {
+      const span = document.createElement('span');
+      span.className = 'ch';
+      span.textContent = c === ' ' ? ' ' : c;
+      frag.appendChild(span);
+    });
+    el.innerHTML = '';
+    el.appendChild(frag);
+  });
+
+  // ============================================================
+  // RAIN
   // ============================================================
   if (!REDUCED) {
     const rainLayer = document.getElementById('rain-layer');
@@ -1486,8 +1971,8 @@ body {
         const line = document.createElement('div');
         line.className = 'rain__line';
         line.style.left = Math.random() * 100 + '%';
-        const dur = 0.7 + Math.random() * 1.1;       // 0.7s - 1.8s
-        const delay = -Math.random() * 2;             // negative for staggered start
+        const dur = 0.7 + Math.random() * 1.1;
+        const delay = -Math.random() * 2;
         const opacity = 0.3 + Math.random() * 0.5;
         const height = 40 + Math.random() * 50;
         line.style.animationDuration = dur + 's';
@@ -1497,6 +1982,21 @@ body {
         rainLayer.appendChild(line);
       }
     }
+  }
+
+  // ============================================================
+  // CURSOR-FOLLOW GLOW
+  // ============================================================
+  if (!REDUCED) {
+    const glow = document.getElementById('cursor-glow');
+    let raf;
+    window.addEventListener('pointermove', (e) => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        glow.style.left = e.clientX + 'px';
+        glow.style.top = e.clientY + 'px';
+      });
+    }, { passive: true });
   }
 
   // ============================================================
@@ -1512,7 +2012,7 @@ body {
   onScroll();
 
   // ============================================================
-  // CHAPTER OBSERVER — drive sticky stage's data-chapter
+  // CHAPTER OBSERVER
   // ============================================================
   const chapters = document.querySelectorAll('[data-chapter-id]');
   const stageWrap = document.getElementById('stage-wrap');
@@ -1520,13 +2020,13 @@ body {
 
   const CHAPTER_LABELS = {
     '0': 'Prologue',
-    '1': 'Chapter I · The Beacon',
-    '2': 'Chapter II · The Flame',
-    '3': 'Chapter III · The Beam',
-    '4': 'Chapter IV · The Keeper',
-    '5': 'Chapter V · The Watch',
-    '6': 'Chapter VI · What’s Coming',
-    '7': 'Epilogue'
+    '1': 'I · The Beacon',
+    '2': 'II · The Flame',
+    '3': 'III · The Beam',
+    '4': 'IV · The Keeper',
+    '5': 'V · The Watch',
+    '6': 'VI · What’s Coming',
+    '7': 'Fin'
   };
 
   let currentChapter = '0';
@@ -1538,7 +2038,6 @@ body {
   }
 
   const chapterIO = new IntersectionObserver((entries) => {
-    // Pick the entry with the highest intersection ratio
     let best = null;
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -1557,7 +2056,7 @@ body {
   chapters.forEach(c => chapterIO.observe(c));
 
   // ============================================================
-  // TRUST BARS — fill on view
+  // TRUST BARS
   // ============================================================
   const trustIO = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -1571,7 +2070,7 @@ body {
   if (firstTrust) trustIO.observe(firstTrust);
 
   // ============================================================
-  // CACHE ROWS — fill on view
+  // CACHE ROWS
   // ============================================================
   const cacheIO = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -1583,6 +2082,22 @@ body {
   }, { threshold: 0.4 });
   const firstCache = document.querySelector('[data-cache]');
   if (firstCache) cacheIO.observe(firstCache);
+
+  // ============================================================
+  // EXPLODED VIEW — staggered assembly on entry
+  // ============================================================
+  const exploded = document.getElementById('exploded');
+  if (exploded) {
+    const explodedIO = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          exploded.classList.add('is-exploded-in');
+          explodedIO.unobserve(exploded);
+        }
+      });
+    }, { threshold: 0.15 });
+    explodedIO.observe(exploded);
+  }
 })();
 </script>
 
