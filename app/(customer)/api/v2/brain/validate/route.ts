@@ -15,6 +15,13 @@ interface HydratedCandidate extends BrainFact {
 }
 
 /**
+ * SMART-K4 followup — pre-coerced booleans + nullable strings so the UI
+ * doesn't have to defend against undefined/null distinctions. The repo
+ * helpers leave these as optional on BrainFact for backwards compat;
+ * the GET response promises them defined.
+ */
+
+/**
  * GET /api/v2/brain/validate
  *
  *   List candidate facts (confidence_state='candidate', not deleted)

@@ -43,6 +43,15 @@ const HAIKU_MODEL =
   process.env.W15_HAIKU_MODEL || "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 4000;
 
+/**
+ * OPT-9 — default cap on how many entities one cron run processes when the
+ * caller doesn't specify `limit_entities`. On a busy day the unbounded
+ * default could fan out to 30-80 customers in a single tick; 20 keeps the
+ * blast radius and Haiku spend predictable. Callers can override by passing
+ * an explicit `limit_entities` value.
+ */
+const DEFAULT_LIMIT_ENTITIES = 20;
+
 /** One note row from customer_notes. */
 export interface NoteRow {
   am_name: string;
@@ -556,10 +565,14 @@ export async function runExtractionSince(
 
   const allEntities = await listEntitiesWithNotesSince(since);
   const skip = Math.max(0, opts.skip_entities ?? 0);
+  // OPT-9 — when the caller doesn't pass an explicit positive
+  // limit_entities, cap at DEFAULT_LIMIT_ENTITIES (20) instead of an
+  // unbounded sweep. Explicit positive values from callers are honored
+  // verbatim — only the default path changed.
   const limit =
     typeof opts.limit_entities === "number" && opts.limit_entities > 0
       ? opts.limit_entities
-      : allEntities.length;
+      : DEFAULT_LIMIT_ENTITIES;
   const entities = allEntities.slice(skip, skip + limit);
   result.entities_attempted = entities.length;
   if (entities.length === 0) {

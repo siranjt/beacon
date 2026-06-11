@@ -203,6 +203,28 @@ export interface BrainFact {
    * same-customer invariant lives in application code.
    */
   derived_from?: string | null;
+  /**
+   * SMART-K4 follow-up — true when this fact's parent (`derived_from`) was
+   * itself superseded by Wave-2's persistResolution. The Validate inbox
+   * surfaces flagged rows so an AM can decide: rewrite the child, supersede
+   * it, or unlink it from the dead parent. Flag is cleared automatically
+   * when the AM triages the candidate (confirm / edit+confirm / reject /
+   * reclassify) and can be cleared explicitly via the dedicated mutation.
+   *
+   * Cascade is bounded — only DIRECT children of the superseded fact get
+   * flagged, never grandchildren. AM choice propagates further only via
+   * their own edits. Defaults to false; backwards compatible.
+   */
+  needs_parent_review?: boolean;
+  /**
+   * SMART-K4 follow-up — human-readable explanation stamped at the moment
+   * needs_parent_review was set, e.g.
+   *   "parent fact <uuid> superseded by <uuid> on 2026-06-11"
+   * Surfaced verbatim in the Validate inbox so AMs see the why before they
+   * act. NULL on rows that were never flagged. Not cleared when the flag
+   * goes false — the last reason is retained for audit.
+   */
+  parent_review_reason?: string | null;
 }
 
 /** Version log row — append-only history. */

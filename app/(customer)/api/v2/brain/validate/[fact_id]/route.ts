@@ -5,6 +5,7 @@ import {
   editAndConfirmCandidateFact,
   rejectCandidateFact,
   reclassifyCandidateFact,
+  clearParentReviewFlag,
 } from "@/lib/brain/repo";
 import { categoryForSubcategory, FIELD_CATALOG } from "@/lib/brain/types";
 import type {
@@ -32,11 +33,17 @@ interface ReclassifyBody {
   field_name: string;
   topic_category?: TopicCategory;
 }
+// SMART-K4 followup — explicit "child is fine as-is" action. Clears
+// needs_parent_review without changing the row's value or confidence.
+interface ClearReviewFlagBody {
+  action: "clear_review_flag";
+}
 type ActionBody =
   | ConfirmBody
   | EditConfirmBody
   | RejectBody
-  | ReclassifyBody;
+  | ReclassifyBody
+  | ClearReviewFlagBody;
 
 /**
  * POST /api/v2/brain/validate/[fact_id]
@@ -221,6 +228,27 @@ export async function POST(
           },
         });
         return NextResponse.json({ ok: true, action: "reclassify", fact: row });
+      }
+
+      case "clear_review_flag": {
+        const ok = await clearParentReviewFlag(fact_id);
+        if (!ok) {
+          return NextResponse.json(
+            { ok: false, error: "fact not found or db unavailable" },
+            { status: 404 },
+          );
+        }
+        void logUmbrellaActivity({
+          email: user.email,
+          role: user.role,
+          am_name: user.am_name ?? null,
+          agent: "customer",
+          event_name: "brain_candidate:clear_review_flag",
+          surface: "admin",
+          entity_id: null,
+          metadata: { fact_id },
+        });
+        return NextResponse.json({ ok: true, action: "clear_review_flag" });
       }
 
       default: {

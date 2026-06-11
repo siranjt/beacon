@@ -137,9 +137,15 @@ function validateBatchResponse(
 }
 
 /**
- * Classify one batch. Returns null on missing key, retries once on
- * malformed JSON, returns null after two failures. Caller falls through
- * to the regex fallback.
+ * Classify one batch. Returns null on missing key, network error, or
+ * malformed JSON. Caller falls through to the regex fallback.
+ *
+ * OPT-6: removed the inline `for (attempt < 2)` retry loop. The
+ * Anthropic SDK is configured with `maxRetries: 2` above — it already
+ * retries on transient 429/5xx errors. The inline loop stacked on top of
+ * that (a single bad-JSON response could fire up to 6 API calls). JSON
+ * parse failures are deterministic — retrying a malformed response gives
+ * the same malformed response. Drop straight to fallback instead.
  */
 async function classifyBatch(
   batch: CandidateMessage[],
@@ -149,31 +155,40 @@ async function classifyBatch(
 
   const userPrompt = buildBatchUserPrompt(batch);
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const res = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: MAX_TOKENS_PER_BATCH,
-        system: CLASSIFY_SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
-      });
-      const text = res.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { text: string }).text)
-        .join("");
-      const parsed = extractJsonArray(text);
-      if (!parsed) continue;
-      const validated = validateBatchResponse(parsed, batch.length);
-      if (validated) return validated;
-    } catch (err) {
+  try {
+    const res = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: MAX_TOKENS_PER_BATCH,
+      system: CLASSIFY_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+    const text = res.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { text: string }).text)
+      .join("");
+    const parsed = extractJsonArray(text);
+    if (!parsed) {
       console.warn(
-        `[nk/classify] Haiku call failed (attempt ${attempt + 1}): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `[nk/classify] Haiku response did not contain a JSON array — falling through to regex fallback (batch size ${batch.length}).`,
       );
+      return null;
     }
+    const validated = validateBatchResponse(parsed, batch.length);
+    if (!validated) {
+      console.warn(
+        `[nk/classify] Haiku JSON failed validation — falling through to regex fallback (batch size ${batch.length}).`,
+      );
+      return null;
+    }
+    return validated;
+  } catch (err) {
+    console.warn(
+      `[nk/classify] Haiku call failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return null;
   }
-  return null;
 }
 
 /**

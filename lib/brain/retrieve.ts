@@ -142,12 +142,13 @@ export interface HybridRetrievalResult {
  * [original] on any error so Beam quality never regresses from where it
  * was before this lands.
  *
- * Gating: only expand when query length is in [5, 200] chars. Very short
- * queries don't carry enough signal for Haiku to paraphrase usefully and
- * very long queries already carry their own diverse vocabulary.
+ * Gating: only expand when query length is in [12, 200] chars. Very short
+ * queries (like "platform?") don't carry enough signal for Haiku to
+ * paraphrase usefully — it just echoes the original noun. Very long
+ * queries already carry their own diverse vocabulary.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const EXPANSION_MIN_CHARS = 5;
+const EXPANSION_MIN_CHARS = 12;
 const EXPANSION_MAX_CHARS = 200;
 const EXPANSION_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const EXPANSION_CACHE_PREFIX = "brain-query-expansion";

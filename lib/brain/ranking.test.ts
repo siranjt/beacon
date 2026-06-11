@@ -8,7 +8,7 @@
  * live Postgres.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   recencyWeight,
   confidenceMultiplier,
@@ -16,9 +16,31 @@ import {
   amFeedbackBoost,
   computeRankingScore,
   resolveCluster,
+  persistResolution,
   RECENCY_HALF_LIFE_DAYS,
 } from "./ranking";
 import type { BrainFact } from "./types";
+
+// Mock the postgres client so persistResolution can be unit-tested without a
+// real DB. We capture the SQL strings + parameters via a tagged-template
+// recorder and assert against them.
+type SqlCall = { strings: TemplateStringsArray; values: unknown[] };
+const sqlCalls: SqlCall[] = [];
+
+vi.mock("../customer/postgres", () => ({
+  getSql: () => {
+    // Tagged-template function: (strings, ...values) => Promise<rows>
+    const fn = (strings: TemplateStringsArray, ...values: unknown[]) => {
+      sqlCalls.push({ strings, values });
+      return Promise.resolve([] as unknown[]);
+    };
+    return fn;
+  },
+}));
+
+beforeEach(() => {
+  sqlCalls.length = 0;
+});
 
 /* Test fixture — minimal BrainFact rows. */
 function f(opts: {
@@ -316,5 +338,95 @@ describe("resolveCluster — conflict resolution", () => {
     expect(r1.superseded.map((s) => s.fact_id)).toEqual(
       r2.superseded.map((s) => s.fact_id),
     );
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────────────
+ * SMART-K4 followup — needs_parent_review cascade
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Look for a sql call whose strings include a marker substring. Matches
+ * loosely across all template-string fragments so we don't depend on
+ * exact whitespace. Returns undefined if no call matches.
+ */
+function findSqlCall(marker: string): SqlCall | undefined {
+  return sqlCalls.find((c) => c.strings.join(" ").includes(marker));
+}
+
+describe("persistResolution — needs_parent_review cascade", () => {
+  it("fires a cascade UPDATE for each loser keyed on derived_from", async () => {
+    const winner = f({
+      fact_id: "winner-id",
+      source_type: "basesheet",
+      updated_at: new Date(),
+    });
+    const loser = f({
+      fact_id: "loser-id",
+      source_type: "manual",
+      updated_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000),
+    });
+    const result = resolveCluster([winner, loser]);
+    expect(result.authoritative.fact_id).toBe("winner-id");
+
+    await persistResolution(result);
+
+    // Two writes per loser: the supersede UPDATE + the cascade UPDATE.
+    // Plus one winner UPDATE. Three total writes for a 1-loser cluster.
+    const cascade = findSqlCall("needs_parent_review = true");
+    expect(cascade).toBeDefined();
+    // The cascade references the loser as the derived_from target.
+    expect(cascade?.values).toContain(loser.fact_id);
+  });
+
+  it("only flags DIRECT children — no recursive cascade through grandchildren", async () => {
+    // We can't query grandchildren without a real DB, but we can assert
+    // the SQL the cascade emits is a plain UPDATE keyed on
+    // derived_from = loser_id with no JOIN / WITH RECURSIVE / second
+    // pass — i.e. the implementation is bounded by construction.
+    const winner = f({ fact_id: "w", source_type: "basesheet" });
+    const loser = f({
+      fact_id: "L",
+      source_type: "manual",
+      updated_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+    });
+    await persistResolution(resolveCluster([winner, loser]));
+
+    const cascade = findSqlCall("needs_parent_review = true");
+    const sqlText = cascade?.strings.join(" ") ?? "";
+    // No recursive flavors of the cascade.
+    expect(sqlText.toLowerCase()).not.toContain("with recursive");
+    expect(sqlText.toLowerCase()).not.toContain("join");
+    // Single UPDATE on the loser id only.
+    expect(sqlText).toContain("UPDATE beacon_brain_facts");
+    expect(sqlText).toContain("derived_from =");
+  });
+
+  it("stamps a human-readable parent_review_reason on each cascade", async () => {
+    const winner = f({ fact_id: "winner-uuid", source_type: "basesheet" });
+    const loser = f({
+      fact_id: "loser-uuid",
+      source_type: "manual",
+      updated_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000),
+    });
+    await persistResolution(resolveCluster([winner, loser]));
+
+    const cascade = findSqlCall("parent_review_reason");
+    expect(cascade).toBeDefined();
+    // The reason string includes both the loser id and the winner id —
+    // it's the audit breadcrumb the Validate inbox renders.
+    const reasonParam = cascade?.values.find(
+      (v) => typeof v === "string" && (v as string).includes("superseded by"),
+    ) as string | undefined;
+    expect(reasonParam).toBeDefined();
+    expect(reasonParam).toContain("loser-uuid");
+    expect(reasonParam).toContain("winner-uuid");
+  });
+
+  it("skips the cascade for a single-element cluster (no losers)", async () => {
+    const only = f({ fact_id: "solo", source_type: "manual" });
+    await persistResolution(resolveCluster([only]));
+    // Only the winner UPDATE fires; no cascade because no losers.
+    expect(findSqlCall("needs_parent_review = true")).toBeUndefined();
   });
 });

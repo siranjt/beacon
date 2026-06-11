@@ -95,6 +95,7 @@ async function findSemanticNeighbor(
     FROM beacon_brain_facts
     WHERE customer_id = ${customer_id}
       AND soft_deleted_at IS NULL
+      AND is_stale = false
       AND embedding IS NOT NULL
     ORDER BY embedding <=> ${vec}::vector
     LIMIT 1
@@ -819,20 +820,27 @@ export async function listCandidates(opts: {
     opts.owning_am_emails && opts.owning_am_emails.length > 0
       ? opts.owning_am_emails
       : null;
+  // SMART-K4 followup — Validate inbox now ALSO surfaces facts whose parent
+  // got superseded (needs_parent_review = true) regardless of
+  // confidence_state. They're more urgent than fresh candidates because
+  // they're already-confirmed truth that just went stale via cascade — so
+  // they sort first. Ordering: needs_parent_review rows DESC (true first),
+  // then customer/category/subcategory/field/created_at as before.
   try {
     const [rowsResult, countResult] = await Promise.all([
       sql`
         SELECT * FROM beacon_brain_facts
-        WHERE confidence_state = 'candidate'
+        WHERE (confidence_state = 'candidate' OR needs_parent_review = true)
           AND soft_deleted_at IS NULL
           AND (${ams}::text[] IS NULL OR owning_am_email = ANY(${ams}))
-        ORDER BY customer_id, topic_category, topic_subcategory, field_name, created_at DESC
+        ORDER BY needs_parent_review DESC,
+                 customer_id, topic_category, topic_subcategory, field_name, created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
       `,
       sql`
         SELECT COUNT(*)::int AS n FROM beacon_brain_facts
-        WHERE confidence_state = 'candidate'
+        WHERE (confidence_state = 'candidate' OR needs_parent_review = true)
           AND soft_deleted_at IS NULL
           AND (${ams}::text[] IS NULL OR owning_am_email = ANY(${ams}))
       `,
@@ -843,6 +851,68 @@ export async function listCandidates(opts: {
     return { rows, total };
   } catch {
     return { rows: [], total: 0 };
+  }
+}
+
+/**
+ * SMART-K4 followup — explicitly clear the needs_parent_review flag on a
+ * fact. Used by the Validate inbox "Clear review flag" action when an AM
+ * decides the child is fine as-is, and called internally from the triage
+ * mutations (confirm / edit+confirm / reject / reclassify) so any
+ * downstream action implicitly unflags the row.
+ *
+ * Does NOT clear parent_review_reason — the last reason is retained for
+ * audit so we can trace why a flag was raised even after it's been
+ * resolved. Idempotent: re-running on a row that's already unflagged is
+ * a no-op.
+ *
+ * Returns true if the fact existed (whether or not the flag changed),
+ * false on db error or missing fact.
+ */
+export async function clearParentReviewFlag(fact_id: string): Promise<boolean> {
+  const sql = getSql();
+  if (!sql) return false;
+  try {
+    await sql`
+      UPDATE beacon_brain_facts
+      SET needs_parent_review = false
+      WHERE fact_id = ${fact_id}::uuid
+        AND needs_parent_review = true
+    `;
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[brain] clearParentReviewFlag failed for ${fact_id}: ${msg}`);
+    return false;
+  }
+}
+
+/**
+ * SMART-K4 followup — count of facts currently flagged for parent review,
+ * scoped to an AM if provided. Drives the Validate inbox count chip + the
+ * Brain panel badge so AMs see "n need parent review" at a glance.
+ */
+export async function getNeedsParentReviewCount(
+  am_email?: string,
+): Promise<number> {
+  const sql = getSql();
+  if (!sql) return 0;
+  try {
+    const rows = (am_email
+      ? ((await sql`
+          SELECT COUNT(*)::int AS n FROM beacon_brain_facts
+          WHERE needs_parent_review = true
+            AND soft_deleted_at IS NULL
+            AND owning_am_email = ${am_email}
+        `) as Array<{ n: number }>)
+      : ((await sql`
+          SELECT COUNT(*)::int AS n FROM beacon_brain_facts
+          WHERE needs_parent_review = true
+            AND soft_deleted_at IS NULL
+        `) as Array<{ n: number }>));
+    return rows[0]?.n ?? 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -923,7 +993,9 @@ export async function getSourceQuoteForFact(fact_id: string): Promise<string | n
   return first.slice(idx + "::quote:".length);
 }
 
-/** Flip a candidate to confirmed. No value change. */
+/** Flip a candidate to confirmed. No value change. Also clears the
+ * SMART-K4 needs_parent_review flag if it was set — taking action on the
+ * fact implicitly resolves the parent-review prompt. */
 export async function confirmCandidateFact(
   fact_id: string,
   by_email: string,
@@ -931,7 +1003,12 @@ export async function confirmCandidateFact(
   const sql = getSql();
   if (!sql) return null;
   const current = await getFactById(fact_id);
-  if (!current || current.confidence_state !== "candidate" || current.soft_deleted_at) {
+  // Allow EITHER a fresh candidate OR a flagged fact (confirmed with
+  // needs_parent_review = true) to be re-confirmed here. Both code paths
+  // emit a 'confirm' version row, both clear the flag.
+  const flagged = current?.needs_parent_review === true;
+  const isCandidate = current?.confidence_state === "candidate";
+  if (!current || current.soft_deleted_at || (!isCandidate && !flagged)) {
     return null;
   }
   const newVersion = current.current_version + 1;
@@ -941,7 +1018,8 @@ export async function confirmCandidateFact(
         confirmed_by_email = ${by_email},
         confirmed_at = NOW(),
         current_version = ${newVersion},
-        updated_at = NOW()
+        updated_at = NOW(),
+        needs_parent_review = false
     WHERE fact_id = ${fact_id}
     RETURNING *
   `) as BrainFact[];
@@ -961,7 +1039,9 @@ export async function confirmCandidateFact(
   return row ?? null;
 }
 
-/** Update value AND flip candidate → confirmed. Logged as 'refine'. */
+/** Update value AND flip candidate → confirmed. Logged as 'refine'. Also
+ * clears the SMART-K4 needs_parent_review flag — the AM's rewrite IS the
+ * resolution for the flagged fact. */
 export async function editAndConfirmCandidateFact(
   fact_id: string,
   new_value: string,
@@ -971,7 +1051,12 @@ export async function editAndConfirmCandidateFact(
   if (!sql) return null;
   if (!new_value || !new_value.trim()) return null;
   const current = await getFactById(fact_id);
-  if (!current || current.confidence_state !== "candidate" || current.soft_deleted_at) {
+  // Allow either a fresh candidate OR a flagged confirmed fact (the AM
+  // sweeping the inbox can rewrite a flagged child the same way they
+  // edit-confirm a candidate). Both paths emit a 'refine' version row.
+  const flagged = current?.needs_parent_review === true;
+  const isCandidate = current?.confidence_state === "candidate";
+  if (!current || current.soft_deleted_at || (!isCandidate && !flagged)) {
     return null;
   }
   const newVersion = current.current_version + 1;
@@ -986,7 +1071,8 @@ export async function editAndConfirmCandidateFact(
         confirmed_by_email = ${by_email},
         confirmed_at = NOW(),
         current_version = ${newVersion},
-        updated_at = NOW()
+        updated_at = NOW(),
+        needs_parent_review = false
     WHERE fact_id = ${fact_id}
     RETURNING *
   `) as BrainFact[];
@@ -1006,7 +1092,10 @@ export async function editAndConfirmCandidateFact(
   return row ?? null;
 }
 
-/** Soft-delete a candidate. Logged as 'reject'. */
+/** Soft-delete a candidate. Logged as 'reject'. Clears the SMART-K4
+ * needs_parent_review flag for cleanliness — the row drops out of the
+ * inbox via soft_deleted_at anyway, but clearing keeps the row's state
+ * coherent for audit. */
 export async function rejectCandidateFact(
   fact_id: string,
   by_email: string,
@@ -1020,7 +1109,8 @@ export async function rejectCandidateFact(
     UPDATE beacon_brain_facts
     SET soft_deleted_at = NOW(),
         current_version = ${newVersion},
-        updated_at = NOW()
+        updated_at = NOW(),
+        needs_parent_review = false
     WHERE fact_id = ${fact_id}
   `;
   await sql`

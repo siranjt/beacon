@@ -76,6 +76,10 @@ CREATE TABLE IF NOT EXISTS customers (
                                 CHECK (status IN ('pending','processing','ready','failed','out_of_scope')),
     failure_reason          TEXT,
     failure_attempts        INTEGER DEFAULT 0,
+    -- OPT-8: consecutive retry-cron failures. Reset to 0 on success. When >= 3,
+    -- the retry-pending cron flips the row to status='failed' so a deterministically
+    -- wedged customer (e.g. entity_id never resolves) stops burning Sonnet calls.
+    retry_failure_streak    INTEGER NOT NULL DEFAULT 0,
 
     -- Audit
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -237,6 +237,12 @@ export async function findClusterMembers(
  *
  * Safe to call with a single-element cluster (no-op — single element
  * is trivially authoritative).
+ *
+ * SMART-K4 followup — after marking each loser superseded, fire-and-forget
+ * a cascade to flag direct derived children (derived_from = loser_id) as
+ * needs_parent_review = true. Soft-fails so the supersede itself succeeds
+ * even if the cascade query errors. Bounded to DIRECT children only —
+ * grandchildren are NOT auto-flagged, the AM decides.
  */
 export async function persistResolution(result: ResolutionResult): Promise<void> {
   const sql = getSql();
@@ -262,6 +268,27 @@ export async function persistResolution(result: ResolutionResult): Promise<void>
           ranking_score = ${score}
       WHERE fact_id = ${loser.fact_id}::uuid
     `;
+
+    // SMART-K4 followup — flag direct derived children of this loser.
+    // Soft-fail: if the cascade query errors, the supersede above still
+    // landed, which is the pre-cascade behavior — children quietly point
+    // at a demoted parent, recoverable on the next sweep.
+    try {
+      const reason = `parent fact ${loser.fact_id} superseded by ${winnerId} on ${new Date().toISOString().slice(0, 10)}`;
+      await sql`
+        UPDATE beacon_brain_facts
+        SET needs_parent_review = true,
+            parent_review_reason = ${reason}
+        WHERE derived_from = ${loser.fact_id}::uuid
+          AND soft_deleted_at IS NULL
+          AND needs_parent_review = false
+      `;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(
+        `[ranking] needs_parent_review cascade failed for loser ${loser.fact_id}: ${msg}`,
+      );
+    }
   }
 }
 
