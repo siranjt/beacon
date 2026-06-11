@@ -12,10 +12,17 @@
   :root {
     --ease-apple: cubic-bezier(0.4, 0, 0.2, 1);
     --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* v5 spring easings — Framer Motion feel */
+    --ease-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);   /* overshoot */
+    --ease-spring-tight: cubic-bezier(0.22, 1, 0.36, 1);     /* smooth-out */
+    --ease-spring-snappy: cubic-bezier(0.65, 0, 0.35, 1);    /* snappy in-out */
+    --ease-spring-glide: cubic-bezier(0.16, 1, 0.3, 1);      /* gentle glide */
     --dur-fast: 220ms;
     --dur-base: 400ms;
     --dur-slow: 700ms;
     --dur-hero: 1200ms;
+    /* Scroll-driven parallax handle */
+    --scroll-y: 0px;
 
     /* Watchfire palette tokens */
     --char: #2B1F14;
@@ -2147,10 +2154,396 @@
     text-transform: uppercase;
     letter-spacing: 0.10em;
   }
+
+  /* ============================================================
+     v5 — AGENCY-GRADE MOTION OVERHAUL
+     ============================================================ */
+
+  /* --- Spring-everywhere: rewrite key transitions on top of v4 --- */
+  .card,
+  .tool-card,
+  .shipped-card,
+  .surface,
+  .query-card,
+  .tax-card,
+  .half {
+    transition:
+      transform 520ms var(--ease-spring-soft),
+      box-shadow 520ms var(--ease-spring-tight),
+      border-color 320ms var(--ease-spring-tight) !important;
+    will-change: transform;
+  }
+  .tool-card:hover {
+    transform: translateY(-6px) scale(1.02);
+  }
+  .surface:hover,
+  .query-card:hover,
+  .tax-card:hover {
+    transform: translateY(-6px) scale(1.02);
+  }
+  .shipped-card:hover {
+    transform: translateY(-8px) scale(1.015);
+  }
+  .half:hover {
+    transform: translateY(-8px) scale(1.01);
+  }
+
+  /* --- Hidden arrow on hoverable cards --- */
+  .tool-card,
+  .surface,
+  .query-card,
+  .shipped-card,
+  .tax-card { position: relative; }
+  .tool-card::after,
+  .surface::after,
+  .query-card::after,
+  .shipped-card::after,
+  .tax-card::after {
+    content: "\2192"; /* right arrow */
+    position: absolute;
+    right: 14px;
+    bottom: 12px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--ember);
+    opacity: 0;
+    transform: translateX(-8px);
+    transition:
+      opacity 280ms var(--ease-spring-tight),
+      transform 380ms var(--ease-spring-soft);
+    pointer-events: none;
+  }
+  .tax-card::after { color: var(--keeper-accent); }
+  .shipped-card--keeper::after { color: var(--keeper-accent); }
+  .shipped-card--brass::after { color: #946A1F; }
+  .shipped-card--voyage::after { color: var(--voyage-accent); }
+  .tool-card:hover::after,
+  .surface:hover::after,
+  .query-card:hover::after,
+  .shipped-card:hover::after,
+  .tax-card:hover::after {
+    opacity: 0.92;
+    transform: translateX(0);
+  }
+
+  /* --- Scroll choreography (reveal + scale + slide) --- */
+  [data-reveal] {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0) scale(0.985);
+    transition:
+      opacity 800ms var(--ease-spring-tight),
+      transform 900ms var(--ease-spring-glide);
+    will-change: opacity, transform;
+  }
+  [data-reveal].in-view {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  [data-reveal-stagger] > * {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.985);
+    transition:
+      opacity 760ms var(--ease-spring-tight),
+      transform 820ms var(--ease-spring-glide);
+    will-change: opacity, transform;
+  }
+  [data-reveal-stagger].in-view > * {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  [data-reveal-stagger].in-view > *:nth-child(1)  { transition-delay: 60ms; }
+  [data-reveal-stagger].in-view > *:nth-child(2)  { transition-delay: 130ms; }
+  [data-reveal-stagger].in-view > *:nth-child(3)  { transition-delay: 200ms; }
+  [data-reveal-stagger].in-view > *:nth-child(4)  { transition-delay: 270ms; }
+  [data-reveal-stagger].in-view > *:nth-child(5)  { transition-delay: 340ms; }
+  [data-reveal-stagger].in-view > *:nth-child(6)  { transition-delay: 410ms; }
+  [data-reveal-stagger].in-view > *:nth-child(7)  { transition-delay: 480ms; }
+  [data-reveal-stagger].in-view > *:nth-child(8)  { transition-delay: 550ms; }
+  [data-reveal-stagger].in-view > *:nth-child(9)  { transition-delay: 620ms; }
+  [data-reveal-stagger].in-view > *:nth-child(10) { transition-delay: 690ms; }
+
+  /* --- Magnetic hover micro-translate (driven by JS) --- */
+  [data-magnetic] {
+    will-change: transform;
+    transition: transform 360ms var(--ease-spring-soft);
+  }
+
+  /* --- Hero char-split title --- */
+  h1.hero-title .h-char {
+    display: inline-block;
+    opacity: 0;
+    transform: translate3d(0, 42px, 0) scale(0.92);
+    transition:
+      opacity 720ms var(--ease-spring-tight),
+      transform 820ms var(--ease-spring-soft);
+    will-change: transform, opacity;
+  }
+  h1.hero-title.is-split-revealed .h-char {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  /* When split is active, suppress the v3 fallback animation so chars do the work */
+  h1.hero-title.is-split-revealed {
+    animation: none;
+  }
+
+  /* --- CTA / page-load pulse for the hero badge --- */
+  @keyframes hero-cta-pulse {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.06); }
+    70%  { transform: scale(0.985); }
+    100% { transform: scale(1); }
+  }
+  .hero-cta-pulse {
+    animation: hero-cta-pulse 1100ms var(--ease-spring-soft) 1;
+  }
+
+  /* --- Marquee strip --- */
+  .marquee {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--paper) 0%, var(--gray-50) 100%);
+    border-top: 1px solid var(--gray-150);
+    border-bottom: 1px solid var(--gray-150);
+    padding: 18px 0;
+  }
+  .marquee::before,
+  .marquee::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 120px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .marquee::before {
+    left: 0;
+    background: linear-gradient(90deg, var(--paper), transparent);
+  }
+  .marquee::after {
+    right: 0;
+    background: linear-gradient(270deg, var(--paper), transparent);
+  }
+  .marquee__track {
+    display: flex;
+    gap: 0;
+    width: max-content;
+    animation: marquee-scroll 38s linear infinite;
+    will-change: transform;
+  }
+  .marquee:hover .marquee__track {
+    animation-play-state: paused;
+  }
+  .marquee__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 28px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--gray-700);
+    white-space: nowrap;
+  }
+  .marquee__dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ember);
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(200, 67, 29, 0.4);
+  }
+  .marquee__item:nth-child(odd) .marquee__dot  { background: var(--brass); box-shadow: 0 0 8px rgba(217, 164, 65, 0.5); }
+  .marquee__item:nth-child(3n) .marquee__dot   { background: var(--keeper-accent); box-shadow: 0 0 8px rgba(26, 47, 74, 0.4); }
+  .marquee__item:nth-child(5n) .marquee__dot   { background: var(--voyage-accent); box-shadow: 0 0 8px rgba(107, 79, 187, 0.4); }
+  @keyframes marquee-scroll {
+    from { transform: translate3d(0, 0, 0); }
+    to   { transform: translate3d(-50%, 0, 0); }
+  }
+
+  /* --- Parallax floaters & hero sparkle (driven by --scroll-y) --- */
+  .floater {
+    transform: translate3d(0, calc(var(--scroll-y, 0px) * 0.25), 0);
+  }
+  .floater--triangle {
+    transform: translate3d(0, calc(var(--scroll-y, 0px) * 0.45), 0);
+  }
+  .floater--circle {
+    transform: translate3d(0, calc(var(--scroll-y, 0px) * 0.15), 0);
+  }
+  .floater--ring {
+    transform: translate3d(0, calc(var(--scroll-y, 0px) * 0.35), 0);
+  }
+  .section--hero::after {
+    transform: translate3d(0, calc(var(--scroll-y, 0px) * 0.18), 0);
+  }
+  .hero-flame-wrap {
+    transform: translate3d(0, calc(var(--scroll-y, 0px) * -0.08), 0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .floater, .section--hero::after, .hero-flame-wrap {
+      transform: none !important;
+    }
+  }
+
+  /* --- Sticky scroll-told section (wave-1 pipeline) --- */
+  .scroll-told {
+    position: relative;
+  }
+  .scroll-told__stage {
+    position: sticky;
+    top: 80px;
+    z-index: 1;
+  }
+  .scroll-told__rail {
+    margin: 32px auto 0;
+    max-width: 880px;
+    padding: 16px 0;
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .scroll-told__step {
+    position: relative;
+    padding: 12px 0 24px 4px;
+    opacity: 0.35;
+    transform: translateY(8px);
+    transition:
+      opacity 600ms var(--ease-spring-tight),
+      transform 700ms var(--ease-spring-glide);
+  }
+  .scroll-told__step.is-active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .scroll-told__dot {
+    grid-column: 1;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid rgba(200, 67, 29, 0.25);
+    margin-top: 14px;
+    transition:
+      background 320ms var(--ease-spring-tight),
+      border-color 320ms var(--ease-spring-tight),
+      box-shadow 480ms var(--ease-spring-soft);
+  }
+  .scroll-told__step.is-active .scroll-told__dot {
+    background: var(--ember);
+    border-color: var(--ember);
+    box-shadow: 0 0 0 6px rgba(200, 67, 29, 0.12);
+  }
+  .scroll-told__step-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 4px;
+  }
+  .scroll-told__step-body {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  @media (max-width: 760px) {
+    .scroll-told__stage { position: static; }
+  }
+
+  /* --- Animated SVG architecture: draw lines on scroll --- */
+  .arch-path {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    transition: stroke-dashoffset 1400ms var(--ease-spring-tight);
+  }
+  .arch-wrap.is-drawn .arch-path {
+    stroke-dashoffset: 0;
+  }
+  .arch-node {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.7);
+    transition:
+      opacity 600ms var(--ease-spring-tight),
+      transform 700ms var(--ease-spring-soft);
+  }
+  .arch-node-lbl,
+  .arch-node-sub {
+    opacity: 0;
+    transition: opacity 500ms var(--ease-spring-tight);
+  }
+  .arch-wrap.is-drawn .arch-node,
+  .arch-wrap.is-drawn .arch-node-lbl,
+  .arch-wrap.is-drawn .arch-node-sub {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .arch-wrap.is-drawn .arch-node:nth-of-type(1) { transition-delay: 60ms; }
+  .arch-wrap.is-drawn .arch-node:nth-of-type(2) { transition-delay: 180ms; }
+  .arch-wrap.is-drawn .arch-node:nth-of-type(3) { transition-delay: 340ms; }
+  .arch-wrap.is-drawn .arch-node:nth-of-type(4) { transition-delay: 420ms; }
+  .arch-wrap.is-drawn .arch-node:nth-of-type(5) { transition-delay: 500ms; }
+  .arch-wrap.is-drawn .arch-node:nth-of-type(6) { transition-delay: 580ms; }
+  .arch-wrap.is-drawn .arch-node:nth-of-type(7) { transition-delay: 700ms; }
+
+  /* --- Cursor-following accent dot --- */
+  .cursor-glow {
+    position: fixed;
+    top: 0; left: 0;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(217, 164, 65, 0.65), rgba(200, 67, 29, 0.18) 60%, transparent 75%);
+    pointer-events: none;
+    z-index: 999;
+    transform: translate3d(-50%, -50%, 0);
+    transition: opacity 380ms var(--ease-spring-tight);
+    opacity: 0;
+    mix-blend-mode: plus-lighter;
+    filter: blur(2px);
+    will-change: transform;
+  }
+  .cursor-glow.is-visible { opacity: 0.85; }
+  @media (pointer: coarse), (hover: none), (prefers-reduced-motion: reduce) {
+    .cursor-glow { display: none; }
+  }
+
+  /* --- Smooth scroll-snap gentle suggestion --- */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    main#main-content {
+      scroll-snap-type: y proximity;
+    }
+    main#main-content .section {
+      scroll-snap-align: start;
+      scroll-snap-stop: normal;
+    }
+  }
+
+  /* --- Topnav badge magnetic + spring --- */
+  .topnav__ver {
+    transition: transform 320ms var(--ease-spring-soft);
+  }
+
+  /* --- Reduced-motion bail for v5 additions --- */
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal], [data-reveal-stagger] > *,
+    h1.hero-title .h-char {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    .marquee__track { animation: none !important; }
+    .arch-path { stroke-dashoffset: 0 !important; }
+    .arch-node, .arch-node-lbl, .arch-node-sub {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    .scroll-told__step { opacity: 1 !important; transform: none !important; }
+    main#main-content { scroll-snap-type: none !important; }
+  }
 </style>
 </head>
 <body class="page-loading">
 
+<div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
 <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
 <a href="#main-content" class="skip-link">Skip to content</a>
 
@@ -2176,7 +2569,7 @@
     </a>
     <div class="topnav__right">
       <span>Beam &nbsp;+&nbsp; Keeper</span>
-      <span class="topnav__ver"><span class="topnav__pulse"></span>8 wins · live</span>
+      <span class="topnav__ver" data-magnetic data-magnetic-strength="0.4"><span class="topnav__pulse"></span>8 wins · live</span>
     </div>
   </div>
 </nav>
@@ -2212,6 +2605,26 @@
     </div>
   </div>
 </section>
+
+<!-- v5 — Marquee strip: capabilities ticker -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee__track" id="marquee-track">
+    <span class="marquee__item"><span class="marquee__dot"></span>Hybrid retrieval</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Voyage rerank-2.5-lite</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>RRF fusion · k=60</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Deterministic conflict resolution</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>60-day half-life recency</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Context cache · 5-min TTL</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Eight tools · seven scopes</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Inline citations everywhere</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Confidence calibration</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Taxonomy v3 · cadence + sentiment</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Cite-chip "why" trace</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Shadow Verdict on every card</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>get_full_customer_view</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Reject-rate dashboard</span>
+  </div>
+</div>
 
 <div class="divider"></div>
 
@@ -2431,15 +2844,15 @@
     <h2 class="headline" data-animate>Two signals. One rerank. Top five facts.</h2>
     <p class="subhead" data-animate>Pure embeddings miss exact-token matches. Pure keywords miss paraphrases. Hybrid retrieval runs both in parallel, fuses the rankings, and lets a dedicated cross-attention reranker pick the winners.</p>
 
-    <!-- The pipeline diagram -->
-    <div class="pipeline" data-animate="scale-in">
-      <div class="pipeline-stage">
+    <!-- The pipeline diagram (v5: each stage now reveals as you scroll into it) -->
+    <div class="pipeline" data-animate="scale-in" data-scroll-told>
+      <div class="pipeline-stage" data-scroll-step>
         <div class="pipeline-stage__num">1</div>
         <div class="pipeline-stage__lbl">Beam asks Keeper a question</div>
         <span class="pipeline-stage__pill">"what platform are they on?"</span>
       </div>
 
-      <div class="pipeline-lanes">
+      <div class="pipeline-lanes" data-scroll-step>
         <div class="pipeline-lane">
           <div class="pipeline-lane__dot pipeline-lane__dot--embed"><i class="ti ti-vector-bezier"></i></div>
           <div class="pipeline-lane__name">pgvector cosine</div>
@@ -2462,11 +2875,11 @@
         </div>
       </div>
 
-      <div class="pipeline-merge">
+      <div class="pipeline-merge" data-scroll-step>
         <i class="ti ti-flame"></i> RRF Reciprocal Rank Fusion · k = 60 <i class="ti ti-flame"></i>
       </div>
 
-      <div class="pipeline-rerank">
+      <div class="pipeline-rerank" data-scroll-step>
         <div class="pipeline-rerank__icon"><i class="ti ti-sparkles"></i></div>
         <div class="pipeline-rerank__body">
           <div class="pipeline-rerank__title">Voyage rerank-2.5-lite</div>
@@ -3155,6 +3568,212 @@
       }
     });
   });
+
+  // ============================================================
+  // v5 — AGENCY-GRADE MOTION LAYER
+  // ============================================================
+
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FINE_POINTER = window.matchMedia('(pointer: fine)').matches && window.matchMedia('(hover: hover)').matches;
+
+  // ---- 1. Hero title char-split + page-load choreography ----
+  const heroTitle = document.querySelector('h1.hero-title');
+  if (heroTitle && !REDUCED) {
+    // Preserve the inner structure: text + the + span + text
+    const plusEl = heroTitle.querySelector('span');
+    const before = 'Beam ';
+    const after = ' Keeper';
+    heroTitle.innerHTML = '';
+    const wrap = (text, baseDelay) => {
+      const frag = document.createDocumentFragment();
+      [...text].forEach((ch, i) => {
+        const span = document.createElement('span');
+        span.className = 'h-char';
+        span.textContent = ch === ' ' ? ' ' : ch;
+        span.style.transitionDelay = (baseDelay + i * 32) + 'ms';
+        frag.appendChild(span);
+      });
+      return frag;
+    };
+    heroTitle.appendChild(wrap(before, 220));
+    if (plusEl) {
+      // Wrap the + char too, applying brass color via inline style
+      const plusSpan = document.createElement('span');
+      plusSpan.className = 'h-char';
+      plusSpan.textContent = '+';
+      plusSpan.style.transitionDelay = (220 + before.length * 32) + 'ms';
+      plusSpan.style.webkitTextFillColor = 'var(--brass)';
+      plusSpan.style.color = 'var(--brass)';
+      plusSpan.style.fontWeight = '300';
+      plusSpan.style.padding = '0 14px';
+      heroTitle.appendChild(plusSpan);
+    }
+    heroTitle.appendChild(wrap(after, 220 + before.length * 32 + 60));
+    requestAnimationFrame(() => heroTitle.classList.add('is-split-revealed'));
+  }
+
+  // Trigger CTA pulse on the topnav badge after hero load
+  const topnavBadge = document.querySelector('.topnav__ver');
+  if (topnavBadge && !REDUCED) {
+    setTimeout(() => {
+      topnavBadge.classList.add('hero-cta-pulse');
+      setTimeout(() => topnavBadge.classList.remove('hero-cta-pulse'), 1200);
+    }, 1100);
+  }
+
+  // ---- 2. data-reveal / data-reveal-stagger observer ----
+  const revealIO = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        revealIO.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.14, rootMargin: '0px 0px -60px 0px' });
+  document.querySelectorAll('[data-reveal], [data-reveal-stagger]').forEach(el => revealIO.observe(el));
+
+  // ---- 3. Magnetic hover (pointermove driven, lerp-decayed) ----
+  if (FINE_POINTER && !REDUCED) {
+    document.querySelectorAll('[data-magnetic]').forEach(el => {
+      const strength = parseFloat(el.dataset.magneticStrength || '0.35');
+      const radius = 80;
+      el.addEventListener('pointerenter', () => {
+        el.style.willChange = 'transform';
+      }, { passive: true });
+      el.addEventListener('pointermove', (e) => {
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dx = e.clientX - cx;
+        const dy = e.clientY - cy;
+        const dist = Math.min(1, Math.hypot(dx, dy) / radius);
+        const fall = 1 - dist;
+        const tx = dx * strength * fall;
+        const ty = dy * strength * fall;
+        el.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0)`;
+      }, { passive: true });
+      el.addEventListener('pointerleave', () => {
+        el.style.transform = 'translate3d(0, 0, 0)';
+        setTimeout(() => { el.style.willChange = ''; }, 400);
+      }, { passive: true });
+    });
+  }
+
+  // ---- 4. Parallax scroll variable (--scroll-y) ----
+  if (!REDUCED) {
+    let parallaxScheduled = false;
+    function updateParallax() {
+      const y = window.scrollY || 0;
+      document.documentElement.style.setProperty('--scroll-y', y + 'px');
+      parallaxScheduled = false;
+    }
+    window.addEventListener('scroll', () => {
+      if (!parallaxScheduled) {
+        parallaxScheduled = true;
+        requestAnimationFrame(updateParallax);
+      }
+    }, { passive: true });
+    updateParallax();
+  }
+
+  // ---- 5. SVG architecture: draw on intersect ----
+  const archWrap = document.querySelector('.arch-wrap');
+  if (archWrap) {
+    const archIO = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          // Set stroke-dasharray dynamically based on each path length
+          archWrap.querySelectorAll('.arch-path').forEach(p => {
+            try {
+              const len = p.getTotalLength ? p.getTotalLength() : 200;
+              p.style.strokeDasharray = len;
+              p.style.strokeDashoffset = len;
+              // force reflow then animate
+              // eslint-disable-next-line no-unused-expressions
+              p.getBoundingClientRect();
+              p.style.transition = 'stroke-dashoffset 1500ms var(--ease-spring-tight)';
+              p.style.strokeDashoffset = '0';
+            } catch (_) { /* noop */ }
+          });
+          archWrap.classList.add('is-drawn');
+          archIO.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.25 });
+    archIO.observe(archWrap);
+  }
+
+  // ---- 6. Cursor-following glow (lerp interpolation) ----
+  const cursorGlow = document.getElementById('cursor-glow');
+  if (cursorGlow && FINE_POINTER && !REDUCED) {
+    let targetX = window.innerWidth / 2;
+    let targetY = window.innerHeight / 2;
+    let currentX = targetX;
+    let currentY = targetY;
+    let rafId = null;
+    function step() {
+      currentX += (targetX - currentX) * 0.18;
+      currentY += (targetY - currentY) * 0.18;
+      cursorGlow.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) translate3d(-50%, -50%, 0)`;
+      rafId = requestAnimationFrame(step);
+    }
+    window.addEventListener('pointermove', (e) => {
+      targetX = e.clientX;
+      targetY = e.clientY;
+      if (!cursorGlow.classList.contains('is-visible')) {
+        cursorGlow.classList.add('is-visible');
+      }
+      if (!rafId) rafId = requestAnimationFrame(step);
+    }, { passive: true });
+    window.addEventListener('pointerleave', () => {
+      cursorGlow.classList.remove('is-visible');
+    }, { passive: true });
+    window.addEventListener('blur', () => {
+      cursorGlow.classList.remove('is-visible');
+    }, { passive: true });
+    // Hide on top-most CTA/link to avoid covering hit-targets
+    document.querySelectorAll('a, button, [data-magnetic]').forEach(el => {
+      el.addEventListener('pointerenter', () => {
+        cursorGlow.style.opacity = '0';
+      }, { passive: true });
+      el.addEventListener('pointerleave', () => {
+        cursorGlow.style.opacity = '';
+      }, { passive: true });
+    });
+  }
+
+  // ---- 7. Scroll-told section progression (wave-1 pipeline narrative) ----
+  // Looks for any [data-scroll-told] container with [data-scroll-step] children
+  // and progressively activates them based on viewport center.
+  const scrollTold = document.querySelector('[data-scroll-told]');
+  if (scrollTold && !REDUCED) {
+    const steps = Array.from(scrollTold.querySelectorAll('[data-scroll-step]'));
+    const stepIO = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.4) {
+          entry.target.classList.add('is-active');
+        }
+      });
+    }, { threshold: [0.4, 0.6, 0.8] });
+    steps.forEach(s => stepIO.observe(s));
+  }
+
+  // ---- 8. Marquee duplicate content for seamless loop ----
+  const marqueeTrack = document.getElementById('marquee-track');
+  if (marqueeTrack && !REDUCED) {
+    // Clone once so the keyframe -50% lands seamlessly
+    marqueeTrack.innerHTML = marqueeTrack.innerHTML + marqueeTrack.innerHTML;
+  }
+
+  // ---- 9. will-change cleanup after big reveals (perf hygiene) ----
+  setTimeout(() => {
+    document.querySelectorAll('[data-animate], [data-cascade], [data-reveal], [data-reveal-stagger]').forEach(el => {
+      if (el.classList.contains('in-view')) {
+        el.style.willChange = '';
+      }
+    });
+  }, 4000);
+
 })();
 </script>
 </body>
