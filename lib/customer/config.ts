@@ -312,6 +312,7 @@ export const EXCLUDED_ENTITIES: Record<string, string> = {
 export const ADMIN_EMAILS: string[] = [
   "success@zoca.com",
   "siranjith.t@zoca.com",
+  "rinitha.a@zoca.com",
 ];
 
 // Manager — cross-AM access, all manager features, no admin-exclusive.
@@ -322,7 +323,6 @@ export const ADMIN_EMAILS: string[] = [
 // confirms which is primary).
 export const MANAGER_EMAILS: string[] = [
   "chetan.m@zoca.com",
-  "rinitha.a@zoca.com",
   "robin@zoca.ai",
   "ashish@zoca.ai",
   "ashish@zoca.com",
