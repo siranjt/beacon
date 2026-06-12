@@ -1478,32 +1478,32 @@
     <div class="feature-pair" data-cascade>
       <div class="feature-card feature-card--keeper">
         <h3 class="feature-card__title"><i class="ti ti-tree"></i> Five categories · taxonomy v3</h3>
-        <p class="feature-card__body" style="color: #c7c7cc;">Identity (owner, decision-makers, sold-by, AM assignment, business profile). Operational (contract, integration, feature usage, tech stack, renewal, onboarding, performance context). Behavioral (payment pattern, comms preference, seasonal, demo style, competitive context, cadence, sentiment). Concerns (latent risk, next-call agenda, soft red flag). Relationship (advocacy, engagement).</p>
+        <p class="feature-card__body">Identity (owner, decision-makers, sold-by, AM assignment, business profile). Operational (contract, integration, feature usage, tech stack, renewal, onboarding, performance context). Behavioral (payment pattern, comms preference, seasonal, demo style, competitive context, cadence, sentiment). Concerns (latent risk, next-call agenda, soft red flag). Relationship (advocacy, engagement).</p>
         <span class="feature-card__chip">lib/brain/types.ts · ~25 subcategories</span>
       </div>
       <div class="feature-card feature-card--keeper">
         <h3 class="feature-card__title"><i class="ti ti-shield-check"></i> Source trust hierarchy</h3>
-        <p class="feature-card__body" style="color: #c7c7cc;">Six provenances: BaseSheet, Chargebee, customer-note, Beam-conversation (AM said it), Beam-extracted (Haiku from notes — must validate), manual. Higher-trust sources auto-confirm at bootstrap; lower-trust sources land in the Validate inbox.</p>
+        <p class="feature-card__body">Six provenances: BaseSheet, Chargebee, customer-note, Beam-conversation (AM said it), Beam-extracted (Haiku from notes — must validate), manual. Higher-trust sources auto-confirm at bootstrap; lower-trust sources land in the Validate inbox.</p>
         <span class="feature-card__chip">FactSourceType · 6 levels</span>
       </div>
       <div class="feature-card feature-card--keeper">
         <h3 class="feature-card__title"><i class="ti ti-arrows-shuffle"></i> Conflict resolution</h3>
-        <p class="feature-card__body" style="color: #c7c7cc;">When two facts collide on the same (customer, topic, field), Keeper's deterministic ranker scores both on source trust + recency (60-day half-life) + specificity. The loser stays in the audit log via <code class="code-chip">superseded_by</code> — nothing is ever deleted silently.</p>
+        <p class="feature-card__body">When two facts collide on the same (customer, topic, field), Keeper's deterministic ranker scores both on source trust + recency (60-day half-life) + specificity. The loser stays in the audit log via <code class="code-chip">superseded_by</code> — nothing is ever deleted silently.</p>
         <span class="feature-card__chip">lib/brain/ranking.ts</span>
       </div>
       <div class="feature-card feature-card--keeper">
         <h3 class="feature-card__title"><i class="ti ti-inbox-check"></i> Validate inbox</h3>
-        <p class="feature-card__body" style="color: #c7c7cc;">Haiku extracts candidate facts from AM notes nightly. They land in the Validate inbox tagged with source pills. Managers approve, refine, or reject. Reject-rate is tracked on the admin quality page to keep extraction prompts honest.</p>
+        <p class="feature-card__body">Haiku extracts candidate facts from AM notes nightly. They land in the Validate inbox tagged with source pills. Managers approve, refine, or reject. Reject-rate is tracked on the admin quality page to keep extraction prompts honest.</p>
         <span class="feature-card__chip">/admin/keeper/validate</span>
       </div>
       <div class="feature-card feature-card--keeper">
         <h3 class="feature-card__title"><i class="ti ti-link"></i> Derived-from chains</h3>
-        <p class="feature-card__body" style="color: #c7c7cc;">Some facts derive from others ("renewal date" → derived from a contract clause). Keeper tracks the chain via <code class="code-chip">derived_from</code>. When a parent gets superseded, derived children are flagged for re-review — no stale child facts living off retired parents.</p>
+        <p class="feature-card__body">Some facts derive from others ("renewal date" → derived from a contract clause). Keeper tracks the chain via <code class="code-chip">derived_from</code>. When a parent gets superseded, derived children are flagged for re-review — no stale child facts living off retired parents.</p>
         <span class="feature-card__chip">SMART-K4 · cascading flags</span>
       </div>
       <div class="feature-card feature-card--keeper">
         <h3 class="feature-card__title"><i class="ti ti-trash-x"></i> Stale prune + bootstrap</h3>
-        <p class="feature-card__body" style="color: #c7c7cc;">Facts past their sunset date or below confidence floor auto-prune nightly. New customers get auto-bootstrapped at Stage A — BaseSheet fact write-back populates Keeper on first sight. Every fallback compounds.</p>
+        <p class="feature-card__body">Facts past their sunset date or below confidence floor auto-prune nightly. New customers get auto-bootstrapped at Stage A — BaseSheet fact write-back populates Keeper on first sight. Every fallback compounds.</p>
         <span class="feature-card__chip">META-A1 · META-A2 · /admin/keeper/enrichment-status</span>
       </div>
     </div>
