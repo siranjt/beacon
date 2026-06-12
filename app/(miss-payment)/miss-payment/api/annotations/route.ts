@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = await getApiUser();
-  const denied = requireRole(user, "admin", "manager");
+  // 2026-06-12 — opened to AMs alongside the page + invoices route.
+  const denied = requireRole(user, "admin", "manager", "am");
   if (denied) return denied;
 
   try {
@@ -30,7 +31,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const user = await getApiUser();
-  const denied = requireRole(user, "admin", "manager");
+  // 2026-06-12 — opened to AMs alongside the page + invoices route.
+  const denied = requireRole(user, "admin", "manager", "am");
   if (denied) return denied;
 
   try {

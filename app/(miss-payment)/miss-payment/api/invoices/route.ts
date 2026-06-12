@@ -13,9 +13,9 @@
  *
  * Each line is JSON: `{ type: "partial" | "complete" | "error", ... }`.
  *
- * Auth: requires admin or manager role (via api-auth.ts). AMs are not
- * granted access since the missed-invoice view is a Finance-ops surface
- * — line-level rep involvement happens via the annotations API.
+ * Auth: 2026-06-12 — opened to admin + manager + am. Previously scoped to
+ * admin + manager only as a Finance-ops surface. Now any signed-in Zoca
+ * user (sign-in is gated by domain allowlist) can fetch the invoice list.
  */
 
 import { NextRequest } from "next/server";
@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
 
   if (!isCronCaller) {
     const user = await getApiUser();
-    const denied = requireRole(user, "admin", "manager");
+    // 2026-06-12 — opened to AMs too. Matches the page-level gate change.
+    const denied = requireRole(user, "admin", "manager", "am");
     if (denied) return denied;
   }
 
