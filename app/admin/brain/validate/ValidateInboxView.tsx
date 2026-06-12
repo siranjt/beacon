@@ -18,6 +18,12 @@ import type {
   TopicCategory,
   TopicSubcategory,
 } from "@/lib/brain/types";
+// WAVE-A-3 — canonical Keeper chip on every inbox row. Confidence keys to
+// the candidate vs confirmed state (candidate = low, confirmed = moderate)
+// so triage state reads at a glance through the chip tint alone.
+import KeeperChip, {
+  type KeeperChipConfidence,
+} from "@/components/keeper/KeeperChip";
 
 type Role = "admin" | "manager" | "am";
 
@@ -35,6 +41,14 @@ interface CandidateRow {
   source_quote: string | null;
   owning_am_email: string | null;
   created_at: string;
+  /**
+   * WAVE-A-2 — true when this row has a superseded ancestor that can be
+   * rolled back via POST /api/admin/keeper/revert. Only true on confirmed
+   * facts surfaced in the inbox (typically needs_parent_review rows).
+   */
+  can_revert?: boolean;
+  /** Echo of the underlying confidence_state so we can branch the Revert UI. */
+  confidence_state?: "candidate" | "confirmed";
 }
 
 interface Props {
@@ -96,6 +110,12 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
         field_name: string;
       }
     >
+  >({});
+
+  // WAVE-A-2 — keyed by fact_id. Open => confirm UI rendered; reason held
+  // here too so it survives Cancel/reopen within the same session view.
+  const [revertingState, setRevertingState] = useState<
+    Record<string, { reason: string; busy: boolean; error: string | null }>
   >({});
 
   // Manager-only toggle: see only my candidates (treat like AM).
@@ -309,6 +329,85 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
       [fact_id]: { ...prev[fact_id], field_name: field },
     }));
   };
+
+  /* ────── WAVE-A-2 revert handlers ────── */
+
+  // Open / close the confirm UI for a row. The reason and busy/error state
+  // live on the same object so they don't get wiped on accidental rerenders.
+  const beginRevert = (fact_id: string) => {
+    setRevertingState((prev) => ({
+      ...prev,
+      [fact_id]: { reason: "", busy: false, error: null },
+    }));
+  };
+  const cancelRevert = (fact_id: string) => {
+    setRevertingState((prev) => {
+      const next = { ...prev };
+      delete next[fact_id];
+      return next;
+    });
+  };
+  const setRevertReason = (fact_id: string, reason: string) => {
+    setRevertingState((prev) => ({
+      ...prev,
+      [fact_id]: { ...(prev[fact_id] ?? { busy: false, error: null }), reason },
+    }));
+  };
+
+  // POST /api/admin/keeper/revert. On success, the row drops from the
+  // inbox (because the fact has changed its superseded_by chain and the
+  // page refetches) and we advance keyboard focus same as the other actions.
+  const submitRevert = useCallback(
+    async (fact_id: string) => {
+      const state = revertingState[fact_id];
+      if (!state) return;
+      setRevertingState((prev) => ({
+        ...prev,
+        [fact_id]: { ...state, busy: true, error: null },
+      }));
+      try {
+        const res = await fetch("/api/admin/keeper/revert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            factId: fact_id,
+            reason: state.reason.trim() || undefined,
+          }),
+        });
+        const json = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          message?: string;
+        };
+        if (!res.ok || !json.ok) {
+          setRevertingState((prev) => ({
+            ...prev,
+            [fact_id]: {
+              ...state,
+              busy: false,
+              error: json.message || json.error || `revert failed (${res.status})`,
+            },
+          }));
+          return;
+        }
+        // Success — refetch so the inbox reflects the cluster swap, and
+        // clear any local UI state for this fact_id.
+        setRevertingState((prev) => {
+          const next = { ...prev };
+          delete next[fact_id];
+          return next;
+        });
+        await fetchRows();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setRevertingState((prev) => ({
+          ...prev,
+          [fact_id]: { ...state, busy: false, error: msg },
+        }));
+      }
+    },
+    [revertingState, fetchRows],
+  );
 
   /* ────── keyboard nav ────── */
 
@@ -605,9 +704,22 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
                       <span className="font-medium text-[14px] text-zoca-text">
                         {row.bizname || "(no bizname)"}
                       </span>
+                      {/* WAVE-A-3 — Keeper chip carries the brand kernel on
+                          every triage row. Topic is the most specific token
+                          we know (field_name), confidence tracks the row's
+                          triage state: candidate rows sit at "low" (waiting
+                          for human confirm), confirmed rows already promoted
+                          land at "moderate". */}
+                      <KeeperChip
+                        topic={formatFieldLabel(row.field_name).toLowerCase()}
+                        confidence={
+                          row.confidence_state === "confirmed"
+                            ? ("moderate" as KeeperChipConfidence)
+                            : ("low" as KeeperChipConfidence)
+                        }
+                      />
                       <span className="text-[10px] uppercase tracking-wider text-zoca-text-2/70 font-mono">
-                        {row.topic_category} / {row.topic_subcategory} /{" "}
-                        <span className="text-zoca-text">{formatFieldLabel(row.field_name)}</span>
+                        {row.topic_category} / {row.topic_subcategory}
                       </span>
                     </div>
                     {row.entity_id && (
@@ -785,9 +897,71 @@ export default function ValidateInboxView({ role, userEmail }: Props) {
                         >
                           ✗ Reject
                         </button>
+                        {/* WAVE-A-2 — Revert action surfaces only on confirmed
+                            rows where the API marked can_revert=true. These
+                            are the `needs_parent_review` rows whose parent
+                            got demoted in a supersession; flipping them back
+                            restores the prior authoritative fact. */}
+                        {row.can_revert && (
+                          <button
+                            type="button"
+                            onClick={() => beginRevert(row.fact_id)}
+                            disabled={isBusy || row.fact_id in revertingState}
+                            className="px-3 py-1 text-[11px] rounded-md border border-zoca-brass/50 bg-zoca-amber-soft/30 text-zoca-char hover:bg-zoca-amber-soft/60 disabled:opacity-50"
+                            title="Roll back to the previously-superseded ancestor"
+                          >
+                            ↺ Revert
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
+                  {/* WAVE-A-2 — inline revert confirm panel. Mirrors the
+                      reclassify editor's visual treatment so it slots in
+                      next to the existing triage UIs without surprise. */}
+                  {row.fact_id in revertingState && (
+                    <div className="mt-3 rounded-md border border-zoca-brass/40 bg-zoca-amber-soft/20 p-2">
+                      <div className="text-[11px] text-zoca-char">
+                        Roll this fact back to the version that was superseded? Optional reason for the audit log:
+                      </div>
+                      <input
+                        type="text"
+                        value={revertingState[row.fact_id].reason}
+                        onChange={(e) =>
+                          setRevertReason(row.fact_id, e.target.value)
+                        }
+                        placeholder="e.g. extracted name was wrong"
+                        maxLength={500}
+                        disabled={revertingState[row.fact_id].busy}
+                        className="mt-1.5 w-full px-2 py-1 text-[12px] border border-zoca-border rounded bg-white text-zoca-text"
+                      />
+                      {revertingState[row.fact_id].error && (
+                        <div className="mt-1 text-[11px] text-red-700">
+                          {revertingState[row.fact_id].error}
+                        </div>
+                      )}
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void submitRevert(row.fact_id)}
+                          disabled={revertingState[row.fact_id].busy}
+                          className="px-3 py-1 text-[11px] font-medium rounded-md bg-zoca-char text-zoca-parchment border border-zoca-char disabled:opacity-50"
+                        >
+                          {revertingState[row.fact_id].busy
+                            ? "Reverting…"
+                            : "Confirm revert"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => cancelRevert(row.fact_id)}
+                          disabled={revertingState[row.fact_id].busy}
+                          className="px-3 py-1 text-[11px] rounded-md border border-zoca-border bg-transparent text-zoca-text"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser, requireRole } from "@/lib/customer/api-auth";
 import { listCandidates, getSourceQuoteForFact } from "@/lib/brain/repo";
+import { canRevert } from "@/lib/brain/revert";
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import type { BrainFact } from "@/lib/brain/types";
 
@@ -12,6 +13,12 @@ interface HydratedCandidate extends BrainFact {
   entity_id: string | null;
   am_name_resolved: string | null;
   source_quote: string | null;
+  /**
+   * WAVE-A-2 — true when this fact has at least one non-deleted ancestor
+   * (`superseded_by = this.fact_id`). Drives the Revert button on confirmed
+   * `needs_parent_review` rows in the Validate inbox.
+   */
+  can_revert: boolean;
 }
 
 /**
@@ -93,12 +100,18 @@ export async function GET(req: NextRequest) {
   for (const r of rows) {
     const snapCust = byCustomerId.get(r.customer_id) ?? null;
     const quote = await getSourceQuoteForFact(r.fact_id);
+    // WAVE-A-2 — only check revertability on confirmed rows. Candidates
+    // never won a supersession (they're awaiting first triage), so they
+    // can't have an ancestor to revert to. Skip the DB round-trip.
+    const canRevertNow =
+      r.confidence_state === "confirmed" ? await canRevert(r.fact_id) : false;
     hydrated.push({
       ...r,
       bizname: snapCust?.company ?? null,
       entity_id: snapCust?.entity_id ?? null,
       am_name_resolved: snapCust?.am_name ?? null,
       source_quote: quote,
+      can_revert: canRevertNow,
     });
   }
 

@@ -18,6 +18,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CitationEntry, CitationProvenance } from "@/lib/ai/citations";
+// WAVE-A-3 — Canonical Keeper chip wrapper. When entry.category === "fact"
+// (Keeper-sourced), we delegate the visible pill to KeeperChip so every
+// surface that renders a Keeper citation shares the brand kernel (vault
+// glyph + brass/ember/patina confidence tint + abbrev `K · topic` label).
+// The popover behavior here stays unchanged — clicking the chip still
+// toggles the X-Ray panel with the value + provenance trace.
+import KeeperChip, {
+  type KeeperChipConfidence,
+} from "@/components/keeper/KeeperChip";
 
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -109,6 +118,40 @@ export default function CitationChip({ citationKey, entry }: Props) {
     ? Object.entries(entry.raw).filter(([, v]) => v !== null && v !== "")
     : [];
 
+  // WAVE-A-3 — Keeper-sourced chip rendering. When the citation came from a
+  // Keeper fact, we swap the generic ✦ button for a canonical KeeperChip
+  // (vault glyph + `K · topic` label) so the brand kernel reads consistently
+  // everywhere Keeper is the source of truth. The popover behavior stays
+  // identical — clicking the KeeperChip wrapper toggles the same X-Ray card.
+  if (entry.category === "fact") {
+    const topic = deriveKeeperTopic(entry);
+    const confidence = inferKeeperConfidence(entry);
+    return (
+      <span
+        ref={wrapRef}
+        style={{
+          position: "relative",
+          display: "inline-block",
+          verticalAlign: "1px",
+        }}
+      >
+        <KeeperChip
+          topic={topic}
+          confidence={confidence}
+          onClick={onToggle}
+        />
+        {open && (
+          <CitationPopover
+            entry={entry}
+            categoryLabel={categoryLabel}
+            rawEntries={rawEntries}
+            citationKey={citationKey}
+          />
+        )}
+      </span>
+    );
+  }
+
   return (
     <span
       ref={wrapRef}
@@ -150,134 +193,233 @@ export default function CitationChip({ citationKey, entry }: Props) {
       </button>
 
       {open && (
-        <span
-          role="dialog"
-          aria-label="Source data"
-          style={{
-            position: "absolute",
-            bottom: "calc(100% + 6px)",
-            left: 0,
-            minWidth: 220,
-            maxWidth: 320,
-            padding: "8px 10px",
-            background: C.parchment,
-            border: `1px solid ${C.border}`,
-            borderLeft: `3px solid ${C.ember}`,
-            borderRadius: 8,
-            boxShadow: "0 8px 24px -8px rgba(43, 31, 20, 0.35)",
-            zIndex: 200,
-            fontFamily: SANS,
-            // Restore reading defaults — the parent bubble uses pre-wrap +
-            // break-word which we don't want bleeding into the popover.
-            whiteSpace: "normal",
-            textAlign: "left",
-          }}
-        >
-          <span
-            style={{
-              display: "block",
-              fontSize: 9,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              color: C.text3,
-              fontFamily: "ui-monospace, monospace",
-              marginBottom: 2,
-            }}
-          >
-            {categoryLabel}
-          </span>
-          <span
-            style={{
-              display: "block",
-              fontSize: 12,
-              fontFamily: SERIF,
-              color: C.char,
-              fontWeight: 500,
-              marginBottom: 4,
-            }}
-          >
-            {entry.label}
-          </span>
-          <span
-            style={{
-              display: "block",
-              fontSize: 13,
-              color: C.char,
-              fontFamily: SANS,
-              fontWeight: 600,
-              marginBottom: rawEntries.length > 0 ? 6 : 0,
-              wordBreak: "break-word",
-            }}
-          >
-            {entry.value}
-          </span>
-          {rawEntries.length > 0 && (
-            <span
-              style={{
-                display: "block",
-                paddingTop: 6,
-                borderTop: `1px solid ${C.border}`,
-              }}
-            >
-              {rawEntries.map(([k, v]) => (
-                <span
-                  key={k}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "100px 1fr",
-                    gap: 6,
-                    fontSize: 11,
-                    lineHeight: 1.4,
-                    padding: "1px 0",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: C.text3,
-                      fontFamily: "ui-monospace, monospace",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {k}
-                  </span>
-                  <span
-                    style={{
-                      color: C.text2,
-                      fontFamily: SANS,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {String(v)}
-                  </span>
-                </span>
-              ))}
-            </span>
-          )}
-          {/* Roadmap-v2-4 — hybrid-retrieval "why" trace. Renders the
-              matched_via badges + RRF score + rerank bar + pool position.
-              Skipped for non-Keeper chips (provenance is undefined). */}
-          {entry.provenance && (
-            <ProvenanceTrace data={entry.provenance} />
-          )}
-          <span
-            style={{
-              display: "block",
-              marginTop: 8,
-              fontSize: 9,
-              color: C.text3,
-              fontFamily: "ui-monospace, monospace",
-              wordBreak: "break-all",
-            }}
-            title="Citation key as emitted by Beacon AI"
-          >
-            {citationKey}
-          </span>
-        </span>
+        <CitationPopover
+          entry={entry}
+          categoryLabel={categoryLabel}
+          rawEntries={rawEntries}
+          citationKey={citationKey}
+        />
       )}
     </span>
   );
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * CitationPopover — extracted X-Ray panel.
+ *
+ * Shared by the generic (non-Keeper) and Keeper rendering paths so the
+ * popover behavior + look stays identical regardless of which chip
+ * surface (KeeperChip vs ✦ button) opened it.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+function CitationPopover({
+  entry,
+  categoryLabel,
+  rawEntries,
+  citationKey,
+}: {
+  entry: CitationEntry;
+  categoryLabel: string;
+  rawEntries: Array<[string, string | number | null]>;
+  citationKey: string;
+}) {
+  return (
+    <span
+      role="dialog"
+      aria-label="Source data"
+      style={{
+        position: "absolute",
+        bottom: "calc(100% + 6px)",
+        left: 0,
+        minWidth: 220,
+        maxWidth: 320,
+        padding: "8px 10px",
+        background: C.parchment,
+        border: `1px solid ${C.border}`,
+        borderLeft: `3px solid ${C.ember}`,
+        borderRadius: 8,
+        boxShadow: "0 8px 24px -8px rgba(43, 31, 20, 0.35)",
+        zIndex: 200,
+        fontFamily: SANS,
+        // Restore reading defaults — the parent bubble uses pre-wrap +
+        // break-word which we don't want bleeding into the popover.
+        whiteSpace: "normal",
+        textAlign: "left",
+      }}
+    >
+      <span
+        style={{
+          display: "block",
+          fontSize: 9,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: C.text3,
+          fontFamily: "ui-monospace, monospace",
+          marginBottom: 2,
+        }}
+      >
+        {categoryLabel}
+      </span>
+      <span
+        style={{
+          display: "block",
+          fontSize: 12,
+          fontFamily: SERIF,
+          color: C.char,
+          fontWeight: 500,
+          marginBottom: 4,
+        }}
+      >
+        {entry.label}
+      </span>
+      <span
+        style={{
+          display: "block",
+          fontSize: 13,
+          color: C.char,
+          fontFamily: SANS,
+          fontWeight: 600,
+          marginBottom: rawEntries.length > 0 ? 6 : 0,
+          wordBreak: "break-word",
+        }}
+      >
+        {entry.value}
+      </span>
+      {rawEntries.length > 0 && (
+        <span
+          style={{
+            display: "block",
+            paddingTop: 6,
+            borderTop: `1px solid ${C.border}`,
+          }}
+        >
+          {rawEntries.map(([k, v]) => (
+            <span
+              key={k}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "100px 1fr",
+                gap: 6,
+                fontSize: 11,
+                lineHeight: 1.4,
+                padding: "1px 0",
+              }}
+            >
+              <span
+                style={{
+                  color: C.text3,
+                  fontFamily: "ui-monospace, monospace",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {k}
+              </span>
+              <span
+                style={{
+                  color: C.text2,
+                  fontFamily: SANS,
+                  wordBreak: "break-word",
+                }}
+              >
+                {String(v)}
+              </span>
+            </span>
+          ))}
+        </span>
+      )}
+      {/* Roadmap-v2-4 — hybrid-retrieval "why" trace. Renders the
+          matched_via badges + RRF score + rerank bar + pool position.
+          Skipped for non-Keeper chips (provenance is undefined). */}
+      {entry.provenance && <ProvenanceTrace data={entry.provenance} />}
+      <span
+        style={{
+          display: "block",
+          marginTop: 8,
+          fontSize: 9,
+          color: C.text3,
+          fontFamily: "ui-monospace, monospace",
+          wordBreak: "break-all",
+        }}
+        title="Citation key as emitted by Beacon AI"
+      >
+        {citationKey}
+      </span>
+    </span>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * WAVE-A-3 — Keeper chip helpers
+ *
+ * Two pure derivations used to map a "fact"-category CitationEntry onto
+ * the (topic, confidence) shape KeeperChip wants:
+ *
+ *   deriveKeeperTopic   — pulls the most-specific human label from the
+ *                         entry. Prefers `field_name` from raw (e.g.
+ *                         "preferred_channel"), falls back to subcategory
+ *                         (e.g. "comms_preference"), then label, then the
+ *                         literal word "fact".
+ *
+ *   inferKeeperConfidence — maps a Keeper fact's source/confirmation
+ *                         shape onto the chip's confidence tier. We
+ *                         deliberately err high: a chip's job is brand
+ *                         consistency, not lying about confidence. When
+ *                         we can't tell, default to "high" rather than
+ *                         painting an "unverified" gray on real Keeper
+ *                         data.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+function deriveKeeperTopic(entry: CitationEntry): string {
+  const raw = entry.raw ?? {};
+  const fieldName = stringOrNull(raw.field_name);
+  if (fieldName) return prettifyToken(fieldName);
+  const subcategory = stringOrNull(raw.topic_subcategory);
+  if (subcategory) return prettifyToken(subcategory);
+  const category = stringOrNull(raw.topic_category);
+  if (category) return prettifyToken(category);
+  // entry.label is something like "concerns/latent_risk/risk_description"
+  // — fall back to its trailing segment.
+  if (entry.label) {
+    const tail = entry.label.split("/").pop()?.trim();
+    if (tail) return prettifyToken(tail);
+  }
+  return "fact";
+}
+
+function inferKeeperConfidence(entry: CitationEntry): KeeperChipConfidence {
+  const raw = entry.raw ?? {};
+  const sourceType = stringOrNull(raw.source_type);
+  const confirmedAt = stringOrNull(raw.confirmed_at);
+
+  // System of record → high.
+  if (sourceType === "basesheet" || sourceType === "chargebee") return "high";
+  // AM typed it directly → high.
+  if (sourceType === "manual") return "high";
+  // CS-note extract → moderate.
+  if (sourceType === "customer_note") return "moderate";
+  // Haiku extraction sitting in the inbox without a confirmation timestamp
+  // → low; once confirmed it graduates to moderate.
+  if (sourceType === "beacon_ai_extracted") {
+    return confirmedAt ? "moderate" : "low";
+  }
+  if (sourceType === "beacon_ai_conversation") {
+    return confirmedAt ? "moderate" : "low";
+  }
+  // No source_type plumbed through — default high. See the helper docblock
+  // for the rationale (brand consistency over false dilution).
+  return "high";
+}
+
+function stringOrNull(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  return s.length > 0 ? s : null;
+}
+
+function prettifyToken(s: string): string {
+  return s.replace(/_/g, " ").trim();
 }
 
 /* ────────────────────────────────────────────────────────────────────────

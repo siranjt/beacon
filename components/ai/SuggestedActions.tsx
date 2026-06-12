@@ -18,6 +18,11 @@
 import { useEffect, useState } from "react";
 import { useActivityLogger } from "@/components/hooks/use-activity-logger";
 import type { AiScope } from "@/lib/ai/scopes";
+// WAVE-A-3 — canonical Keeper chip on suggestions that the model marked
+// as Keeper-grounded. Plumbing is opt-in: any SuggestedAction landing with
+// `keeper_grounded: true` (and optionally `keeper_topic`) gets the chip;
+// older payloads without the field render unchanged.
+import KeeperChip from "@/components/keeper/KeeperChip";
 
 const SERIF = 'Georgia, "Times New Roman", serif';
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
@@ -44,6 +49,16 @@ interface SuggestedAction {
   why: string;
   prompt?: string;
   href?: string;
+  /**
+   * WAVE-A-3 — optional Keeper-grounding marker. When the suggest payload
+   * indicates the recommendation came from a Keeper fact (e.g. "owner
+   * prefers WhatsApp" pulling out of `behavioral/comms_preference`), the
+   * client renders a KeeperChip on the card so the brand kernel reads
+   * consistently. Backwards compatible: undefined behaves the same as the
+   * pre-Wave-A renderer.
+   */
+  keeper_grounded?: boolean;
+  keeper_topic?: string;
 }
 
 interface ApiResponse {
@@ -223,6 +238,16 @@ export default function SuggestedActions({ scope }: Props) {
                   >
                     {tone.label}
                   </span>
+                  {/* WAVE-A-3 — Keeper chip when the suggestion came from
+                      a Keeper fact. Sits next to the kind label so the
+                      provenance reads before the user even reads the
+                      action text. */}
+                  {a.keeper_grounded && (
+                    <KeeperChip
+                      topic={a.keeper_topic ?? "fact"}
+                      confidence="high"
+                    />
+                  )}
                 </div>
                 <div
                   style={{

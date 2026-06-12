@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiUser, requireRole } from "@/lib/customer/api-auth";
 import { readLatestSnapshotV2 } from "@/lib/customer/postgres";
 import { getFactsForCustomer } from "@/lib/brain/repo";
+import { canRevert } from "@/lib/brain/revert";
 import type { BrainFact } from "@/lib/brain/types";
+
+// WAVE-A-2 — facts surfaced on the V2BrainPanel pick up a `can_revert` flag
+// so the inline `↺ Revert` action only renders for rows that actually have a
+// superseded ancestor to roll back to.
+type FactWithRevert = BrainFact & { can_revert: boolean };
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,11 +95,20 @@ export async function GET(
       );
     }
 
-    const facts = await getFactsForCustomer(cbCustomerId, {
+    const rawFacts = await getFactsForCustomer(cbCustomerId, {
       confirmedOnly: true,
     });
 
-    const grouped: Record<string, BrainFact[]> = {
+    // WAVE-A-2 — hydrate each fact with `can_revert`. The check is cheap
+    // (single indexed SELECT on superseded_by — see lib/brain/revert.ts).
+    // Done sequentially to stay inside Neon's HTTP connection budget; switch
+    // to Promise.all later if customers with 50+ facts become common.
+    const facts: FactWithRevert[] = [];
+    for (const f of rawFacts) {
+      facts.push({ ...f, can_revert: await canRevert(f.fact_id) });
+    }
+
+    const grouped: Record<string, FactWithRevert[]> = {
       identity: [],
       operational: [],
       behavioral: [],

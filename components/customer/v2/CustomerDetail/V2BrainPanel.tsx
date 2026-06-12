@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   Clock,
   History,
+  RotateCcw,
   Settings,
   Smile,
   User,
@@ -45,10 +46,20 @@ import type {
   BrainFactVersion,
   TopicCategory,
 } from "@/lib/brain/types";
+// WAVE-A-1 — Memory Score header chip. Lives in the panel header so AMs see
+// "X% covered" the moment the Keeper panel opens.
+import KeeperChip from "@/components/keeper/KeeperChip";
 
 type Props = {
   entityId: string;
 };
+
+/**
+ * WAVE-A-2 — fact shape with the per-row can_revert flag the API hydrates
+ * from `lib/brain/revert.ts canRevert()`. Drives the inline ↺ Revert action
+ * surfaced on hover, only for facts that actually have a superseded ancestor.
+ */
+type FactWithRevert = BrainFact & { can_revert?: boolean };
 
 type FetchResponse = {
   ok: boolean;
@@ -62,14 +73,14 @@ type FetchResponse = {
     current_pod: string | null;
     current_sp: string | null;
   } | null;
-  facts: BrainFact[];
+  facts: FactWithRevert[];
   grouped: {
-    identity: BrainFact[];
-    operational: BrainFact[];
-    behavioral: BrainFact[];
-    concerns: BrainFact[];
+    identity: FactWithRevert[];
+    operational: FactWithRevert[];
+    behavioral: FactWithRevert[];
+    concerns: FactWithRevert[];
     /** Wave 1.1 — new top-level category. */
-    relationship: BrainFact[];
+    relationship: FactWithRevert[];
   };
   facts_count: number;
   reason?: string;
@@ -362,15 +373,61 @@ function HistoryEntry({ entry }: { entry: BrainFactVersion }) {
   );
 }
 
-function FactRow({ fact }: { fact: BrainFact }) {
+function FactRow({
+  fact,
+  onReverted,
+}: {
+  fact: FactWithRevert;
+  /**
+   * WAVE-A-2 — callback fired after a successful revert lands. The parent
+   * refetches the panel so the cluster swap (old becomes authoritative) is
+   * visible without a page reload.
+   */
+  onReverted?: () => void;
+}) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [versions, setVersions] = useState<BrainFactVersion[] | null>(null);
 
+  // WAVE-A-2 — revert confirm state. Closed → idle. Open → confirm form
+  // showing optional reason input + Revert button. Busy → POSTing. Error
+  // → inline error message persists until next toggle.
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [revertReason, setRevertReason] = useState("");
+  const [revertBusy, setRevertBusy] = useState(false);
+  const [revertError, setRevertError] = useState<string | null>(null);
+
   const src = sourceColor(fact.source_type);
   const age = relativeAge(fact.updated_at);
   const Icon = CATEGORY_ICONS[fact.topic_category];
+
+  async function submitRevert() {
+    setRevertBusy(true);
+    setRevertError(null);
+    try {
+      const res = await fetch("/api/admin/keeper/revert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          factId: fact.fact_id,
+          reason: revertReason.trim() || undefined,
+        }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string; message?: string };
+      if (!res.ok || !json.ok) {
+        setRevertError(json.message || json.error || `revert failed (${res.status})`);
+        return;
+      }
+      setRevertConfirmOpen(false);
+      setRevertReason("");
+      onReverted?.();
+    } catch (e) {
+      setRevertError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRevertBusy(false);
+    }
+  }
 
   // Only fetch on first expand; subsequent toggles reuse the cached list.
   // If `current_version <= 1`, there's no meaningful history to show — we
@@ -403,7 +460,7 @@ function FactRow({ fact }: { fact: BrainFact }) {
   }
 
   return (
-    <div className="py-1.5 text-[12px] leading-snug">
+    <div className="group/factrow py-1.5 text-[12px] leading-snug">
       <div className="flex items-start gap-2">
         <div className="mt-0.5 flex min-w-[110px] flex-shrink-0 items-center gap-1 text-zoca-text-2">
           <Icon size={11} className="flex-shrink-0 opacity-70" aria-hidden />
@@ -448,9 +505,72 @@ function FactRow({ fact }: { fact: BrainFact }) {
                 </span>
               )}
             </button>
+            {/* WAVE-A-2 — Revert action. Only renders when the server says
+                this fact has a superseded ancestor (can_revert=true). The
+                `group/factrow:hover` class on the wrapping <div> reveals
+                it on hover; it stays accessible-on-focus via opacity-0
+                focus-visible:opacity-100. */}
+            {fact.can_revert && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRevertConfirmOpen((v) => !v);
+                  setRevertError(null);
+                }}
+                className="inline-flex items-center gap-0.5 rounded-full border border-zoca-brass/40 bg-zoca-amber-soft/30 px-1.5 py-0.5 text-zoca-char hover:bg-zoca-amber-soft/60 opacity-0 group-hover/factrow:opacity-100 focus-visible:opacity-100 transition-opacity"
+                title="Revert this fact to its previously-superseded ancestor"
+                aria-expanded={revertConfirmOpen}
+              >
+                <RotateCcw size={9} aria-hidden />
+                Revert
+              </button>
+            )}
           </div>
         </div>
       </div>
+      {/* WAVE-A-2 — confirm form. Inline, no modal. Mirrors the history
+          panel's visual treatment so the two actions feel like siblings. */}
+      {revertConfirmOpen && (
+        <div className="ml-[118px] mt-1.5 rounded-md border border-zoca-brass/40 bg-zoca-amber-soft/20 px-2 py-1.5">
+          <div className="text-[11px] text-zoca-char">
+            Roll this fact back to the previous version of {labelFor(fact.field_name)}? Optional reason:
+          </div>
+          <input
+            type="text"
+            value={revertReason}
+            onChange={(e) => setRevertReason(e.target.value)}
+            placeholder="e.g. extracted the wrong owner name"
+            maxLength={500}
+            disabled={revertBusy}
+            className="mt-1 w-full px-1.5 py-1 text-[11px] border border-zoca-border rounded bg-white text-zoca-text"
+          />
+          {revertError && (
+            <div className="mt-1 text-[10px] text-zoca-pink-bright">{revertError}</div>
+          )}
+          <div className="mt-1.5 flex gap-1.5">
+            <button
+              type="button"
+              onClick={submitRevert}
+              disabled={revertBusy}
+              className="px-2 py-0.5 text-[10px] font-semibold rounded border border-zoca-char bg-zoca-char text-zoca-parchment disabled:opacity-50"
+            >
+              {revertBusy ? "Reverting…" : "Confirm revert"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRevertConfirmOpen(false);
+                setRevertReason("");
+                setRevertError(null);
+              }}
+              disabled={revertBusy}
+              className="px-2 py-0.5 text-[10px] rounded border border-zoca-border bg-transparent text-zoca-text"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {historyOpen && (
         <div
           id={`fact-history-${fact.fact_id}`}
@@ -494,15 +614,17 @@ function TopicSection({
   label,
   category,
   facts,
+  onReverted,
 }: {
   label: string;
   category: TopicCategory;
-  facts: BrainFact[];
+  facts: FactWithRevert[];
+  onReverted?: () => void;
 }) {
   if (facts.length === 0) return null;
   const Icon = CATEGORY_ICONS[category];
   // Group by subcategory for visual clustering within the topic.
-  const bySubcategory: Record<string, BrainFact[]> = {};
+  const bySubcategory: Record<string, FactWithRevert[]> = {};
   for (const f of facts) {
     if (!bySubcategory[f.topic_subcategory]) {
       bySubcategory[f.topic_subcategory] = [];
@@ -520,7 +642,7 @@ function TopicSection({
       {Object.entries(bySubcategory).map(([sub, rows]) => (
         <div key={sub} className="border-t border-zoca-border/40 first:border-t-0">
           {rows.map((r) => (
-            <FactRow key={r.fact_id} fact={r} />
+            <FactRow key={r.fact_id} fact={r} onReverted={onReverted} />
           ))}
         </div>
       ))}
@@ -528,11 +650,31 @@ function TopicSection({
   );
 }
 
+/** WAVE-A-1 — Memory Score response shape. Mirrors the API route output. */
+type CoverageResponse = {
+  ok: boolean;
+  coverage?: {
+    percent: number;
+    slotsFilled: number;
+    slotsTotal: number;
+    perCategory: Record<TopicCategory, number>;
+  };
+  confidence?: "high" | "moderate" | "low";
+  error?: string;
+};
+
 export default function V2BrainPanel({ entityId }: Props) {
   const [data, setData] = useState<FetchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  // WAVE-A-1 — Memory Score (fetched in parallel with the facts list).
+  const [coverage, setCoverage] = useState<CoverageResponse | null>(null);
+
+  // WAVE-A-2 — bumped on every successful revert so child rows can request a
+  // panel-wide refetch. Cheap counter; useEffect dependency picks up the
+  // change and refires the fetch.
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -559,7 +701,34 @@ export default function V2BrainPanel({ entityId }: Props) {
     return () => {
       cancelled = true;
     };
+  }, [entityId, refreshNonce]);
+
+  // WAVE-A-1 — Memory Score fetch. Fires in parallel with the facts list so
+  // the chip lands as soon as the score is ready, independent of facts load.
+  // Soft-fails: any error here just leaves the chip hidden — the panel
+  // itself stays functional.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(
+      `/api/v2/customer/${encodeURIComponent(entityId)}/keeper-coverage`,
+    )
+      .then((r) => r.json())
+      .then((json: CoverageResponse) => {
+        if (cancelled) return;
+        setCoverage(json);
+      })
+      .catch(() => {
+        // Silent — chip is decorative.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [entityId]);
+
+  // WAVE-A-2 — handler passed down to each FactRow. Bumps the refresh nonce
+  // so the panel refetches and the cluster swap (old becomes authoritative,
+  // current becomes superseded) is visible without a page reload.
+  const handleReverted = () => setRefreshNonce((n) => n + 1);
 
   // Memo to avoid re-rendering the section tree on unrelated parent re-renders.
   const sections = useMemo(() => {
@@ -570,26 +739,31 @@ export default function V2BrainPanel({ entityId }: Props) {
           label="Identity"
           category="identity"
           facts={data.grouped.identity}
+          onReverted={handleReverted}
         />
         <TopicSection
           label="Operational"
           category="operational"
           facts={data.grouped.operational}
+          onReverted={handleReverted}
         />
         <TopicSection
           label="Behavioral"
           category="behavioral"
           facts={data.grouped.behavioral}
+          onReverted={handleReverted}
         />
         <TopicSection
           label="Concerns"
           category="concerns"
           facts={data.grouped.concerns}
+          onReverted={handleReverted}
         />
         <TopicSection
           label="Relationship"
           category="relationship"
           facts={data.grouped.relationship}
+          onReverted={handleReverted}
         />
       </div>
     );
@@ -603,17 +777,30 @@ export default function V2BrainPanel({ entityId }: Props) {
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
-        className="-m-1 mb-2 flex w-full items-baseline justify-between gap-2 rounded-md p-1 text-left hover:bg-zoca-border/20"
+        className="-m-1 mb-2 flex w-full items-center justify-between gap-2 rounded-md p-1 text-left hover:bg-zoca-border/20"
       >
-        <h3 className="text-[13px] font-semibold uppercase tracking-wider text-zoca-text-2">
-          Keeper
-          {data?.facts_count !== undefined && data.facts_count > 0 && (
-            <span className="ml-1.5 text-[11px] font-normal normal-case tracking-normal text-zoca-text-2/70">
-              · {data.facts_count} confirmed fact
-              {data.facts_count === 1 ? "" : "s"}
-            </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[13px] font-semibold uppercase tracking-wider text-zoca-text-2">
+            Keeper
+            {data?.facts_count !== undefined && data.facts_count > 0 && (
+              <span className="ml-1.5 text-[11px] font-normal normal-case tracking-normal text-zoca-text-2/70">
+                · {data.facts_count} confirmed fact
+                {data.facts_count === 1 ? "" : "s"}
+              </span>
+            )}
+          </h3>
+          {/* WAVE-A-1 — Memory Score chip. Renders once the coverage fetch
+              resolves. Confidence tier comes from the API (>=80 high,
+              50–79 moderate, <50 low) so the chip's brass/ember/patina
+              tint tracks the score automatically. */}
+          {coverage?.ok && coverage.coverage && coverage.confidence && (
+            <KeeperChip
+              topic={`${coverage.coverage.percent}% covered`}
+              confidence={coverage.confidence}
+              size="lg"
+            />
           )}
-        </h3>
+        </div>
         <span className="text-[10px] text-zoca-text-2">
           {collapsed ? "expand" : "collapse"}
         </span>

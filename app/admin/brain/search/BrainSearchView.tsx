@@ -14,6 +14,12 @@ import type {
   TopicCategory,
   TopicSubcategory,
 } from "@/lib/brain/types";
+// WAVE-A-3 — canonical Keeper chip on every search-result row. Confidence
+// keys to source_type via the same heuristic used in CitationChip so the
+// brand kernel reads the same across Beam citations + admin search.
+import KeeperChip, {
+  type KeeperChipConfidence,
+} from "@/components/keeper/KeeperChip";
 
 type Row = {
   fact_id: string;
@@ -47,6 +53,29 @@ const ALL_CATEGORIES: TopicCategory[] = [
 ];
 
 const PAGE_SIZE = 50;
+
+/**
+ * WAVE-A-3 — Map a Keeper fact's source_type onto the chip's confidence tier.
+ * Mirrors the inference rule used by CitationChip → KeeperChip on the Beam
+ * side so the chip color reads the same everywhere a Keeper-sourced fact is
+ * shown. Confirmed facts always sit at "high" or "moderate"; we don't paint
+ * unverified gray on real Keeper rows.
+ */
+function keeperConfidenceFromSource(
+  sourceType: string,
+  confirmedAt: string | null,
+): KeeperChipConfidence {
+  if (sourceType === "basesheet" || sourceType === "chargebee") return "high";
+  if (sourceType === "manual") return "high";
+  if (sourceType === "customer_note") return "moderate";
+  if (sourceType === "beacon_ai_extracted") {
+    return confirmedAt ? "moderate" : "low";
+  }
+  if (sourceType === "beacon_ai_conversation") {
+    return confirmedAt ? "moderate" : "low";
+  }
+  return "high";
+}
 
 export default function BrainSearchView() {
   // Filter state.
@@ -325,8 +354,23 @@ export default function BrainSearchView() {
                         {r.am_name ?? "—"}
                       </td>
                       <td className="py-2 pr-2 text-zoca-text-2">
-                        <span className="font-mono text-[11px]">
-                          {r.topic_subcategory}.{r.field_name}
+                        {/* WAVE-A-3 — canonical KeeperChip on every search
+                            hit. Topic is the field name (most-specific
+                            human label); the subcategory stays beside it
+                            for context. md size reads cleanly inside a
+                            table cell. */}
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <KeeperChip
+                            topic={r.field_name.replace(/_/g, " ")}
+                            confidence={keeperConfidenceFromSource(
+                              r.source_type,
+                              r.confirmed_at,
+                            )}
+                            size="md"
+                          />
+                          <span className="font-mono text-[10px] text-zoca-text-2/70">
+                            {r.topic_subcategory}
+                          </span>
                         </span>
                       </td>
                       <td className="py-2 pr-2">{r.value}</td>
