@@ -1,0 +1,2027 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Beacon — the watchtower for Zoca</title>
+<meta name="description" content="One platform. Six agents. Two roles. Powered by Beam and grounded by Keeper. A survey of the watchtower." />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+  /* ============================================================
+     Beacon platform KT — design tokens (matched to BeamKeeper v5)
+     ============================================================ */
+  :root {
+    --ease-apple: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-spring-tight: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring-snappy: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring-glide: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast: 220ms;
+    --dur-base: 400ms;
+    --dur-slow: 700ms;
+    --dur-hero: 1200ms;
+    --scroll-y: 0px;
+
+    /* Watchfire palette */
+    --char: #2B1F14;
+    --ember: #C8431D;
+    --brass: #D9A441;
+    --gold:  #FBBF24;
+    --lapis: #1A2F4A;
+    --slate: #3D4E5C;
+    --patina: #4A7C59;
+    --pine: #2D4843;
+    --crimson: #7C2D12;
+    --sea-lapis: #2A4D5C;
+    --parchment: #FBF8F1;
+    --paper: #fbfbfd;
+    --gray-50: #f5f5f7;
+    --gray-150: #ebebef;
+    --gray-300: #d2d2d7;
+    --gray-500: #86868b;
+    --gray-700: #515154;
+    --gray-900: #1d1d1f;
+
+    --beam-accent: var(--ember);
+    --beam-glow: rgba(200, 67, 29, 0.18);
+    --keeper-accent: var(--lapis);
+    --keeper-glow: rgba(26, 47, 74, 0.16);
+
+    --section-pad-x: clamp(20px, 5vw, 56px);
+    --section-pad-y: clamp(64px, 8vw, 110px);
+    --section-pad-y-hero-top: clamp(96px, 11vw, 150px);
+    --section-pad-y-hero-bot: clamp(80px, 9vw, 130px);
+    --container-max: 1180px;
+  }
+
+  *,*::before,*::after { box-sizing: border-box; }
+  html,body { margin:0; padding:0; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; }
+  html, body { overflow-x: clip; }
+  img, svg, video { max-width: 100%; }
+
+  body.page-loading { opacity: 0; }
+  body { transition: opacity 300ms var(--ease-apple); }
+
+  .skip-link {
+    position: absolute; top: -100px; left: 12px;
+    background: var(--gray-900); color: #fff;
+    padding: 10px 18px; border-radius: 8px;
+    font-size: 14px; font-weight: 500; z-index: 2000;
+    text-decoration: none;
+    transition: top var(--dur-fast) var(--ease-apple);
+  }
+  .skip-link:focus { top: 12px; outline: 2px solid #06c; outline-offset: 2px; }
+
+  /* Animation states */
+  [data-animate] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 700ms var(--ease-apple), transform 700ms var(--ease-apple);
+    will-change: opacity, transform;
+  }
+  [data-animate="scale-in"] { transform: scale(0.96); }
+  [data-animate].in-view { opacity: 1; transform: none; }
+  [data-cascade] > * {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 600ms var(--ease-apple), transform 600ms var(--ease-apple);
+  }
+  [data-cascade].in-view > * { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,*::before,*::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+    [data-animate], [data-cascade] > * { opacity: 1 !important; transform: none !important; }
+    .beacon-flame-1, .beacon-flame-2, .beacon-flame-3, .beacon-flame-4,
+    .beacon-mark--glow, .marquee__track, .cursor-glow, .floater,
+    .topnav__pulse, .agent-card, .hero-flame-wrap,
+    .arch-pulse, .ticker-pulse { animation: none !important; }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--gray-900);
+    background: var(--paper);
+    font-weight: 400;
+  }
+  a { color: #06c; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code.code-chip {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.86em;
+    background: rgba(0,0,0,0.05);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* ============================================================
+     Section frame
+     ============================================================ */
+  .section {
+    width: 100%;
+    padding: var(--section-pad-y) var(--section-pad-x);
+    position: relative;
+    overflow: hidden;
+  }
+  .section--white  { background: var(--paper); color: var(--gray-900); }
+  .section--gray   { background: var(--gray-50); color: var(--gray-900); }
+  .section--dark   { background: var(--char); color: var(--gray-50); }
+  .section--lapis  { background: var(--lapis); color: var(--gray-50); }
+  .section--ember  { background: linear-gradient(135deg, #FFF9F1 0%, #FFE9D3 100%); color: var(--gray-900); }
+  .section--parchment { background: var(--parchment); color: var(--gray-900); }
+  .section--hero   {
+    padding: var(--section-pad-y-hero-top) var(--section-pad-x) var(--section-pad-y-hero-bot);
+    background: linear-gradient(180deg, var(--parchment) 0%, var(--paper) 100%);
+  }
+  .section--final  {
+    padding: var(--section-pad-y-hero-bot) var(--section-pad-x) var(--section-pad-y);
+    background: var(--char);
+    color: var(--gray-50);
+  }
+  .container { max-width: 980px; margin: 0 auto; width: 100%; }
+  .container--narrow { max-width: 720px; margin: 0 auto; width: 100%; }
+  .container--wide { max-width: var(--container-max); margin: 0 auto; width: 100%; }
+
+  /* ============================================================
+     Typography
+     ============================================================ */
+  .kicker {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--ember);
+    margin: 0 0 14px;
+  }
+  .kicker--muted { color: var(--gray-500); }
+  .kicker--keeper { color: var(--keeper-accent); }
+  .kicker--brass  { color: var(--brass); }
+  .section--dark .kicker, .section--lapis .kicker { color: var(--brass); }
+  .section--dark .kicker--muted, .section--lapis .kicker--muted { color: #a1a1a6; }
+
+  h1.hero-title {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 104px;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.0;
+    margin: 0 0 8px;
+    /* Solid color — gradient-clip breaks per-char split. See BeamKeeper note. */
+    color: var(--char);
+  }
+  h2.hero-sub {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 30px;
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    color: var(--gray-700);
+    margin: 0 0 28px;
+    text-align: center;
+  }
+  h2.headline {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 48px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    margin: 0 0 18px;
+    text-align: center;
+  }
+  h2.headline--lg { font-size: 60px; }
+  .section--dark h2.headline, .section--lapis h2.headline { color: var(--gray-50); }
+  p.subhead {
+    font-size: 21px;
+    font-weight: 400;
+    line-height: 1.42;
+    color: var(--gray-700);
+    margin: 0 auto 36px;
+    max-width: 720px;
+    text-align: center;
+  }
+  .section--dark p.subhead, .section--lapis p.subhead { color: #a1a1a6; }
+  p.body {
+    font-size: 19px; line-height: 1.5;
+    color: var(--gray-700); margin: 0 0 22px;
+  }
+  .section--dark p.body, .section--lapis p.body { color: #c7c7cc; }
+
+  /* ============================================================
+     BeaconMark — same as BeamKeeper
+     ============================================================ */
+  .beacon-mark {
+    display: inline-block; flex-shrink: 0;
+    transform-origin: bottom center;
+    width: 12px; height: 32px;
+  }
+  .beacon-mark--sm  { width: 9px;  height: 24px; }
+  .beacon-mark--md  { width: 12px; height: 32px; }
+  .beacon-mark--lg  { width: 18px; height: 48px; }
+  .beacon-mark--xl  { width: 27px; height: 72px; }
+  .beacon-mark--hero { width: 42px; height: 112px; }
+
+  @keyframes beacon-flame-1 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.06, 1.12); }
+    60%      { transform: scale(0.97, 0.96); }
+  }
+  @keyframes beacon-flame-2 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.10, 1.16); }
+    60%      { transform: scale(0.94, 0.94); }
+  }
+  @keyframes beacon-flame-3 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.13, 1.20); }
+    60%      { transform: scale(0.92, 0.92); }
+  }
+  @keyframes beacon-flame-4 {
+    0%, 100% { transform: scale(1); }
+    25%      { transform: scale(1.18, 1.25); }
+    60%      { transform: scale(0.88, 0.88); }
+  }
+  .beacon-flame-1 { animation: beacon-flame-1 2.2s ease-in-out infinite; }
+  .beacon-flame-2 { animation: beacon-flame-2 1.7s ease-in-out infinite; }
+  .beacon-flame-3 { animation: beacon-flame-3 1.3s ease-in-out infinite; }
+  .beacon-flame-4 { animation: beacon-flame-4 0.9s ease-in-out infinite; }
+  @keyframes beacon-tower-glow {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(217, 164, 65, 0)); }
+    50%      { filter: drop-shadow(0 1px 16px rgba(217, 164, 65, 0.75)); }
+  }
+  .beacon-mark--glow { animation: beacon-tower-glow 2.2s ease-in-out infinite; }
+
+  .hero-flame-wrap {
+    display: inline-block;
+    margin-bottom: 18px;
+    transform: scale(0.7);
+    opacity: 0;
+    transition: transform var(--dur-hero) var(--ease-apple), opacity var(--dur-hero) var(--ease-apple);
+    position: relative;
+  }
+  .hero-flame-wrap.in-view { transform: scale(1.0); opacity: 1; }
+  .hero-flame-wrap::before,
+  .hero-flame-wrap::after {
+    content: ""; position: absolute;
+    left: 50%; bottom: 12%;
+    width: 80px; height: 80px;
+    margin-left: -40px;
+    border-radius: 50%;
+    border: 1.5px solid var(--brass);
+    opacity: 0;
+    animation: hero-ring 3.4s ease-out infinite;
+  }
+  .hero-flame-wrap::after { animation-delay: 1.7s; }
+  @keyframes hero-ring {
+    0%   { transform: scale(0.4); opacity: 0.55; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
+
+  /* ============================================================
+     Top nav
+     ============================================================ */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(251, 248, 241, 0.92);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .topnav__inner {
+    max-width: var(--container-max); margin: 0 auto;
+    padding: 12px var(--section-pad-x);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px;
+  }
+  .topnav__left {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--gray-900); font-weight: 600;
+    font-size: 15px;
+  }
+  .topnav__word { letter-spacing: -0.01em; }
+  .topnav__right {
+    display: flex; align-items: center; gap: 18px;
+    font-size: 13px; color: var(--gray-500);
+  }
+  .topnav__ver {
+    background: var(--ember); color: #fff;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.04em;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .topnav__pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 0 rgba(255,255,255,0.6);
+    animation: topnav-pulse 1.6s ease-out infinite;
+  }
+  @keyframes topnav-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.6); }
+    100% { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
+  }
+  @media (max-width: 640px) {
+    .topnav__right span:first-child { display: none; }
+  }
+
+  /* Scroll progress bar */
+  .scroll-progress {
+    position: fixed; top: 0; left: 0; height: 3px;
+    background: linear-gradient(90deg, var(--ember), var(--brass), var(--gold));
+    width: 0%; z-index: 200;
+    transition: width 80ms linear;
+  }
+
+  /* ============================================================
+     Hero
+     ============================================================ */
+  .hero-tag {
+    display: inline-block;
+    font-size: 13px; font-weight: 600;
+    padding: 6px 14px; border-radius: 999px;
+    background: rgba(200, 67, 29, 0.08);
+    color: var(--ember);
+    letter-spacing: 0.05em;
+    margin: 4px 6px;
+  }
+  .hero-tag--keeper {
+    background: rgba(26, 47, 74, 0.08);
+    color: var(--keeper-accent);
+  }
+  .hero-tag--brass {
+    background: rgba(217, 164, 65, 0.12);
+    color: #8B6914;
+  }
+  .hero-load { opacity: 0; transform: translateY(8px); transition: opacity 600ms var(--ease-apple), transform 600ms var(--ease-apple); }
+  .hero-load.in { opacity: 1; transform: none; }
+
+  /* ============================================================
+     Marquee
+     ============================================================ */
+  .marquee {
+    background: var(--char);
+    color: var(--gray-50);
+    padding: 14px 0;
+    overflow: hidden;
+    position: relative;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .marquee::before, .marquee::after {
+    content: ""; position: absolute; top: 0; bottom: 0;
+    width: 96px; z-index: 2; pointer-events: none;
+  }
+  .marquee::before { left: 0; background: linear-gradient(90deg, var(--char), transparent); }
+  .marquee::after  { right: 0; background: linear-gradient(270deg, var(--char), transparent); }
+  .marquee__track {
+    display: inline-flex; gap: 0;
+    white-space: nowrap;
+    animation: marquee-scroll 44s linear infinite;
+  }
+  .marquee:hover .marquee__track { animation-play-state: paused; }
+  .marquee__item {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 0 24px;
+    font-size: 14px; font-weight: 500;
+    letter-spacing: 0.04em;
+    color: #f0e7d3;
+  }
+  .marquee__dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--brass);
+    box-shadow: 0 0 8px rgba(217, 164, 65, 0.5);
+  }
+  .marquee__item:nth-child(odd) .marquee__dot  { background: var(--brass); }
+  .marquee__item:nth-child(3n)  .marquee__dot  { background: var(--ember); box-shadow: 0 0 8px rgba(200, 67, 29, 0.5); }
+  .marquee__item:nth-child(5n)  .marquee__dot  { background: var(--patina); box-shadow: 0 0 8px rgba(74, 124, 89, 0.5); }
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ============================================================
+     Two-halves split
+     ============================================================ */
+  .halves {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+    margin-top: 32px;
+  }
+  .half {
+    border-radius: 24px;
+    padding: 44px 32px;
+    border: 1px solid var(--gray-150);
+    background: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .half--umbrella {
+    background: linear-gradient(160deg, #FFF9F1 0%, #FFEFD9 100%);
+    border-color: rgba(200, 67, 29, 0.18);
+  }
+  .half--brain {
+    background: linear-gradient(160deg, #F4F6FA 0%, #E5EBF5 100%);
+    border-color: rgba(26, 47, 74, 0.18);
+  }
+  .half__icon {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 0 18px;
+    font-size: 32px;
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  }
+  .half__icon--umbrella { background: linear-gradient(135deg, var(--ember), var(--brass)); }
+  .half__icon--brain    { background: linear-gradient(135deg, var(--lapis), var(--slate)); }
+  .half__title {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 32px; font-weight: 600; letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  .half__role {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    margin: 0 0 16px;
+    color: var(--ember);
+  }
+  .half--brain .half__role { color: var(--keeper-accent); }
+  .half__desc { font-size: 16px; line-height: 1.55; color: var(--gray-700); margin: 0 0 16px; }
+  .half__bullets { margin-top: 16px; }
+  .half__bullet {
+    display: flex; gap: 12px; margin-bottom: 12px;
+    font-size: 14px; line-height: 1.5; color: var(--gray-700);
+  }
+  .half__bullet-icon {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(200, 67, 29, 0.1);
+    color: var(--ember);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .half--brain .half__bullet-icon {
+    background: rgba(26, 47, 74, 0.1);
+    color: var(--keeper-accent);
+  }
+  @media (max-width: 760px) {
+    .halves { grid-template-columns: 1fr; }
+    h1.hero-title { font-size: 64px; }
+    h2.headline { font-size: 36px; }
+    h2.headline--lg { font-size: 44px; }
+  }
+
+  /* ============================================================
+     Agent cards (6-up grid)
+     ============================================================ */
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+    margin-top: 38px;
+  }
+  @media (max-width: 1000px) { .agent-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .agent-grid { grid-template-columns: 1fr; } }
+
+  .agent-card {
+    background: #fff;
+    border-radius: 18px;
+    border: 1px solid var(--gray-150);
+    padding: 26px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 260ms var(--ease-apple), box-shadow 260ms var(--ease-apple), border-color 260ms var(--ease-apple);
+  }
+  .agent-card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--accent, var(--ember));
+  }
+  .agent-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.06);
+    border-color: var(--accent, var(--ember));
+  }
+  .agent-card__head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .agent-card__icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: var(--accent, var(--ember));
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .agent-card__status {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .status--live {
+    background: rgba(74, 124, 89, 0.12);
+    color: #2B6B3F;
+  }
+  .status--live::before {
+    content: ""; display: inline-block;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #2B6B3F;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .status--locked {
+    background: rgba(217, 164, 65, 0.16);
+    color: #8B6914;
+  }
+  .agent-card__name {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 22px; font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 6px;
+    color: var(--gray-900);
+  }
+  .agent-card__route {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--gray-500);
+    margin: 0 0 14px;
+  }
+  .agent-card__desc {
+    font-size: 14px; line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0 0 16px;
+  }
+  .agent-card__caps {
+    padding-top: 14px;
+    border-top: 1px dashed var(--gray-150);
+  }
+  .agent-card__cap {
+    display: flex; gap: 8px; align-items: flex-start;
+    font-size: 12.5px; line-height: 1.5;
+    color: var(--gray-700);
+    margin-bottom: 8px;
+  }
+  .agent-card__cap i {
+    color: var(--accent, var(--ember));
+    font-size: 14px; flex-shrink: 0; padding-top: 2px;
+  }
+  .agent-card__role {
+    margin-top: 14px;
+    font-size: 11px; font-weight: 600;
+    color: var(--gray-500);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .agent-card__role-bold { color: var(--accent, var(--ember)); }
+
+  /* ============================================================
+     Day-in-the-life cards (AM + Manager sections)
+     ============================================================ */
+  .day-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 18px; margin-top: 32px;
+  }
+  @media (max-width: 900px) { .day-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .day-grid { grid-template-columns: 1fr; } }
+  .day-card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid var(--gray-150);
+    padding: 22px 20px;
+    position: relative;
+    transition: transform 220ms var(--ease-apple), box-shadow 220ms var(--ease-apple);
+  }
+  .day-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.05);
+  }
+  .day-card__step {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ember);
+    margin-bottom: 8px;
+  }
+  .day-card--manager .day-card__step { color: var(--keeper-accent); }
+  .day-card__title {
+    font-size: 16px; font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 8px;
+  }
+  .day-card__body {
+    font-size: 13.5px; line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  .day-card__chip {
+    display: inline-block;
+    margin-top: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--ember);
+    background: rgba(200, 67, 29, 0.08);
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .day-card--manager .day-card__chip {
+    color: var(--keeper-accent);
+    background: rgba(26, 47, 74, 0.08);
+  }
+
+  /* ============================================================
+     Beam + Keeper "feature" rows
+     ============================================================ */
+  .feature-pair {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 24px; margin-top: 28px;
+  }
+  @media (max-width: 800px) { .feature-pair { grid-template-columns: 1fr; } }
+  .feature-card {
+    background: #fff;
+    border: 1px solid var(--gray-150);
+    border-radius: 14px;
+    padding: 22px;
+  }
+  .feature-card__title {
+    font-size: 14px; font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .feature-card__title i {
+    color: var(--ember);
+    font-size: 16px;
+  }
+  .feature-card__body {
+    font-size: 13.5px; line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  .feature-card__chip {
+    display: inline-block;
+    margin-top: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--gray-500);
+    background: var(--gray-50);
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .feature-card--keeper .feature-card__title i { color: var(--keeper-accent); }
+
+  /* ============================================================
+     Architecture SVG section
+     ============================================================ */
+  .arch-frame {
+    margin: 36px auto 0;
+    max-width: 920px;
+    background: var(--paper);
+    border: 1px solid var(--gray-150);
+    border-radius: 22px;
+    padding: 28px;
+    overflow: hidden;
+  }
+  .section--dark .arch-frame {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.10);
+  }
+  .arch-svg {
+    width: 100%; height: auto;
+    display: block;
+  }
+  @keyframes arch-pulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+  }
+  .arch-pulse { animation: arch-pulse 2.6s ease-in-out infinite; }
+  .arch-pulse--b { animation-delay: 0.6s; }
+  .arch-pulse--c { animation-delay: 1.2s; }
+  .arch-pulse--d { animation-delay: 1.8s; }
+  @keyframes arch-flow {
+    0%   { stroke-dashoffset: 60; }
+    100% { stroke-dashoffset: 0; }
+  }
+  .arch-line {
+    stroke-dasharray: 6 6;
+    animation: arch-flow 2s linear infinite;
+  }
+
+  /* ============================================================
+     Pipeline strip (5 stages)
+     ============================================================ */
+  .pipeline-strip {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 14px; margin-top: 30px;
+  }
+  @media (max-width: 800px) { .pipeline-strip { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .pipeline-strip { grid-template-columns: 1fr; } }
+  .stage-card {
+    background: #fff;
+    border: 1px solid var(--gray-150);
+    border-radius: 14px;
+    padding: 20px 16px;
+    text-align: left;
+    position: relative;
+    transition: transform 220ms var(--ease-apple), box-shadow 220ms var(--ease-apple);
+  }
+  .stage-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.06);
+  }
+  .stage-card__tag {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ember);
+    margin-bottom: 6px;
+  }
+  .stage-card__name {
+    font-size: 14px; font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 4px;
+  }
+  .stage-card__cron {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px;
+    color: var(--gray-500);
+    margin-bottom: 10px;
+  }
+  .stage-card__body {
+    font-size: 12.5px; line-height: 1.5;
+    color: var(--gray-700);
+    margin: 0;
+  }
+
+  /* ============================================================
+     Integrations grid
+     ============================================================ */
+  .integ-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-top: 32px;
+  }
+  @media (max-width: 900px) { .integ-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 520px) { .integ-grid { grid-template-columns: repeat(2, 1fr); } }
+  .integ-card {
+    background: #fff;
+    border: 1px solid var(--gray-150);
+    border-radius: 12px;
+    padding: 18px 14px;
+    text-align: center;
+    transition: transform 220ms var(--ease-apple), border-color 220ms var(--ease-apple);
+  }
+  .integ-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--ember);
+  }
+  .integ-card__icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--gray-50);
+    color: var(--gray-700);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 8px;
+    font-size: 18px;
+  }
+  .integ-card__name {
+    font-size: 12px; font-weight: 600;
+    color: var(--gray-900);
+    margin: 0 0 2px;
+  }
+  .integ-card__role {
+    font-size: 10px;
+    color: var(--gray-500);
+    margin: 0;
+  }
+
+  /* ============================================================
+     Stats row
+     ============================================================ */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 18px; margin-top: 40px;
+  }
+  .stat {
+    text-align: center;
+    padding: 28px 18px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.10);
+  }
+  .stat__num {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 56px; font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1; margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--brass), var(--gold));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat__unit {
+    font-size: 22px; font-weight: 500;
+    color: var(--brass);
+    margin-left: 2px;
+  }
+  .stat__lbl {
+    font-size: 12px;
+    color: #a1a1a6;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  @media (max-width: 760px) { .stats { grid-template-columns: 1fr 1fr; } }
+
+  /* ============================================================
+     "Just shipped" 8-card grid
+     ============================================================ */
+  .shipped-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-top: 32px;
+  }
+  @media (max-width: 1000px) { .shipped-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px)  { .shipped-grid { grid-template-columns: 1fr; } }
+  .shipped-card {
+    background: #fff;
+    border: 1px solid var(--gray-150);
+    border-radius: 14px;
+    padding: 20px;
+    transition: transform 220ms var(--ease-apple), box-shadow 220ms var(--ease-apple);
+  }
+  .shipped-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.05);
+  }
+  .shipped-card__head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .shipped-card__icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: rgba(200, 67, 29, 0.1);
+    color: var(--ember);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .shipped-card__tag {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  .shipped-card__title {
+    font-size: 14px; font-weight: 700;
+    color: var(--gray-900);
+    margin: 0 0 6px;
+  }
+  .shipped-card__body {
+    font-size: 12.5px; line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0;
+  }
+
+  /* ============================================================
+     Cost callout
+     ============================================================ */
+  .cost-row {
+    display: grid; grid-template-columns: auto 1fr;
+    gap: 32px; align-items: center;
+    margin: 32px auto 0;
+    max-width: 880px;
+    padding: 32px;
+    background: linear-gradient(135deg, rgba(74,124,89,0.05), rgba(217,164,65,0.05));
+    border: 1px solid rgba(74,124,89,0.18);
+    border-radius: 18px;
+  }
+  @media (max-width: 720px) { .cost-row { grid-template-columns: 1fr; text-align: center; } }
+  .cost-num {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 64px; font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--patina);
+    font-variant-numeric: tabular-nums;
+  }
+  .cost-num__unit { font-size: 26px; font-weight: 500; color: var(--patina); margin-right: 2px; }
+  .cost-body {
+    font-size: 15px; line-height: 1.55;
+    color: var(--gray-700);
+    margin: 0;
+  }
+  .cost-body strong { color: var(--gray-900); }
+  .cost-pills {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 12px;
+  }
+  .cost-pill {
+    font-size: 11px; font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(74,124,89,0.12);
+    color: #2B6B3F;
+  }
+
+  /* ============================================================
+     Roadmap
+     ============================================================ */
+  .roadmap {
+    margin-top: 36px;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .roadmap-row {
+    display: flex; align-items: flex-start; gap: 18px;
+    padding: 18px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .roadmap-row:last-child { border-bottom: none; }
+  .roadmap-row__num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(251, 191, 36, 0.12);
+    color: var(--brass);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .roadmap-row__body { flex: 1; }
+  .roadmap-row__title {
+    font-size: 16px; font-weight: 600;
+    color: var(--gray-50);
+    margin: 0 0 4px;
+  }
+  .roadmap-row__desc {
+    font-size: 14px; color: #a1a1a6;
+    margin: 0; line-height: 1.5;
+  }
+
+  /* ============================================================
+     Cross-link to BeamKeeper deep dive
+     ============================================================ */
+  .deep-dive {
+    margin-top: 24px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 20px;
+    border-radius: 999px;
+    background: var(--char);
+    color: #f0e7d3;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    transition: transform 220ms var(--ease-apple), box-shadow 220ms var(--ease-apple);
+  }
+  .deep-dive:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+    text-decoration: none;
+  }
+  .deep-dive i { color: var(--brass); }
+
+  /* ============================================================
+     Floaters (ambient)
+     ============================================================ */
+  .floaters { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  .floater { position: absolute; opacity: 0.06; color: var(--ember); }
+  .floater--circle { color: var(--patina); }
+  .floater--ring   { color: var(--lapis); }
+
+  /* Cursor glow */
+  .cursor-glow {
+    position: fixed;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(circle, rgba(217,164,65,0.10), transparent 70%);
+    transform: translate(-50%, -50%);
+    transition: opacity 200ms var(--ease-apple);
+    opacity: 0;
+    mix-blend-mode: multiply;
+  }
+
+  /* ============================================================
+     Footer
+     ============================================================ */
+  .footer-mini {
+    text-align: center;
+    padding: clamp(40px, 6vw, 60px) var(--section-pad-x);
+    background: var(--char);
+    color: #a1a1a6;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .footer-mini svg { vertical-align: middle; margin-right: 6px; }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gray-300), transparent);
+    margin: 0;
+  }
+
+  /* ============================================================
+     Final epilogue
+     ============================================================ */
+  .epilogue {
+    max-width: 720px; margin: 0 auto;
+    text-align: center;
+  }
+  .epilogue h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 44px; font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    color: var(--gray-50);
+  }
+  .epilogue p {
+    font-size: 18px; line-height: 1.55;
+    color: #c7c7cc;
+    margin: 0 0 14px;
+  }
+  .epilogue p em { color: var(--brass); font-style: italic; }
+
+  /* Per-char hero title reveal */
+  h1.hero-title .h-char {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(40px) rotate(2deg);
+    transition: opacity 700ms var(--ease-spring-tight), transform 700ms var(--ease-spring-tight);
+  }
+  h1.hero-title.is-revealed .h-char {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+</style>
+</head>
+<body class="page-loading">
+
+<div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+<a href="#main-content" class="skip-link">Skip to content</a>
+
+<!-- Reusable Beacon flame symbol — identical to BeamKeeper.html -->
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true">
+  <symbol id="beacon-mark" viewBox="-6 -32 12 32">
+    <rect x="-6" y="-4"  width="12" height="4" fill="#2B1F14"/>
+    <rect x="-5" y="-10" width="10" height="4" fill="#2B1F14"/>
+    <rect x="-4" y="-16" width="8"  height="4" fill="#2B1F14"/>
+    <rect x="-3" y="-22" width="6"  height="4" fill="#2B1F14"/>
+    <path d="M 0 -32 C 4 -28 5 -23 3 -21 L -3 -21 C -5 -23 -4 -28 0 -32 Z" fill="#C8431D" class="beacon-flame-1" style="transform-origin: 0px -21px;"/>
+    <path d="M 0 -30 C 3.4 -27 4 -23 2.5 -21 L -2.5 -21 C -4 -23 -3.4 -27 0 -30 Z" fill="#C8431D" opacity="0.75" class="beacon-flame-2" style="transform-origin: 0px -21px;"/>
+    <path d="M 0 -27 C 2 -24 3 -21 2 -19 L -2 -19 C -3 -21 -2 -24 0 -27 Z" fill="#FBBF24" class="beacon-flame-3" style="transform-origin: 0px -19px;"/>
+    <path d="M 0 -25 C 1.2 -23 1.5 -21 1 -19 L -1 -19 C -1.5 -21 -1.2 -23 0 -25 Z" fill="#FBBF24" class="beacon-flame-4" style="transform-origin: 0px -19px;"/>
+  </symbol>
+</svg>
+
+<nav class="topnav" aria-label="Primary">
+  <div class="topnav__inner">
+    <a href="#top" class="topnav__left" style="text-decoration:none;color:inherit;">
+      <svg class="beacon-mark"><use href="#beacon-mark"/></svg>
+      <span class="topnav__word">Beacon</span>
+    </a>
+    <div class="topnav__right">
+      <span>Platform tour</span>
+      <span class="topnav__ver"><span class="topnav__pulse"></span>6 agents · 4 live · 2 maintenance</span>
+    </div>
+  </div>
+</nav>
+
+<a id="top"></a>
+<main id="main-content">
+
+<!-- ============================================================ -->
+<!-- 1. HERO                                                      -->
+<!-- ============================================================ -->
+<section class="section section--hero">
+  <div class="container">
+    <div class="hero-flame-wrap" data-hero-flame style="text-align:center; display:block;">
+      <svg class="beacon-mark beacon-mark--hero beacon-mark--glow"><use href="#beacon-mark"/></svg>
+    </div>
+    <p class="kicker hero-load" data-hero-step="1" style="text-align:center;">The watchtower for Zoca</p>
+    <h1 class="hero-title hero-load" data-hero-step="2" style="text-align:center;">Beacon</h1>
+    <h2 class="hero-sub hero-load" data-hero-step="3">One place. Six agents. Two roles. One AI brain.</h2>
+    <p class="hero-load" data-hero-step="4" style="text-align:center; max-width: 680px; margin: 0 auto; font-size: 19px; line-height: 1.5; color: var(--gray-700);">
+      Beacon is the umbrella over Zoca's customer-success operations — six purpose-built agents for live disengagement, growth reporting, escalation triage, ICP gating, missed payments, and churn-risk signals. All grounded in Beam, the AI copilot, and Keeper, the per-customer memory.
+    </p>
+    <div class="hero-load" data-hero-step="5" style="text-align:center; margin-top: 32px;">
+      <span class="hero-tag">6 agents</span>
+      <span class="hero-tag">AM + Manager views</span>
+      <span class="hero-tag hero-tag--keeper">Beam · 19 tools</span>
+      <span class="hero-tag hero-tag--keeper">Keeper · 5 categories</span>
+      <span class="hero-tag hero-tag--brass">24 crons orchestrated</span>
+      <span class="hero-tag hero-tag--brass">Hourly snapshot · nightly enrich</span>
+    </div>
+  </div>
+</section>
+
+<!-- Marquee ticker -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee__track" id="marquee-track">
+    <span class="marquee__item"><span class="marquee__dot"></span>Customer Beacon</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Performance Beacon</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Escalation Beacon</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Post-Payment Reviews</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Miss Payment Beacon</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Negative Keyword Beacon</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Beam · the copilot</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Keeper · the memory</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Stage A · hourly snapshot</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Monday briefing</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Daily anomaly digest</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Hybrid retrieval · RRF · Voyage rerank</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Inline citations everywhere</span>
+    <span class="marquee__item"><span class="marquee__dot"></span>Built for Zoca</span>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 2. WHAT IS BEACON                                            -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container container--wide">
+    <p class="kicker kicker--muted" data-animate style="text-align:center;">The umbrella</p>
+    <h2 class="headline" data-animate>One watchtower over the entire book.</h2>
+    <p class="subhead" data-animate>Before Beacon, every CS workflow was a separate tool — different login, different data shape, different feel. Beacon collapses six of them into one umbrella, with shared auth, shared search, shared memory, and a single AI copilot that travels with you across surfaces.</p>
+
+    <div class="halves" data-cascade>
+      <div class="half half--umbrella">
+        <div class="half__icon half__icon--umbrella"><i class="ti ti-tower"></i></div>
+        <p class="half__role">The umbrella</p>
+        <h3 class="half__title">Six agents under one roof.</h3>
+        <p class="half__desc">Live disengagement signals, growth reports, escalation triage, ICP gating, missed-payment chase, and churn-risk alerts. Each one runs on Beacon's shared spine — same auth, same activity log, same Cmd+K, same copilot.</p>
+        <div class="half__bullets">
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-shield-check"></i></span><span><strong>One auth.</strong> Google sign-in. Email-domain allowlist. Three roles: admin, manager, AM.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-command"></i></span><span><strong>One search.</strong> Cmd+K opens the umbrella palette — every customer, every agent, every page.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-inbox"></i></span><span><strong>One inbox.</strong> The launcher aggregates today's queue across all four live agents and surfaces what needs attention.</span></div>
+        </div>
+      </div>
+      <div class="half half--brain">
+        <div class="half__icon half__icon--brain"><i class="ti ti-brain"></i></div>
+        <p class="half__role">The brain</p>
+        <h3 class="half__title">Beam asks. Keeper remembers.</h3>
+        <p class="half__desc">Every agent shares one AI copilot — Beam — and one per-customer memory store — Keeper. The same Beam that drafts an email on Customer 360 also queries the book on Customer Beacon, prioritizes the queue on Escalation, and explains a missed-payment row on Miss Payment.</p>
+        <div class="half__bullets">
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-message-circle"></i></span><span><strong>Always on.</strong> Press <code class="code-chip">Cmd/Ctrl + K</code> or open the panel from any agent — scope auto-detects.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-quote"></i></span><span><strong>Cites everything.</strong> Every Beam answer carries inline cite chips — click any chip to see the source fact and recency.</span></div>
+          <div class="half__bullet"><span class="half__bullet-icon"><i class="ti ti-database"></i></span><span><strong>Memory carries.</strong> A fact written to Keeper on Customer 360 shows up automatically on Escalation, Miss Payment, and the Performance report.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 3. THE SIX AGENTS                                            -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">The six agents</p>
+    <h2 class="headline" data-animate>Six surfaces. One platform.</h2>
+    <p class="subhead" data-animate>Each agent solves one operational job end-to-end. Four are live today. Two are temporarily under maintenance and will return shortly. All six share Beam + Keeper.</p>
+
+    <div class="agent-grid" data-cascade>
+
+      <!-- Customer Beacon -->
+      <div class="agent-card" style="--accent: #C8431D;">
+        <div class="agent-card__head">
+          <div class="agent-card__icon"><i class="ti ti-radar-2"></i></div>
+          <span class="agent-card__status status--live">Live</span>
+        </div>
+        <h3 class="agent-card__name">Customer Beacon</h3>
+        <p class="agent-card__route">/customer</p>
+        <p class="agent-card__desc">Live disengagement signals across the AM book. Hourly snapshot refresh. The default morning surface for every AM.</p>
+        <div class="agent-card__caps">
+          <div class="agent-card__cap"><i class="ti ti-flame"></i><span>Composite score combines comms, app usage, billing; RED / YELLOW / GREEN tiers per customer.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-clock-hour-4"></i><span>Triage view with snooze, mark-contacted, call-outcome, pin, and per-card AM notes.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-presentation"></i><span>Manager rollup, Monday briefing, daily anomaly digest, AM-tier movement view.</span></div>
+        </div>
+        <p class="agent-card__role">Built for <span class="agent-card__role-bold">AMs · Managers · Admin</span></p>
+      </div>
+
+      <!-- Performance Beacon -->
+      <div class="agent-card" style="--accent: #D9A441;">
+        <div class="agent-card__head">
+          <div class="agent-card__icon"><i class="ti ti-chart-bar"></i></div>
+          <span class="agent-card__status status--locked">Maintenance · back soon</span>
+        </div>
+        <h3 class="agent-card__name">Performance Beacon</h3>
+        <p class="agent-card__route">/performance</p>
+        <p class="agent-card__desc">Per-customer growth and local-SEO reports. GBP profile-click trends, keyword rankings, leads, reviews — packaged into one shareable view.</p>
+        <div class="agent-card__caps">
+          <div class="agent-card__cap"><i class="ti ti-target"></i><span>GBP click trend (peak / current / dip on complete months), top keyword rankings with distribution.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-message"></i><span>Lead-source mix from booking_enquiries; 12-week review activity bucketed weekly.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-history"></i><span>Recent reports gallery with click-to-preview. Predictions are NEVER surfaced.</span></div>
+        </div>
+        <p class="agent-card__role">Built for <span class="agent-card__role-bold">AMs · Managers</span></p>
+      </div>
+
+      <!-- Escalation Beacon -->
+      <div class="agent-card" style="--accent: #7C2D12;">
+        <div class="agent-card__head">
+          <div class="agent-card__icon"><i class="ti ti-alert-triangle"></i></div>
+          <span class="agent-card__status status--live">Live</span>
+        </div>
+        <h3 class="agent-card__name">Escalation Beacon</h3>
+        <p class="agent-card__route">/escalation</p>
+        <p class="agent-card__desc">One search returns full triage on a customer — open Linear tickets, the 5-channel comms timeline, and the recent escalation history.</p>
+        <div class="agent-card__caps">
+          <div class="agent-card__cap"><i class="ti ti-search"></i><span>Find by name or Chargebee handle; pulls timeline from App Chat, Email, Phone, Video, SMS.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-tag"></i><span>Live Linear tickets shown inline — open tickets surface first, status synced.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-history"></i><span>Beam can prioritize the queue and call out stalled tickets older than 14 days.</span></div>
+        </div>
+        <p class="agent-card__role">Built for <span class="agent-card__role-bold">AMs · CS leads</span></p>
+      </div>
+
+      <!-- Post-Payment Reviews -->
+      <div class="agent-card" style="--accent: #4A7C59;">
+        <div class="agent-card__head">
+          <div class="agent-card__icon"><i class="ti ti-shield-dollar"></i></div>
+          <span class="agent-card__status status--locked">Maintenance · back soon</span>
+        </div>
+        <h3 class="agent-card__name">Post-Payment Reviews</h3>
+        <p class="agent-card__route">/post-payment</p>
+        <p class="agent-card__desc">Auto-gates new Discovery customers via the Module 02 ICP framework at first pay. Stripe webhook → evaluator → verdict in minutes.</p>
+        <div class="agent-card__caps">
+          <div class="agent-card__cap"><i class="ti ti-receipt-tax"></i><span>Stripe webhook lands on first pay; evaluator runs the 2-step ICP framework end-to-end.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-check"></i><span>Verdicts: ICP · Needs AM call · Not ICP — with reasons cited per rule.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-clock-pause"></i><span>Forever-pending timeout + retry cron; Slack alert on stuck analyses.</span></div>
+        </div>
+        <p class="agent-card__role">Built for <span class="agent-card__role-bold">Managers · Admin</span></p>
+      </div>
+
+      <!-- Miss Payment Beacon -->
+      <div class="agent-card" style="--accent: #2A4D5C;">
+        <div class="agent-card__head">
+          <div class="agent-card__icon"><i class="ti ti-cash-banknote-off"></i></div>
+          <span class="agent-card__status status--live">Live</span>
+        </div>
+        <h3 class="agent-card__name">Miss Payment Beacon</h3>
+        <p class="agent-card__route">/miss-payment</p>
+        <p class="agent-card__desc">Live unpaid invoices across the book. ACH status, AM ownership, auto-debit flag, multi-month detection, Linear tickets, per-row notes.</p>
+        <div class="agent-card__caps">
+          <div class="agent-card__cap"><i class="ti ti-file-invoice"></i><span>Both <code class="code-chip">payment_due</code> and <code class="code-chip">not_paid</code> invoices from Chargebee count as missed.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-progress-alert"></i><span>ACH in-progress matched per invoice; auto-debit flag and AM owner shown inline.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-calendar-month"></i><span>Multi-month repeat offenders flagged automatically as the priority chase list.</span></div>
+        </div>
+        <p class="agent-card__role">Built for <span class="agent-card__role-bold">AMs · Finance ops</span></p>
+      </div>
+
+      <!-- Negative Keyword Beacon -->
+      <div class="agent-card" style="--accent: #2D4843;">
+        <div class="agent-card__head">
+          <div class="agent-card__icon"><i class="ti ti-alert-octagon"></i></div>
+          <span class="agent-card__status status--live">Live</span>
+        </div>
+        <h3 class="agent-card__name">Negative Keyword Beacon</h3>
+        <p class="agent-card__route">/negative-keyword</p>
+        <p class="agent-card__desc">AI-classified churn-risk signals across all 5 comms channels, refreshed every 6 hours, with one-click Linear ticket creation.</p>
+        <div class="agent-card__caps">
+          <div class="agent-card__cap"><i class="ti ti-message-2-search"></i><span>Pre-screen on keyword + sentiment, then Haiku classifies into 7 categories (Cancellation, Billing, Feature, etc.).</span></div>
+          <div class="agent-card__cap"><i class="ti ti-ticket"></i><span>One-click Linear ticket creation from any open alert with full context attached.</span></div>
+          <div class="agent-card__cap"><i class="ti ti-layout-dashboard"></i><span>Three tabs: Alerts (paginated), Overview (KPIs), Created Tickets. Dismiss inline.</span></div>
+        </div>
+        <p class="agent-card__role">Built for <span class="agent-card__role-bold">AMs · Retention</span></p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 4. FOR AMs                                                   -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="floaters" aria-hidden="true">
+    <svg class="floater" style="top: 10%; left: 5%; width: 36px; height: 36px;" viewBox="0 0 36 36"><polygon points="18,4 32,30 4,30" fill="currentColor"/></svg>
+    <svg class="floater floater--circle" style="bottom: 18%; right: 8%; width: 44px; height: 44px;" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20" fill="currentColor"/></svg>
+  </div>
+  <div class="container container--wide" style="position:relative; z-index:2;">
+    <p class="kicker" data-animate style="text-align:center;">For AMs</p>
+    <h2 class="headline" data-animate>A morning that starts with answers.</h2>
+    <p class="subhead" data-animate>Beacon collapses what used to be five tabs into one launcher. The day starts with "what needs my attention" — not "which tool should I open."</p>
+
+    <div class="day-grid" data-cascade>
+      <div class="day-card">
+        <p class="day-card__step">Step 01 · 09:00</p>
+        <p class="day-card__title">Open the launcher</p>
+        <p class="day-card__body">The launcher greets you by first name with today's inbox: live RED customers, open escalations, missed-invoice nudges, and negative-keyword alerts on your book. Beam suggests the single highest-leverage move first.</p>
+        <span class="day-card__chip">/ · inbox aggregator</span>
+      </div>
+      <div class="day-card">
+        <p class="day-card__step">Step 02 · 09:10</p>
+        <p class="day-card__title">Triage Customer Beacon</p>
+        <p class="day-card__body">Open Customer Beacon to see your AM book with composite scores, signals, and tier movement. Filter by RED. Press the mark-contacted, snooze, or pin button on any card. Drop a note that lands in Customer 360 and Keeper.</p>
+        <span class="day-card__chip">/customer · AM triage</span>
+      </div>
+      <div class="day-card">
+        <p class="day-card__step">Step 03 · 09:30</p>
+        <p class="day-card__title">Drill into Customer 360</p>
+        <p class="day-card__body">Click any biz name to land on Customer 360 — full timeline, billing, comms perspective, Keeper facts, Performance summary, open tickets. Ask Beam: "Why is this customer at this score?" and get a cited 4-bullet answer.</p>
+        <span class="day-card__chip">/360/{entityId}</span>
+      </div>
+      <div class="day-card">
+        <p class="day-card__step">Step 04 · 10:00</p>
+        <p class="day-card__title">Ask Beam to draft</p>
+        <p class="day-card__body">Press Cmd+K from any surface. "Draft a warm-but-direct email referencing one specific thing from their data." Beam pulls AM voice from your settings, drops in a real signal, and produces a customer-ready paragraph.</p>
+        <span class="day-card__chip">Cmd+K · draft_email</span>
+      </div>
+      <div class="day-card">
+        <p class="day-card__step">Step 05 · 14:00</p>
+        <p class="day-card__title">Chase the unpaid</p>
+        <p class="day-card__body">Switch to Miss Payment Beacon. See your invoices with ACH status and auto-debit flags. Multi-month repeat offenders are pre-sorted at the top. Drop a per-row note when you've followed up; create a Linear ticket if it needs escalation.</p>
+        <span class="day-card__chip">/miss-payment</span>
+      </div>
+      <div class="day-card">
+        <p class="day-card__step">Step 06 · 16:00</p>
+        <p class="day-card__title">Check negative signals</p>
+        <p class="day-card__body">Open Negative Keyword Beacon. AI-flagged churn risks from today's comms — cancellation talk, billing pushback, feature dissatisfaction. One click to dismiss or create a retention ticket.</p>
+        <span class="day-card__chip">/negative-keyword</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 5. FOR MANAGERS                                              -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container container--wide">
+    <p class="kicker kicker--keeper" data-animate style="text-align:center;">For Managers</p>
+    <h2 class="headline" data-animate>Cross-book by design.</h2>
+    <p class="subhead" data-animate>Where an AM sees their own book, a Manager sees the whole tower. Beacon's manager surfaces aggregate, compare, and proactively brief — without losing the ability to dive into a single AM or a single customer.</p>
+
+    <div class="day-grid" data-cascade>
+      <div class="day-card day-card--manager">
+        <p class="day-card__step">Surface 01</p>
+        <p class="day-card__title">Manager rollup</p>
+        <p class="day-card__body">Full-book composite-score distribution, lifecycle states (active / newly onboarded / resurrected), tier-movement strip, and AM book-trend strip. Filter by pod or AM.</p>
+        <span class="day-card__chip">/customer/manager</span>
+      </div>
+      <div class="day-card day-card--manager">
+        <p class="day-card__step">Surface 02</p>
+        <p class="day-card__title">Monday briefing</p>
+        <p class="day-card__body">Auto-generated weekly digest landed every Monday 02:30 UTC. Beam summarizes book health, calls out the week's anomalies, and surfaces the three things to discuss in the AM 1-on-1s.</p>
+        <span class="day-card__chip">cron · monday-briefing</span>
+      </div>
+      <div class="day-card day-card--manager">
+        <p class="day-card__step">Surface 03</p>
+        <p class="day-card__title">Daily anomaly digest</p>
+        <p class="day-card__body">Every morning at 02:30 UTC, Beam scans the previous day's compose snapshot and posts a Slack digest: tier drops, score shocks, missed payments, NK alerts grouped by AM. The first read of the day.</p>
+        <span class="day-card__chip">cron · daily-digest</span>
+      </div>
+      <div class="day-card day-card--manager">
+        <p class="day-card__step">Surface 04</p>
+        <p class="day-card__title">1-on-1 prep</p>
+        <p class="day-card__body">Drop into any AM's book view. Ask Beam: "Which customers on this AM regressed the most this week?" — get a cited list with the specific reason and the conversation starter for the 1-on-1.</p>
+        <span class="day-card__chip">customer-book scope</span>
+      </div>
+      <div class="day-card day-card--manager">
+        <p class="day-card__step">Surface 05</p>
+        <p class="day-card__title">Cross-book Keeper search</p>
+        <p class="day-card__body">Use <code class="code-chip">query_brain</code> to find every customer in the book where a fact matches: "all customers who mentioned moving off GlossGenius," "all customers who flagged staff turnover this quarter." Pagination built in.</p>
+        <span class="day-card__chip">/admin/brain/search</span>
+      </div>
+      <div class="day-card day-card--manager">
+        <p class="day-card__step">Surface 06</p>
+        <p class="day-card__title">Activity + spend visibility</p>
+        <p class="day-card__body">The admin activity log shows every AM action (mark-contacted, note, escalate, draft). The Anthropic spend page shows daily/monthly AI spend by surface, capped under $120/mo.</p>
+        <span class="day-card__chip">/admin/activity · /admin/anthropic-spend</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 6. BEAM — the copilot                                        -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">Beam — the copilot</p>
+    <h2 class="headline" data-animate>Nineteen tools. Ten scopes. One panel.</h2>
+    <p class="subhead" data-animate>Beam is the AI that lives in every Beacon surface. The same panel adapts to where you are — Customer 360, the book, the escalation queue, a Performance report, the missed-invoice list — and surfaces only the tools that make sense on that screen.</p>
+
+    <div class="feature-pair" data-cascade>
+      <div class="feature-card">
+        <h3 class="feature-card__title"><i class="ti ti-tools"></i> 19 server-side tools</h3>
+        <p class="feature-card__body">Read tools (lookup, query book, read notes, read Keeper, get billing, get performance, full-customer-view, mixpanel, reviews, booking history). Write tools (snooze, pin, mark-contacted, add note, add Keeper fact). Draft tools (email, Slack). Every tool execution is audit-logged.</p>
+        <span class="feature-card__chip">lib/ai/tools/* · audit-by-construction</span>
+      </div>
+      <div class="feature-card">
+        <h3 class="feature-card__title"><i class="ti ti-target-arrow"></i> Per-scope tool subsets</h3>
+        <p class="feature-card__body">Beam sees only the tools that apply to your current surface — mutators on Customer 360, query-the-book on Manager views, draft tools on every customer-aware scope. The model never reaches for a tool that doesn't fit the context.</p>
+        <span class="feature-card__chip">SCOPE_TOOL_ALLOWLIST · 10 scopes</span>
+      </div>
+      <div class="feature-card">
+        <h3 class="feature-card__title"><i class="ti ti-list-numbers"></i> Plan-first answers</h3>
+        <p class="feature-card__body">For multi-step questions, Beam writes a short plan first ("I'll pull the billing record, the Keeper renewal note, and the last 30 days of comms"), then executes the plan tool by tool, citing each source.</p>
+        <span class="feature-card__chip">prompts.ts · plan-first</span>
+      </div>
+      <div class="feature-card">
+        <h3 class="feature-card__title"><i class="ti ti-quote"></i> Inline citations</h3>
+        <p class="feature-card__body">Every claim Beam makes ships with a cite chip. <code class="code-chip">[K:integration]</code> means "from Keeper, integration subcategory." <code class="code-chip">[N:note]</code> means "from a customer note." Click any chip to see the exact source row and timestamp.</p>
+        <span class="feature-card__chip">lib/ai/citations.ts</span>
+      </div>
+      <div class="feature-card">
+        <h3 class="feature-card__title"><i class="ti ti-shield-check"></i> Grounded refusals</h3>
+        <p class="feature-card__body">When Beam doesn't have the data, it says so plainly — and logs the gap to <code class="code-chip">beacon_ai_failure_log</code> for the admin gap viewer. No hallucinations. No "best guess" verdicts on questions it can't ground.</p>
+        <span class="feature-card__chip">/admin/beacon-ai-gaps</span>
+      </div>
+      <div class="feature-card">
+        <h3 class="feature-card__title"><i class="ti ti-search"></i> Hybrid retrieval</h3>
+        <p class="feature-card__body">When Beam needs a Keeper fact, it runs Voyage embeddings AND Postgres BM25 in parallel, fuses the candidates with reciprocal-rank fusion, and reranks with Voyage rerank-2.5-lite. Top-5 of ~40 candidates land in context.</p>
+        <span class="feature-card__chip">lib/brain/retrieve.ts</span>
+      </div>
+    </div>
+
+    <p style="text-align:center; margin-top: 36px;" data-animate>
+      <a href="/kt/BeamKeeper.html" class="deep-dive">Read the Beam + Keeper deep dive <i class="ti ti-arrow-right"></i></a>
+    </p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 7. KEEPER — the memory                                       -->
+<!-- ============================================================ -->
+<section class="section section--lapis">
+  <div class="container container--wide">
+    <p class="kicker kicker--brass" data-animate style="text-align:center;">Keeper — the memory</p>
+    <h2 class="headline" data-animate>The truth that travels with the customer.</h2>
+    <p class="subhead" data-animate>Keeper holds one canonical row per (customer, topic, field). Five top-level categories. ~25 subcategories. ~70 named structured fields. Every fact carries its source, its timestamp, and its conflict-resolution score.</p>
+
+    <div class="feature-pair" data-cascade>
+      <div class="feature-card feature-card--keeper">
+        <h3 class="feature-card__title"><i class="ti ti-tree"></i> Five categories · taxonomy v3</h3>
+        <p class="feature-card__body" style="color: #c7c7cc;">Identity (owner, decision-makers, sold-by, AM assignment, business profile). Operational (contract, integration, feature usage, tech stack, renewal, onboarding, performance context). Behavioral (payment pattern, comms preference, seasonal, demo style, competitive context, cadence, sentiment). Concerns (latent risk, next-call agenda, soft red flag). Relationship (advocacy, engagement).</p>
+        <span class="feature-card__chip">lib/brain/types.ts · ~25 subcategories</span>
+      </div>
+      <div class="feature-card feature-card--keeper">
+        <h3 class="feature-card__title"><i class="ti ti-shield-check"></i> Source trust hierarchy</h3>
+        <p class="feature-card__body" style="color: #c7c7cc;">Six provenances: BaseSheet, Chargebee, customer-note, Beam-conversation (AM said it), Beam-extracted (Haiku from notes — must validate), manual. Higher-trust sources auto-confirm at bootstrap; lower-trust sources land in the Validate inbox.</p>
+        <span class="feature-card__chip">FactSourceType · 6 levels</span>
+      </div>
+      <div class="feature-card feature-card--keeper">
+        <h3 class="feature-card__title"><i class="ti ti-arrows-shuffle"></i> Conflict resolution</h3>
+        <p class="feature-card__body" style="color: #c7c7cc;">When two facts collide on the same (customer, topic, field), Keeper's deterministic ranker scores both on source trust + recency (60-day half-life) + specificity. The loser stays in the audit log via <code class="code-chip">superseded_by</code> — nothing is ever deleted silently.</p>
+        <span class="feature-card__chip">lib/brain/ranking.ts</span>
+      </div>
+      <div class="feature-card feature-card--keeper">
+        <h3 class="feature-card__title"><i class="ti ti-inbox-check"></i> Validate inbox</h3>
+        <p class="feature-card__body" style="color: #c7c7cc;">Haiku extracts candidate facts from AM notes nightly. They land in the Validate inbox tagged with source pills. Managers approve, refine, or reject. Reject-rate is tracked on the admin quality page to keep extraction prompts honest.</p>
+        <span class="feature-card__chip">/admin/keeper/validate</span>
+      </div>
+      <div class="feature-card feature-card--keeper">
+        <h3 class="feature-card__title"><i class="ti ti-link"></i> Derived-from chains</h3>
+        <p class="feature-card__body" style="color: #c7c7cc;">Some facts derive from others ("renewal date" → derived from a contract clause). Keeper tracks the chain via <code class="code-chip">derived_from</code>. When a parent gets superseded, derived children are flagged for re-review — no stale child facts living off retired parents.</p>
+        <span class="feature-card__chip">SMART-K4 · cascading flags</span>
+      </div>
+      <div class="feature-card feature-card--keeper">
+        <h3 class="feature-card__title"><i class="ti ti-trash-x"></i> Stale prune + bootstrap</h3>
+        <p class="feature-card__body" style="color: #c7c7cc;">Facts past their sunset date or below confidence floor auto-prune nightly. New customers get auto-bootstrapped at Stage A — BaseSheet fact write-back populates Keeper on first sight. Every fallback compounds.</p>
+        <span class="feature-card__chip">META-A1 · META-A2 · /admin/keeper/enrichment-status</span>
+      </div>
+    </div>
+
+    <p style="text-align:center; margin-top: 36px;" data-animate>
+      <a href="/kt/BeamKeeper.html" class="deep-dive">Read the Beam + Keeper deep dive <i class="ti ti-arrow-right"></i></a>
+    </p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 8. THE PIPELINE BEHIND IT ALL                                -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">The pipeline</p>
+    <h2 class="headline" data-animate>What feeds the watchtower.</h2>
+    <p class="subhead" data-animate>A four-stage refresh runs against every active customer every day. Stage A every hour. Stages B / C / D every night at 22:00 UTC. Compose every hour to keep customer trends and narrative fresh.</p>
+
+    <!-- Animated architecture diagram -->
+    <div class="arch-frame" data-animate="scale-in">
+      <svg class="arch-svg" viewBox="0 0 920 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Beacon pipeline architecture">
+        <defs>
+          <linearGradient id="archGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#C8431D"/>
+            <stop offset="100%" stop-color="#D9A441"/>
+          </linearGradient>
+          <linearGradient id="snapGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1A2F4A"/>
+            <stop offset="100%" stop-color="#3D4E5C"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Sources column -->
+        <g font-family="Inter, system-ui, sans-serif" font-size="11" fill="#515154">
+          <rect x="20" y="20"  width="160" height="40" rx="8" fill="#FBF8F1" stroke="#ebebef"/>
+          <text x="100" y="44" text-anchor="middle" font-weight="600" fill="#1d1d1f">Chargebee</text>
+          <rect x="20" y="72"  width="160" height="40" rx="8" fill="#FBF8F1" stroke="#ebebef"/>
+          <text x="100" y="96" text-anchor="middle" font-weight="600" fill="#1d1d1f">Metabase</text>
+          <rect x="20" y="124" width="160" height="40" rx="8" fill="#FBF8F1" stroke="#ebebef"/>
+          <text x="100" y="148" text-anchor="middle" font-weight="600" fill="#1d1d1f">HubSpot</text>
+          <rect x="20" y="176" width="160" height="40" rx="8" fill="#FBF8F1" stroke="#ebebef"/>
+          <text x="100" y="200" text-anchor="middle" font-weight="600" fill="#1d1d1f">Linear · Slack</text>
+          <rect x="20" y="228" width="160" height="40" rx="8" fill="#FBF8F1" stroke="#ebebef"/>
+          <text x="100" y="252" text-anchor="middle" font-weight="600" fill="#1d1d1f">Stripe webhook</text>
+          <text x="100" y="296" text-anchor="middle" font-weight="600" letter-spacing="1" fill="#86868b">SOURCES</text>
+        </g>
+
+        <!-- Animated flow lines: sources → stages -->
+        <g stroke="#D9A441" stroke-width="1.8" fill="none">
+          <path class="arch-line" d="M 180 40  C 240 40, 260 60, 320 60"/>
+          <path class="arch-line" d="M 180 92  C 240 92, 260 90, 320 90"/>
+          <path class="arch-line" d="M 180 144 C 240 144, 260 130, 320 130"/>
+          <path class="arch-line" d="M 180 196 C 240 196, 260 170, 320 170"/>
+          <path class="arch-line" d="M 180 248 C 240 248, 260 210, 320 210"/>
+        </g>
+
+        <!-- Stages column -->
+        <g font-family="Inter, system-ui, sans-serif" font-size="11">
+          <rect x="320" y="40"  width="180" height="36" rx="8" fill="#FFF9F1" stroke="#C8431D"/>
+          <circle cx="338" cy="58" r="4" fill="#C8431D" class="arch-pulse"/>
+          <text x="354" y="58" fill="#1d1d1f" font-weight="700">Stage A · hourly</text>
+          <text x="354" y="71" fill="#86868b" font-size="10">snapshot · billing · entities</text>
+
+          <rect x="320" y="92"  width="180" height="36" rx="8" fill="#FFF9F1" stroke="#C8431D"/>
+          <circle cx="338" cy="110" r="4" fill="#C8431D" class="arch-pulse arch-pulse--b"/>
+          <text x="354" y="110" fill="#1d1d1f" font-weight="700">Stage B · 22:00</text>
+          <text x="354" y="123" fill="#86868b" font-size="10">comms events ingest</text>
+
+          <rect x="320" y="144" width="180" height="36" rx="8" fill="#FFF9F1" stroke="#C8431D"/>
+          <circle cx="338" cy="162" r="4" fill="#C8431D" class="arch-pulse arch-pulse--c"/>
+          <text x="354" y="162" fill="#1d1d1f" font-weight="700">Stage C · 22:00</text>
+          <text x="354" y="175" fill="#86868b" font-size="10">HubSpot enrichment</text>
+
+          <rect x="320" y="196" width="180" height="36" rx="8" fill="#FFF9F1" stroke="#C8431D"/>
+          <circle cx="338" cy="214" r="4" fill="#C8431D" class="arch-pulse arch-pulse--d"/>
+          <text x="354" y="214" fill="#1d1d1f" font-weight="700">Stage D · 22:00</text>
+          <text x="354" y="227" fill="#86868b" font-size="10">deals · calls · notes</text>
+
+          <rect x="320" y="248" width="180" height="36" rx="8" fill="#FFEFD9" stroke="#D9A441"/>
+          <circle cx="338" cy="266" r="4" fill="#D9A441" class="arch-pulse"/>
+          <text x="354" y="266" fill="#1d1d1f" font-weight="700">Compose · hourly +05</text>
+          <text x="354" y="279" fill="#86868b" font-size="10">trends · narrative</text>
+
+          <text x="410" y="310" text-anchor="middle" font-weight="600" letter-spacing="1" fill="#86868b" font-size="11">PIPELINE</text>
+        </g>
+
+        <!-- Flow into snapshot -->
+        <g stroke="url(#archGrad)" stroke-width="1.8" fill="none">
+          <path class="arch-line" d="M 500 60  C 560 60, 580 130, 620 150"/>
+          <path class="arch-line" d="M 500 110 C 560 110, 580 140, 620 152"/>
+          <path class="arch-line" d="M 500 162 C 560 162, 580 158, 620 158"/>
+          <path class="arch-line" d="M 500 214 C 560 214, 580 180, 620 162"/>
+          <path class="arch-line" d="M 500 266 C 560 266, 580 200, 620 168"/>
+        </g>
+
+        <!-- Snapshot box -->
+        <g font-family="Inter, system-ui, sans-serif">
+          <rect x="620" y="100" width="140" height="100" rx="14" fill="url(#snapGrad)"/>
+          <text x="690" y="138" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">customer</text>
+          <text x="690" y="156" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">snapshot</text>
+          <text x="690" y="178" text-anchor="middle" fill="#D9A441" font-weight="600" font-size="11">one per customer</text>
+          <text x="690" y="310" text-anchor="middle" font-weight="600" letter-spacing="1" fill="#86868b" font-size="11">SNAPSHOT</text>
+        </g>
+
+        <!-- Snapshot → agents -->
+        <g stroke="#4A7C59" stroke-width="1.8" fill="none">
+          <path class="arch-line" d="M 760 130 C 800 130, 820 70,  860 70"/>
+          <path class="arch-line" d="M 760 145 C 800 145, 820 120, 860 120"/>
+          <path class="arch-line" d="M 760 160 C 800 160, 820 170, 860 170"/>
+          <path class="arch-line" d="M 760 175 C 800 175, 820 220, 860 220"/>
+        </g>
+
+        <!-- Agent endpoints -->
+        <g font-family="Inter, system-ui, sans-serif" font-size="10" fill="#1d1d1f" font-weight="700">
+          <circle cx="870" cy="70"  r="8" fill="#C8431D"/>
+          <text x="884" y="74" fill="#515154" font-size="10">Customer Beacon</text>
+          <circle cx="870" cy="120" r="8" fill="#D9A441"/>
+          <text x="884" y="124" fill="#515154" font-size="10">Performance</text>
+          <circle cx="870" cy="170" r="8" fill="#7C2D12"/>
+          <text x="884" y="174" fill="#515154" font-size="10">Escalation</text>
+          <circle cx="870" cy="220" r="8" fill="#2A4D5C"/>
+          <text x="884" y="224" fill="#515154" font-size="10">+ Beam</text>
+          <text x="870" y="310" text-anchor="middle" font-weight="600" letter-spacing="1" fill="#86868b" font-size="11">AGENTS</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="pipeline-strip" data-cascade>
+      <div class="stage-card">
+        <p class="stage-card__tag">Stage A</p>
+        <p class="stage-card__name">Snapshot</p>
+        <p class="stage-card__cron">0 * * * · hourly</p>
+        <p class="stage-card__body">Live Chargebee subs, billing health, entity mapping, Metabase BaseSheet supplement. Integrity assertions guard against silent drops.</p>
+      </div>
+      <div class="stage-card">
+        <p class="stage-card__tag">Stage B</p>
+        <p class="stage-card__name">Comms ingest</p>
+        <p class="stage-card__cron">0 22 * * · nightly</p>
+        <p class="stage-card__body">Bulk comms events from Metabase — App Chat, Email, Phone, Video, SMS. V2 pipeline streams chunks straight into Postgres.</p>
+      </div>
+      <div class="stage-card">
+        <p class="stage-card__tag">Stage C</p>
+        <p class="stage-card__name">HubSpot</p>
+        <p class="stage-card__cron">0 22 * * · nightly</p>
+        <p class="stage-card__body">Company enrichment from HubSpot (contacts, ownership, lifecycle). Soft-fails per object so one outage doesn't break the night.</p>
+      </div>
+      <div class="stage-card">
+        <p class="stage-card__tag">Stage D</p>
+        <p class="stage-card__name">Proactive narrative</p>
+        <p class="stage-card__cron">0 22 * * · nightly</p>
+        <p class="stage-card__body">Deals, calls, AM notes enrichment. Time-budgeted per fetcher so the stage fits inside Vercel's 5-minute function ceiling.</p>
+      </div>
+      <div class="stage-card">
+        <p class="stage-card__tag">Compose</p>
+        <p class="stage-card__name">Trends + narrative</p>
+        <p class="stage-card__cron">5 * * * · hourly</p>
+        <p class="stage-card__body">Updates customer_trends and the per-customer narrative. Skips recently-churned at compose. Auto-bootstrap for new sightings.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 9. INTEGRATIONS                                              -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">Integrations</p>
+    <h2 class="headline" data-animate>The supply chain.</h2>
+    <p class="subhead" data-animate>Beacon doesn't try to be the system of record for anything. It pulls from where the truth lives and binds it together.</p>
+
+    <div class="integ-grid" data-cascade>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-credit-card"></i></div><p class="integ-card__name">Chargebee</p><p class="integ-card__role">subs · invoices · ACH</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-database"></i></div><p class="integ-card__name">Metabase</p><p class="integ-card__role">BaseSheet · comms · perf</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-target"></i></div><p class="integ-card__name">HubSpot</p><p class="integ-card__role">contacts · deals · notes</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-tag"></i></div><p class="integ-card__name">Linear</p><p class="integ-card__role">tickets · escalations</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-brand-slack"></i></div><p class="integ-card__name">Slack</p><p class="integ-card__role">alerts · digests · activity</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-receipt"></i></div><p class="integ-card__name">Stripe</p><p class="integ-card__role">post-payment webhook</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-sparkles"></i></div><p class="integ-card__name">Anthropic</p><p class="integ-card__role">Sonnet + Haiku</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-route"></i></div><p class="integ-card__name">Voyage AI</p><p class="integ-card__role">embeddings + rerank</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-bug"></i></div><p class="integ-card__name">Sentry</p><p class="integ-card__role">error tracking</p></div>
+      <div class="integ-card"><div class="integ-card__icon"><i class="ti ti-brand-google"></i></div><p class="integ-card__name">Google OAuth</p><p class="integ-card__role">sign-in · allowlist</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 10. EFFICIENCY + COST                                        -->
+<!-- ============================================================ -->
+<section class="section section--white">
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">Efficiency</p>
+    <h2 class="headline" data-animate>Smart by default. Cheap by design.</h2>
+    <p class="subhead" data-animate>Beacon is built to stay under a hard Anthropic cap. Every AI call is logged. Prompts are cached. Tool subsets are scoped. The book-level work that doesn't need to be hourly isn't hourly.</p>
+
+    <div class="cost-row" data-animate>
+      <div>
+        <div class="cost-num"><span class="cost-num__unit">$</span>25–95<span class="cost-num__unit">/mo</span></div>
+        <p style="font-size: 11px; color: var(--gray-500); margin: 4px 0 0; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;">Projected Anthropic spend</p>
+      </div>
+      <div>
+        <p class="cost-body">After 18 optimization passes shipped today: prompt caching on every <code class="code-chip">/api/ai/ask</code>, per-scope tool allowlists, server-side <code class="code-chip">/api/ai/suggest</code> cache, two-stage tool routing, batched NK classification, weekly eval (not nightly), book-context trim, compose narrative-enrich daily (not hourly). All Anthropic call sites pass through <code class="code-chip">lib/ai/spend-log.ts</code> and surface on the spend admin page. Hard cap: <strong>under $120/mo</strong>.</p>
+        <div class="cost-pills">
+          <span class="cost-pill">Prompt caching</span>
+          <span class="cost-pill">Two-stage routing</span>
+          <span class="cost-pill">Per-scope tools</span>
+          <span class="cost-pill">Server-side suggest cache</span>
+          <span class="cost-pill">Weekly eval</span>
+          <span class="cost-pill">Batched NK</span>
+          <span class="cost-pill">Trimmed context</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="text-align:center; margin-top: 24px;" data-animate>
+      <a href="/admin/anthropic-spend" class="deep-dive" style="background: var(--patina);">View live spend <i class="ti ti-arrow-right"></i></a>
+    </p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 11. JUST SHIPPED                                             -->
+<!-- ============================================================ -->
+<section class="section section--gray">
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">Just shipped</p>
+    <h2 class="headline" data-animate>Eight platform wins.</h2>
+    <p class="subhead" data-animate>The umbrella story is mostly the story of "all six agents on one spine." Here's what landed to make that real.</p>
+
+    <div class="shipped-grid" data-cascade>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-tower"></i></div>
+          <span class="shipped-card__tag">Umbrella</span>
+        </div>
+        <h3 class="shipped-card__title">6 agents under one roof</h3>
+        <p class="shipped-card__body">Phases A–F migrated Performance, Escalation, Post-Payment, Miss Payment, and Negative Keyword into the Beacon umbrella alongside Customer Beacon. Shared auth, shared activity log, shared shell.</p>
+      </div>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-sparkles"></i></div>
+          <span class="shipped-card__tag">Beam</span>
+        </div>
+        <h3 class="shipped-card__title">19 tools across 10 scopes</h3>
+        <p class="shipped-card__body">Beam's tool registry now covers read, write, draft, and synthesis (get_full_customer_view) — auto-fired without approval gates, with hidden tool-trace rendering for a clean UX.</p>
+      </div>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-binoculars"></i></div>
+          <span class="shipped-card__tag">Keeper</span>
+        </div>
+        <h3 class="shipped-card__title">Hybrid retrieval + ranking</h3>
+        <p class="shipped-card__body">pgvector + Postgres BM25, RRF-fused, Voyage rerank-2.5-lite. Wave-2 deterministic conflict resolution with superseded_by audit. Wave-3 context cache with 5-min TTL.</p>
+      </div>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-palette"></i></div>
+          <span class="shipped-card__tag">Watchfire</span>
+        </div>
+        <h3 class="shipped-card__title">Palette across all surfaces</h3>
+        <p class="shipped-card__body">12+ Watchfire PRs swept every agent — ember, brass, lapis, parchment, char. Georgia serif for headings. Heraldic register top to bottom.</p>
+      </div>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-grid-dots"></i></div>
+          <span class="shipped-card__tag">Alignment</span>
+        </div>
+        <h3 class="shipped-card__title">Cross-agent shell polish</h3>
+        <p class="shipped-card__body">BeaconPageShell standard, BeaconAmbient atmosphere, sparkle hero, end-to-end width tokens. Every agent shares the same chrome rhythm.</p>
+      </div>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-chart-bar"></i></div>
+          <span class="shipped-card__tag">Performance</span>
+        </div>
+        <h3 class="shipped-card__title">Reports ported in</h3>
+        <p class="shipped-card__body">Performance Beacon migrated under the umbrella with click-to-preview, recent reports gallery, ZOCA + Beacon lockup, and current-rank column on keyword tables.</p>
+      </div>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-message-2"></i></div>
+          <span class="shipped-card__tag">Comms</span>
+        </div>
+        <h3 class="shipped-card__title">Comms backbone V2</h3>
+        <p class="shipped-card__body">Stage B cut over to the bulk-events Metabase pipeline. Per-entity Haiku perspective layer feeds every agent and Beam scope with one warm/cool sentiment + substance score.</p>
+      </div>
+      <div class="shipped-card">
+        <div class="shipped-card__head">
+          <div class="shipped-card__icon"><i class="ti ti-coin"></i></div>
+          <span class="shipped-card__tag">Cost</span>
+        </div>
+        <h3 class="shipped-card__title">Spend observability live</h3>
+        <p class="shipped-card__body">Every Anthropic call site logged. /admin/anthropic-spend shows daily + monthly spend by surface. 18 cost optimizations holding the platform under a $120/mo hard cap.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- 12. STATS                                                     -->
+<!-- ============================================================ -->
+<section class="section section--dark">
+  <div class="container container--wide">
+    <p class="kicker" data-animate style="text-align:center;">By the numbers</p>
+    <h2 class="headline" data-animate>The watchtower at a glance.</h2>
+
+    <div class="stats" data-cascade>
+      <div class="stat">
+        <div class="stat__num">6</div>
+        <p class="stat__lbl">Agents · 4 live</p>
+      </div>
+      <div class="stat">
+        <div class="stat__num">19</div>
+        <p class="stat__lbl">Beam tools</p>
+      </div>
+      <div class="stat">
+        <div class="stat__num">24</div>
+        <p class="stat__lbl">Crons orchestrated</p>
+      </div>
+      <div class="stat">
+        <div class="stat__num">~25</div>
+        <p class="stat__lbl">Keeper subcategories</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 13. WHAT'S COMING                                            -->
+<!-- ============================================================ -->
+<section class="section section--lapis">
+  <div class="container">
+    <p class="kicker kicker--brass" data-animate style="text-align:center;">What's coming</p>
+    <h2 class="headline" data-animate>Next on the watchtower.</h2>
+    <p class="subhead" data-animate>The roadmap below is platform-level — agent-specific follow-ups live inside each agent's own roadmap.</p>
+
+    <div class="roadmap" data-cascade>
+      <div class="roadmap-row">
+        <div class="roadmap-row__num">1</div>
+        <div class="roadmap-row__body">
+          <h4 class="roadmap-row__title">Performance + Post-Payment back online</h4>
+          <p class="roadmap-row__desc">Both agents are temporarily in maintenance behind a curtain. Routes interceptors render MaintenanceCurtain; API webhooks (Stripe) stay reachable. Unlock by dropping their entries from <code class="code-chip">LOCKED_AGENTS</code> in <code class="code-chip">lib/config.ts</code>.</p>
+        </div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-row__num">2</div>
+        <div class="roadmap-row__body">
+          <h4 class="roadmap-row__title">AM Transition Toolkit on the platform</h4>
+          <p class="roadmap-row__desc">Per-customer transition briefs, per-AM handoff decks, and the live transition tracker — currently a standalone toolkit — folded into Beacon as a Manager-only surface with pod-level filtering and the canonical performance + comms + Keeper context.</p>
+        </div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-row__num">3</div>
+        <div class="roadmap-row__body">
+          <h4 class="roadmap-row__title">Tauri Mac app shell</h4>
+          <p class="roadmap-row__desc">TestFlight-shipped native shell wrapping the Next.js frontend. Vercel backend stays. Apple Developer account is active; ~1.5d of work to land an internal build for the team.</p>
+        </div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-row__num">4</div>
+        <div class="roadmap-row__body">
+          <h4 class="roadmap-row__title">Cross-scope synthesis polish</h4>
+          <p class="roadmap-row__desc">The get_full_customer_view tool already fans out Keeper + comms + performance + escalations + notes in parallel. Next: extend the synthesis to book-level questions, and surface the synthesis confidence trace on the cite chip.</p>
+        </div>
+      </div>
+      <div class="roadmap-row">
+        <div class="roadmap-row__num">5</div>
+        <div class="roadmap-row__body">
+          <h4 class="roadmap-row__title">Eval harness for every agent</h4>
+          <p class="roadmap-row__desc">Beam already has a 100+ case weekly eval that catches regressions on tone, refusal, and tool-routing. Next: per-agent regression suites — Miss Payment edge cases, NK classification accuracy, post-payment ICP verdicts — running on the same nightly cron.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 14. EPILOGUE                                                  -->
+<!-- ============================================================ -->
+<section class="section section--final">
+  <div class="container--narrow">
+    <div class="epilogue" data-animate>
+      <h2>Six agents. One copilot. One memory.</h2>
+      <p>The watchtower isn't the agents. The watchtower is what the agents share — auth, search, memory, copilot, palette, rhythm. Beacon is what you get when you stop building six tools and start building one platform.</p>
+      <p><em>Built for Zoca. Powered by Beam. Grounded by Keeper.</em></p>
+      <div style="margin-top: 32px;">
+        <a href="/kt/BeamKeeper.html" class="deep-dive">Beam + Keeper deep dive <i class="ti ti-arrow-right"></i></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="footer-mini">
+  <svg class="beacon-mark" style="width:9px; height:24px;"><use href="#beacon-mark"/></svg>
+  <span>Beacon — the watchtower for Zoca · platform tour · v1</span>
+</div>
+
+</main>
+
+<script>
+  /* ============================================================
+     Motion runtime
+     ============================================================ */
+  (function () {
+    "use strict";
+
+    document.body.classList.remove("page-loading");
+
+    var reduced = false;
+    try {
+      reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch (e) {}
+
+    /* Scroll progress bar */
+    var prog = document.getElementById("scroll-progress");
+    function onScroll() {
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      var pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+      if (prog) prog.style.width = pct + "%";
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    /* Cursor glow (mouse-only, skip for reduced motion + touch) */
+    if (!reduced && window.matchMedia("(pointer: fine)").matches) {
+      var glow = document.getElementById("cursor-glow");
+      if (glow) {
+        var tx = 0, ty = 0, cx = 0, cy = 0;
+        document.addEventListener("mousemove", function (e) {
+          tx = e.clientX; ty = e.clientY;
+          glow.style.opacity = "1";
+        });
+        document.addEventListener("mouseleave", function () {
+          glow.style.opacity = "0";
+        });
+        function tick() {
+          cx += (tx - cx) * 0.18;
+          cy += (ty - cy) * 0.18;
+          glow.style.left = cx + "px";
+          glow.style.top = cy + "px";
+          requestAnimationFrame(tick);
+        }
+        tick();
+      }
+    }
+
+    /* IntersectionObserver — animate in */
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in-view");
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+
+      document.querySelectorAll("[data-animate], [data-cascade]").forEach(function (el) {
+        io.observe(el);
+      });
+
+      /* Hero flame trigger */
+      var flame = document.querySelector("[data-hero-flame]");
+      if (flame) {
+        requestAnimationFrame(function () { flame.classList.add("in-view"); });
+      }
+    } else {
+      /* No-IO fallback */
+      document.querySelectorAll("[data-animate], [data-cascade]").forEach(function (el) {
+        el.classList.add("in-view");
+      });
+      var flame2 = document.querySelector("[data-hero-flame]");
+      if (flame2) flame2.classList.add("in-view");
+    }
+
+    /* Hero load cascade */
+    var heroSteps = document.querySelectorAll(".hero-load");
+    if (!reduced) {
+      heroSteps.forEach(function (el, i) {
+        setTimeout(function () { el.classList.add("in"); }, 180 + i * 120);
+      });
+    } else {
+      heroSteps.forEach(function (el) { el.classList.add("in"); });
+    }
+
+    /* Hero title char-split + reveal */
+    var title = document.querySelector("h1.hero-title");
+    if (title && !reduced) {
+      var text = title.textContent.trim();
+      title.innerHTML = "";
+      Array.prototype.forEach.call(text, function (ch, i) {
+        var span = document.createElement("span");
+        span.className = "h-char";
+        span.style.transitionDelay = (i * 60) + "ms";
+        span.textContent = ch === " " ? " " : ch;
+        title.appendChild(span);
+      });
+      requestAnimationFrame(function () { title.classList.add("is-revealed"); });
+    }
+
+    /* Marquee — duplicate track for infinite loop */
+    var track = document.getElementById("marquee-track");
+    if (track && !reduced) {
+      track.innerHTML = track.innerHTML + track.innerHTML;
+    }
+  })();
+</script>
+
+</body>
+</html>
