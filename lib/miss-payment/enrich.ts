@@ -58,7 +58,20 @@ export function buildInvoiceRows(args: {
     const subId = inv.subscription_id || "";
     const customer = customers[customerId] || {};
     const sub = subs[subId] || {};
-    const bs = baseSheet.byCustomerId.get(customerId) || {};
+
+    // 2026-06-12 — multi-location fix. Each Chargebee subscription carries a
+    // `cf_entity_id` custom field that binds it to a SPECIFIC entity (one
+    // location). Previously we resolved the BaseSheet row by `customer_id`
+    // only, which kept just the last entity in `byCustomerId` for multi-loc
+    // customers — so Sky Dental's 3 invoices all surfaced as the
+    // Rajarajeswari Nagar location instead of their actual Sahakar Nagar /
+    // Koramangala / Rajarajeswari Nagar splits. Now: prefer the entity-
+    // specific BaseSheet row keyed off `sub.cf_entity_id`. Fall back to the
+    // customer-level row if the subscription is missing the custom field
+    // (rare ops hole — older subs predating the binding rollout).
+    const cfEntityId = (sub?.cf_entity_id || "").trim();
+    const bsByEntity = cfEntityId ? baseSheet.byEntityId.get(cfEntityId) : null;
+    const bs = bsByEntity || baseSheet.byCustomerId.get(customerId) || {};
 
     const amountDue = (inv.amount_due ?? 0) / 100;
     const status = (inv.status as InvoiceStatus) || "payment_due";
@@ -76,7 +89,10 @@ export function buildInvoiceRows(args: {
       return "";
     })();
 
-    const entityId = bs.entity_id || "";
+    // Prefer the cf_entity_id from the subscription (ground truth) over
+    // whatever the BaseSheet row carries — they should agree, but the sub
+    // binding wins if anything drifts.
+    const entityId = cfEntityId || bs.entity_id || "";
     const ticket = ticketsByEntity && entityId
       ? ticketsByEntity.get(entityId.toLowerCase())
       : undefined;
