@@ -171,9 +171,15 @@
     letter-spacing: -0.035em;
     line-height: 1.0;
     margin: 0 0 8px;
-    background: linear-gradient(135deg, var(--char) 0%, var(--ember) 50%, var(--brass) 100%);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent; color: transparent;
+    /* 2026-06-12 — solid char color. Earlier version used a gradient via
+       `background-clip: text` + `-webkit-text-fill-color: transparent`, but
+       once the char-split JS replaces innerHTML with `<span class="h-char">`
+       per character, each inline-block span creates its own painting context
+       and the gradient-clip technique doesn't propagate. Result: chars
+       rendered fully transparent. Brass "+" survived only because the
+       char-split JS explicitly sets its color back to brass via inline style.
+       Solid color fixes char-split + keeps the look. */
+    color: var(--char);
   }
   h2.hero-sub {
     font-size: 32px;
@@ -216,6 +222,11 @@
   .beacon-mark {
     display: inline-block; flex-shrink: 0;
     transform-origin: bottom center;
+    /* 2026-06-12 — default size for any unmodified .beacon-mark. Without
+       this, an SVG without a size modifier renders at its intrinsic
+       viewBox dimensions (~150px wide), which was making the topnav mark
+       grossly oversized. Modifier classes below override this default. */
+    width: 12px; height: 32px;
   }
   .beacon-mark--sm  { width: 9px;  height: 24px; }
   .beacon-mark--md  { width: 12px; height: 32px; }
@@ -1239,15 +1250,8 @@
     100% { left: 220%; }
   }
 
-  /* Hero title gradient breathing */
-  h1.hero-title {
-    background-size: 200% 200%;
-    animation: hero-gradient 8s ease-in-out infinite;
-  }
-  @keyframes hero-gradient {
-    0%, 100% { background-position: 0% 50%; }
-    50%      { background-position: 100% 50%; }
-  }
+  /* 2026-06-12 — gradient-breathing dropped along with the
+     background-clip: text technique. See note on h1.hero-title above. */
 
   /* ============================================================
      v2 — Just-shipped section
