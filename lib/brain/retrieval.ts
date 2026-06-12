@@ -160,19 +160,26 @@ export async function loadBrainForPrompt(
       field: f.field_name,
       value: f.value,
     };
+    // WAVE-A-HOTFIX (2026-06-13) — Embed the citation marker inline so
+    // Beam emits `[cite:fact:<id>]` when quoting the value. Without this
+    // the vault chip falls through to (unverified) gray in CitationChip
+    // because the prompt block never exposed the fact_id and Beam had
+    // no way to construct the right key. Pair with
+    // buildBrainStaticCitations() in the customer-360 context loader.
+    const valueWithCite = `${f.value} [cite:fact:${f.fact_id}]`;
     if (f.field_name === "other") {
       // 'other' rows go into the array; their subcategory tags them.
-      other.push({ subcategory: f.topic_subcategory, value: f.value });
+      other.push({ subcategory: f.topic_subcategory, value: valueWithCite });
       continue;
     }
     // Key format: "subcategory.field_name" so the model can disambiguate
     // multiple subcategories sharing similar field names in the future.
     const key = `${f.topic_subcategory}.${f.field_name}`;
-    if (f.topic_category === "relationship") relationship[key] = f.value;
-    else if (f.topic_category === "identity") identity[key] = f.value;
-    else if (f.topic_category === "operational") operational[key] = f.value;
-    else if (f.topic_category === "behavioral") behavioral[key] = f.value;
-    else if (f.topic_category === "concerns") concerns[key] = f.value;
+    if (f.topic_category === "relationship") relationship[key] = valueWithCite;
+    else if (f.topic_category === "identity") identity[key] = valueWithCite;
+    else if (f.topic_category === "operational") operational[key] = valueWithCite;
+    else if (f.topic_category === "behavioral") behavioral[key] = valueWithCite;
+    else if (f.topic_category === "concerns") concerns[key] = valueWithCite;
   }
 
   return {

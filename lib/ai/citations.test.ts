@@ -9,7 +9,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { buildBrainProvenanceCitations } from "./citations";
+import {
+  buildBrainProvenanceCitations,
+  buildBrainStaticCitations,
+} from "./citations";
 
 function fact(over: Partial<Parameters<typeof buildBrainProvenanceCitations>[0]["facts"][number]> = {}) {
   return {
@@ -123,5 +126,63 @@ describe("buildBrainProvenanceCitations", () => {
       query: "anything",
     });
     expect(lookup).toEqual({});
+  });
+});
+
+/**
+ * WAVE-A-HOTFIX (2026-06-13) — Static Keeper citations land context-loaded
+ * facts (loaded via loadBrainForPrompt at prompt-build time, NOT via hybrid
+ * retrieval tool call) into the lookup. Without these entries the vault
+ * chip falls through to (unverified) gray in CitationChip every time Beam
+ * quotes the AE / contract / MRR fact already in CONTEXT.brain.
+ */
+describe("buildBrainStaticCitations", () => {
+  it("emits one entry per fact_id, category 'fact', source_type 'keeper_static'", () => {
+    const lookup = buildBrainStaticCitations({
+      "f-aaa": {
+        topic: "identity",
+        subcategory: "sold_by_ae_info",
+        field: "sold_by_ae",
+        value: "Chandan Gowda",
+      },
+      "f-bbb": {
+        topic: "operational",
+        subcategory: "contract_terms",
+        field: "mrr",
+        value: "249",
+      },
+    });
+    expect(Object.keys(lookup).sort()).toEqual(["fact:f-aaa", "fact:f-bbb"]);
+    expect(lookup["fact:f-aaa"].category).toBe("fact");
+    expect(lookup["fact:f-aaa"].value).toBe("Chandan Gowda");
+    expect(lookup["fact:f-aaa"].label).toBe(
+      "identity/sold_by_ae_info/sold_by_ae",
+    );
+    expect(lookup["fact:f-aaa"].raw?.source_type).toBe("keeper_static");
+    // No provenance — static facts didn't go through rerank.
+    expect(lookup["fact:f-aaa"].provenance).toBeUndefined();
+  });
+
+  it("returns an empty lookup when called with null / undefined", () => {
+    expect(buildBrainStaticCitations(null)).toEqual({});
+    expect(buildBrainStaticCitations(undefined)).toEqual({});
+  });
+
+  it("skips entries with an empty fact_id key", () => {
+    const lookup = buildBrainStaticCitations({
+      "": {
+        topic: "identity",
+        subcategory: null,
+        field: null,
+        value: "skip me",
+      },
+      "real-fact": {
+        topic: "identity",
+        subcategory: null,
+        field: null,
+        value: "keep me",
+      },
+    });
+    expect(Object.keys(lookup)).toEqual(["fact:real-fact"]);
   });
 });

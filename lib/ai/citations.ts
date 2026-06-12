@@ -240,6 +240,56 @@ export function buildBrainProvenanceCitations(args: {
   return out;
 }
 
+/**
+ * WAVE-A-HOTFIX (2026-06-13) — Build a citation lookup for Keeper facts
+ * loaded statically into the prompt context (via `loadBrainForPrompt`),
+ * NOT from a hybrid retrieval tool call.
+ *
+ * The context-loader pulls authoritative facts into CONTEXT.brain on
+ * every Customer 360 page load. When Beam quotes one ("AE is Chandan
+ * Gowda"), it emits `[cite:fact:<id>]`. Without these entries in the
+ * lookup, the chip falls through to the (unverified) gray pill.
+ *
+ * Mirrors `buildBrainProvenanceCitations` shape so CitationChip's
+ * `category === "fact"` branch + KeeperChip delegation work uniformly
+ * across hybrid-retrieved and statically-loaded facts. No provenance
+ * field — these facts didn't go through rerank, so there's no
+ * matched_via / rrf_score to surface.
+ */
+export function buildBrainStaticCitations(
+  factIdsForCitation: Record<
+    string,
+    {
+      topic: string;
+      subcategory: string | null;
+      field: string | null;
+      value: string;
+    }
+  > | null | undefined,
+): CitationLookup {
+  const out: CitationLookup = {};
+  if (!factIdsForCitation) return out;
+  for (const [fact_id, f] of Object.entries(factIdsForCitation)) {
+    if (!fact_id) continue;
+    const subPath = f.subcategory
+      ? `${f.topic ?? "fact"}/${f.subcategory}${f.field ? `/${f.field}` : ""}`
+      : "Keeper fact";
+    out[makeCitationKey("fact", fact_id)] = {
+      category: "fact",
+      label: subPath,
+      value: f.value,
+      raw: {
+        topic_category: f.topic ?? null,
+        topic_subcategory: f.subcategory ?? null,
+        field_name: f.field ?? null,
+        source_type: "keeper_static",
+        confirmed_at: null,
+      },
+    };
+  }
+  return out;
+}
+
 /* ────────────────────────────────────────────────────────────────
  * Loader-side builders
  *

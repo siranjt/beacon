@@ -29,6 +29,11 @@ import type { ScoredCustomerV2 } from "@/lib/customer/types";
 import {
   buildCitationLookup,
   buildCommsPerspectiveCitations,
+  // WAVE-A-HOTFIX (2026-06-13) — Static Keeper citations for facts
+  // loaded into the prompt context via loadBrainForPrompt, so Beam's
+  // `[cite:fact:<id>]` markers resolve instead of falling through to
+  // the (unverified) gray pill.
+  buildBrainStaticCitations,
   type CitationLookup,
   type CommsPerspectiveCitationData,
 } from "@/lib/ai/citations";
@@ -477,6 +482,13 @@ async function _loadCustomer360ContextImpl(entityId: string): Promise<LoadedCont
           bizName: sc.company ?? null,
           perspective: asCitationPerspective(perspective),
         }),
+        // WAVE-A-HOTFIX (2026-06-13) — Surface Keeper facts as citable
+        // entries. brain.fact_ids_for_citation was already built by
+        // loadBrainForPrompt for exactly this purpose but was never wired
+        // into the lookup. Without it, every `[cite:fact:<id>]` marker
+        // Beam emits falls through to (unverified) — the bug we saw in
+        // the V2BrainPanel smoke test.
+        ...buildBrainStaticCitations(brain?.fact_ids_for_citation),
       }
     : {};
 
