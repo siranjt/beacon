@@ -21,6 +21,12 @@ import ConfidenceBadge, {
   type ConfidenceData,
 } from "@/components/ai/ConfidenceBadge";
 import type { ActionCardStatus as SharedActionCardStatus } from "@/lib/ai/action-state";
+// BEAM-THINKING (2026-06-13) — Direction C loader. Vault glyph for
+// Keeper-touching tools, BeaconMark flicker for everything else.
+// Replaces the bare brass dot + "Fetching the details…" pill that
+// rendered as an unbranded gray rectangle when the parent column was
+// narrow.
+import BeamThinkingPill from "@/components/ai/BeamThinkingPill";
 
 const SANS = "-apple-system, Inter, system-ui, sans-serif";
 const SERIF = 'Georgia, "Times New Roman", serif';
@@ -365,48 +371,18 @@ export default function ActionCard({
 
   // 2026-06-11 — auto-fire UX: when a tool is mid-flight (status="approving"),
   // collapse the whole "Beam proposes" card with args panel + buttons into a
-  // single-line "Fetching the details…" pill. The full card was visually loud
-  // and felt like it was still asking for approval. Now we show just a slim
-  // status pill while the request is in-flight; the approved/error pill
-  // replaces it once the result lands.
+  // single-line in-flight pill. The full card was visually loud and felt like
+  // it was still asking for approval.
+  //
+  // 2026-06-13 — Direction C polish. The previous brass dot + "Fetching the
+  // details…" copy rendered as an unbranded gray rectangle when the parent
+  // column was narrow (Success caught it in the Wave A smoke test). Now we
+  // route through BeamThinkingPill, which picks per-tool copy ("Beam is
+  // opening the Keeper…" / "Beam is pulling billing…") and swaps the visual:
+  // spinning KeeperVault for Keeper-touching tools, BeaconMark flicker for
+  // everything else. Brand-coherent, AM-legible, never blank.
   if (status === "approving" || pressed === "approve") {
-    return (
-      <div
-        style={{
-          alignSelf: "flex-start",
-          maxWidth: "92%",
-          padding: "6px 10px",
-          fontSize: 12,
-          color: C.text2,
-          fontFamily: SANS,
-          background: "rgba(217, 164, 65, 0.10)",
-          border: `1px solid ${C.brass}`,
-          borderRadius: 8,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <span
-          aria-hidden="true"
-          style={{
-            display: "inline-block",
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: C.brass,
-            animation: "beacon-fetch-pulse 1.2s ease-in-out infinite",
-          }}
-        />
-        <span>Fetching the details…</span>
-        <style>{`
-          @keyframes beacon-fetch-pulse {
-            0%, 100% { opacity: 0.35; transform: scale(0.85); }
-            50%      { opacity: 1;    transform: scale(1.15); }
-          }
-        `}</style>
-      </div>
-    );
+    return <BeamThinkingPill toolName={data.toolName} />;
   }
 
   // At this point status is necessarily "pending" — all other states returned
