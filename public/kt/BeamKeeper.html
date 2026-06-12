@@ -47,11 +47,21 @@
     --keeper-glow: rgba(26, 47, 74, 0.16);
     --voyage-accent: #6B4FBB;
     --voyage-glow: rgba(107, 79, 187, 0.18);
+
+    /* v5-align — section rhythm tokens (single source of truth) */
+    --section-pad-x: clamp(20px, 5vw, 56px);
+    --section-pad-y: clamp(64px, 8vw, 110px);
+    --section-pad-y-hero-top: clamp(96px, 11vw, 150px);
+    --section-pad-y-hero-bot: clamp(80px, 9vw, 130px);
+    --container-max: 1180px;
   }
 
   *,*::before,*::after { box-sizing: border-box; }
   html,body { margin:0; padding:0; }
   html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; }
+  /* v5-align — prevent any decorative floater / parallax element from spawning a horizontal scrollbar */
+  html, body { overflow-x: clip; }
+  img, svg, video { max-width: 100%; }
 
   body.page-loading { opacity: 0; }
   body { transition: opacity 300ms var(--ease-apple); }
@@ -111,18 +121,31 @@
   /* ============================================================
      Section frame
      ============================================================ */
-  .section { width: 100%; padding: 100px 24px; }
+  .section {
+    width: 100%;
+    padding: var(--section-pad-y) var(--section-pad-x);
+    /* v5-align — every section is a positioned overflow-clip box so floaters / parallax decor never escape */
+    position: relative;
+    overflow: hidden;
+  }
   .section--white  { background: var(--paper); color: var(--gray-900); }
   .section--gray   { background: var(--gray-50); color: var(--gray-900); }
   .section--dark   { background: var(--char); color: var(--gray-50); }
   .section--lapis  { background: var(--lapis); color: var(--gray-50); }
   .section--ember  { background: linear-gradient(135deg, #FFF9F1 0%, #FFE9D3 100%); color: var(--gray-900); }
   .section--parchment { background: var(--parchment); color: var(--gray-900); }
-  .section--hero   { padding: 140px 24px 120px; background: linear-gradient(180deg, var(--parchment) 0%, var(--paper) 100%); }
-  .section--final  { padding: 120px 24px 100px; background: var(--char); color: var(--gray-50); }
-  .container { max-width: 980px; margin: 0 auto; }
-  .container--narrow { max-width: 720px; margin: 0 auto; }
-  .container--wide { max-width: 1180px; margin: 0 auto; }
+  .section--hero   {
+    padding: var(--section-pad-y-hero-top) var(--section-pad-x) var(--section-pad-y-hero-bot);
+    background: linear-gradient(180deg, var(--parchment) 0%, var(--paper) 100%);
+  }
+  .section--final  {
+    padding: var(--section-pad-y-hero-bot) var(--section-pad-x) var(--section-pad-y);
+    background: var(--char);
+    color: var(--gray-50);
+  }
+  .container { max-width: 980px; margin: 0 auto; width: 100%; }
+  .container--narrow { max-width: 720px; margin: 0 auto; width: 100%; }
+  .container--wide { max-width: var(--container-max); margin: 0 auto; width: 100%; }
 
   /* ============================================================
      Typography
@@ -250,9 +273,10 @@
     border-bottom: 1px solid rgba(0,0,0,0.06);
   }
   .topnav__inner {
-    max-width: 1180px; margin: 0 auto;
-    padding: 12px 24px;
+    max-width: var(--container-max); margin: 0 auto;
+    padding: 12px var(--section-pad-x);
     display: flex; align-items: center; justify-content: space-between;
+    gap: 14px;
   }
   .topnav__left {
     display: flex; align-items: center; gap: 10px;
@@ -1110,10 +1134,15 @@
   }
   .footer-mini {
     text-align: center;
-    padding: 50px 24px;
+    padding: clamp(40px, 6vw, 60px) var(--section-pad-x);
     background: var(--char);
     color: #a1a1a6;
     font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   .footer-mini svg { vertical-align: middle; margin-right: 6px; }
 
@@ -2539,6 +2568,231 @@
     .scroll-told__step { opacity: 1 !important; transform: none !important; }
     main#main-content { scroll-snap-type: none !important; }
   }
+
+  /* ============================================================
+     v5-align — alignment polish pass (no visual rewrite, just nail it)
+     ============================================================ */
+
+  /* All halves grids: stretch children to equal heights, baseline-align titles via flex column */
+  .halves { align-items: stretch; }
+  .half {
+    display: flex;
+    flex-direction: column;
+  }
+  .half__bullets { margin-top: auto; }
+  .half__bullets { padding-top: 20px; }
+  /* Push bullets block to the bottom only if there is one — for halves without bullets the layout stays as-is */
+  .half:has(.half__bullets) .half__desc { flex-shrink: 0; }
+
+  /* Trust-layer 4-card grid (re-uses .halves): cards should match heights too */
+  .halves .card {
+    display: flex;
+    flex-direction: column;
+  }
+  .halves .card .card__body { flex: 1 1 auto; }
+
+  /* shipped-grid: switch from a hard 1fr 1fr to auto-fit so no orphan rows ever appear */
+  .shipped-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  /* keep the 1-col mobile fallback the original CSS already set */
+  @media (max-width: 480px) {
+    .shipped-grid { grid-template-columns: 1fr; }
+  }
+
+  /* shipped-grid--eight: auto-fit + minmax kills the 3-then-1 orphan that 4x1 produces around 1024-1180px */
+  .shipped-grid--eight {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  /* Override the older fixed 4-col rule at the awkward 1024-1200 range. The auto-fit above handles it cleanly. */
+  @media (max-width: 1200px) and (min-width: 1025px) {
+    .shipped-grid--eight { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  }
+  /* Below 760 keep two columns (don't drop to one until 480 so phablets still get a 2-col grid) */
+  @media (max-width: 1024px) and (min-width: 761px) {
+    .shipped-grid--eight { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 760px) and (min-width: 481px) {
+    .shipped-grid--eight { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  }
+  @media (max-width: 480px) {
+    .shipped-grid--eight { grid-template-columns: 1fr; }
+  }
+
+  /* Tool grid + taxonomy + queries + surface-map all benefit from auto-fit to never orphan a row */
+  .tool-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+  @media (max-width: 480px) { .tool-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .taxonomy {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+  @media (max-width: 480px) { .taxonomy { grid-template-columns: repeat(2, 1fr); } }
+
+  .surface-map {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  @media (max-width: 480px) { .surface-map { grid-template-columns: 1fr; } }
+
+  .queries {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  /* Card grids should stretch by default so footers line up */
+  .tool-grid, .taxonomy, .surface-map, .queries, .shipped-grid, .shipped-grid--eight {
+    align-items: stretch;
+  }
+  .tool-card, .tax-card, .surface, .query-card, .shipped-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .query-card__a, .shipped-card__body { margin-top: auto; }
+
+  /* Stats row: also auto-fit so the 4-up never produces a 3+1 orphan */
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  @media (max-width: 480px) { .stats { grid-template-columns: 1fr; } }
+
+  /* dil-flow: replace the 4-col fixed with auto-fit so the row-step arrow doesn't dangle */
+  .dil-flow {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  /* When the flow wraps, hide ALL inter-step arrows on small viewports to prevent a half-visible arrow */
+  @media (max-width: 900px) {
+    .dil-step::after { display: none; }
+  }
+
+  /* Pipeline stage: allow shrinking on narrow viewports so the label doesn't push pills off-screen */
+  @media (max-width: 760px) {
+    .pipeline-stage { flex-wrap: wrap; }
+    .pipeline-stage__lbl { min-width: 0; flex: 1 1 100%; }
+    .pipeline-lane { flex-wrap: wrap; }
+    .pipeline-lane__name { min-width: 0; flex: 1 1 60%; }
+    .pipeline-lane__path { flex: 1 1 100%; order: 3; }
+    .pipeline { padding: 22px 18px; }
+  }
+
+  /* Trust bars: shrink left column on narrow widths so the bar doesn't squish to 0 */
+  @media (max-width: 580px) {
+    .trust-bar { grid-template-columns: 110px 1fr 44px; gap: 10px; }
+    .trust-bar__name { font-size: 12px; }
+  }
+
+  /* Cache rows: same treatment */
+  @media (max-width: 580px) {
+    .cache-row { grid-template-columns: 110px 1fr 60px; gap: 10px; }
+  }
+
+  /* Arena reduction: the 1fr auto 1fr layout on very narrow widths puts the arrow off-axis */
+  @media (max-width: 580px) {
+    .reduction { grid-template-columns: 1fr; gap: 14px; }
+    .reduction-arrow { transform: rotate(90deg); }
+  }
+
+  /* Wave timeline: at the awkward 760-1100 range, force flex-wrap so labels don't overlap, and stop rotating */
+  @media (max-width: 1100px) and (min-width: 761px) {
+    .wave-timeline { flex-wrap: wrap; justify-content: center; padding: 20px 16px 28px; }
+    .wave-timeline__track { display: none; }
+    .wave-timeline__dot { transform: scale(1); opacity: 1; margin: 6px 4px; }
+    .wave-timeline__lbl {
+      position: static;
+      transform: none;
+      opacity: 1 !important;
+      font-size: 10px;
+      white-space: normal;
+      max-width: none;
+      text-align: left;
+      margin-left: 8px;
+    }
+    .wave-timeline__dot {
+      display: inline-flex;
+      align-items: center;
+      width: auto;
+      height: auto;
+      border-radius: 999px;
+      padding: 4px 10px 4px 4px;
+    }
+  }
+
+  /* Hero — guarantee a single centered axis even with the v5 char-split title */
+  .section--hero .container {
+    align-items: center;
+  }
+  .section--hero h1.hero-title,
+  .section--hero h2.hero-sub,
+  .section--hero p.hero-load {
+    width: 100%;
+  }
+  h1.hero-title {
+    text-align: center;
+    /* allow the title to wrap on narrow viewports rather than overflow */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  /* tighten hero title on small phones — original v5 had 64px at 760, scale more aggressively at 480 */
+  @media (max-width: 480px) {
+    h1.hero-title { font-size: 52px; line-height: 1.05; }
+    h2.hero-sub { font-size: 22px; }
+    h2.headline { font-size: 30px; }
+    h2.headline--lg { font-size: 36px; }
+  }
+
+  /* Hero tag row: ensure consistent wrapping behavior */
+  .section--hero .hero-load[data-hero-step="5"] {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin: 28px auto 0;
+    max-width: 760px;
+  }
+  .section--hero .hero-load[data-hero-step="5"] .hero-tag {
+    margin: 0;
+  }
+
+  /* Topnav: ensure left + right blocks both shrink gracefully under tight widths */
+  .topnav__right { flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 480px) {
+    .topnav__inner { padding-top: 10px; padding-bottom: 10px; }
+    .topnav__right > span:first-child { display: none; }
+    .topnav__left { font-size: 14px; }
+  }
+
+  /* Architecture SVG: scale gracefully on narrow viewports */
+  .arch-wrap { width: 100%; }
+  .arch-svg { width: 100%; height: auto; max-width: 100%; }
+
+  /* Floaters must never spawn a horizontal scrollbar */
+  .floaters { overflow: hidden; }
+  .floater { max-width: 50px; max-height: 50px; }
+
+  /* Marquee fade-mask edge — soften on narrow viewports so it doesn't dominate the strip */
+  @media (max-width: 580px) {
+    .marquee::before, .marquee::after { width: 56px; }
+    .marquee__item { padding: 0 18px; font-size: 13px; }
+  }
+
+  /* Roadmap rows: keep icon column fixed so all titles align on the same x-axis */
+  .roadmap-row { align-items: flex-start; }
+  .roadmap-row__num { margin-top: 2px; }
+
+  /* Built-with strip: ensure all items align baseline on the same row */
+  .built-with {
+    align-items: flex-start;
+  }
+  .built-with__item { min-width: 120px; }
+
+  /* Counter row: even spacing under tight widths */
+  @media (max-width: 580px) {
+    .counter-row { gap: 28px; }
+    .counter__num { font-size: 52px; }
+  }
+
+  /* Dividers: ensure they always span the section's content width and don't pick up section padding */
+  .divider { width: 100%; }
 </style>
 </head>
 <body class="page-loading">
