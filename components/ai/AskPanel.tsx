@@ -47,6 +47,11 @@ import ActionCard, {
   type ActionCardStatus,
 } from "@/components/ai/ActionCard";
 import { isResolvable } from "@/lib/ai/action-state";
+// BEAM-THINKING (2026-06-13) — Direction C loader. Same component
+// ActionCard uses for in-flight tool calls, reused here for the
+// empty-streaming-assistant placeholder that previously rendered as a
+// blank parchment bubble with an invisible blinking cursor.
+import BeamThinkingPill from "@/components/ai/BeamThinkingPill";
 // Phase E-17 Wave 3a — inline citations + confidence calibration.
 import CitationChip from "@/components/ai/CitationChip";
 import ConfidenceBadge, {
@@ -1879,6 +1884,28 @@ function Bubble({
   // currently streaming. We don't want users voting on a half-formed answer.
   const showFeedback =
     !isUser && !streaming && typeof turnId === "number" && !!onFeedback;
+
+  // BEAM-THINKING (2026-06-13) — when an assistant turn is mid-stream
+  // but no text has landed yet (and no tool_use card has been issued),
+  // render the Direction C loader instead of the previous empty
+  // parchment bubble + invisible BlinkingCursor. Success caught this
+  // in smoke testing: the cursor was too subtle, so the bubble read as
+  // a blank gray rectangle. Pill carries its own background, so we
+  // skip the bubble wrapper entirely in this case. Once text starts
+  // streaming, we fall back into the normal render path below.
+  if (!isUser && streaming && !content) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+        }}
+      >
+        <BeamThinkingPill toolName={null} />
+      </div>
+    );
+  }
 
   return (
     <div
