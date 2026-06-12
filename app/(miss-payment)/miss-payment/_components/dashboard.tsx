@@ -25,13 +25,16 @@ type Tab = "All" | "June" | "May" | "April" | "March";
 const TABS: Tab[] = ["All", "June", "May", "April", "March"];
 
 const KPI_LABELS: Record<KpiKey, string> = {
-  outstanding: "All invoices",
-  invoices: "All invoices",
+  outstanding: "High-value (≥ $500)",
+  invoices: "Repeat businesses (≥ 2 invoices)",
   ach: "ACH In Progress",
   multi: "Multi-month only",
   tickets: "Has Linear ticket",
   annotations: "Has notes",
 };
+
+// 2026-06-12 — Outstanding KPI filter threshold.
+const HIGH_VALUE_THRESHOLD = 500;
 
 export default function Dashboard() {
   const [rows, setRows] = useState<InvoiceRow[]>([]);
@@ -154,6 +157,18 @@ export default function Dashboard() {
     return !!(a && (a.caller || a.connectionStatus || a.comments || a.oldComments || a.amComment));
   };
 
+  // 2026-06-12 — pre-compute repeat-business customer ids on the tab-filtered
+  // set so the "invoices" KPI filter matches the count shown on the card.
+  const repeatBusinessSet = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of tabFiltered) {
+      counts.set(r.customerId, (counts.get(r.customerId) || 0) + 1);
+    }
+    const out = new Set<string>();
+    for (const [cid, n] of counts) if (n >= 2) out.add(cid);
+    return out;
+  }, [tabFiltered]);
+
   const filtered = useMemo(() => {
     const q = filters.q.trim().toLowerCase();
     return tabFiltered.filter((r) => {
@@ -171,6 +186,10 @@ export default function Dashboard() {
         const key = r.entityId || r.customerId;
         if (!multiMonthSet.has(key)) return false;
       }
+      // 2026-06-12 — Outstanding card filter: only high-value invoices.
+      if (activeKpi === "outstanding" && (r.amountDue || 0) < HIGH_VALUE_THRESHOLD) return false;
+      // 2026-06-12 — Invoices card filter: only rows from repeat businesses.
+      if (activeKpi === "invoices" && !repeatBusinessSet.has(r.customerId)) return false;
       if (activeKpi === "ach" && r.achStatus !== "In Progress") return false;
       if (activeKpi === "multi") {
         const key = r.entityId || r.customerId;
@@ -181,7 +200,7 @@ export default function Dashboard() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, filters, multiMonthSet, activeKpi, annotations]);
+  }, [tabFiltered, filters, multiMonthSet, activeKpi, annotations, repeatBusinessSet]);
 
   const tabCounts = useMemo(() => {
     const m: Record<Tab, number> = { All: rows.length, June: 0, May: 0, April: 0, March: 0 };
@@ -209,10 +228,8 @@ export default function Dashboard() {
   }
 
   function onKpiClick(k: KpiKey) {
-    if (k === "outstanding" || k === "invoices") {
-      setActiveKpi(null);
-      return;
-    }
+    // 2026-06-12 — every KPI now toggles a real filter, including outstanding
+    // and invoices. Click again to clear (cur === k → null).
     setActiveKpi((cur) => (cur === k ? null : k));
   }
 

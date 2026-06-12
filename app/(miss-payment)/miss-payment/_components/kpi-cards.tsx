@@ -51,9 +51,24 @@ export default function KpiCards({
       }).length
     : 0;
 
+  // 2026-06-12 — all 6 tiles are click-to-filter for parity. Outstanding
+  // filters to high-value invoices (>= $500). Invoices filters to repeat
+  // businesses (the same customer appears on ≥ 2 unpaid invoices). The
+  // dashboard's row-filter useMemo applies the matching predicate when
+  // activeKpi flips.
+  const HIGH_VALUE_THRESHOLD = 500;
+  const customerCounts = new Map<string, number>();
+  for (const r of rows) {
+    customerCounts.set(r.customerId, (customerCounts.get(r.customerId) || 0) + 1);
+  }
+  const highValue = rows.filter((r) => (r.amountDue || 0) >= HIGH_VALUE_THRESHOLD).length;
+  const repeatBusinessInvoices = rows.filter(
+    (r) => (customerCounts.get(r.customerId) || 0) >= 2,
+  ).length;
+
   const tiles: Tile[] = [
-    { key: "outstanding", label: "Outstanding", value: fmtUsd(outstanding), accent: "#2B1F14", sub: `across ${rows.length} invoices`, pillClass: "pill-blue", pillText: "100% TOT", clickable: false },
-    { key: "invoices", label: "Invoices", value: fmtNum(rows.length), accent: "#C8431D", sub: `${customers} unique businesses`, pillClass: "pill-pink", pillText: `${rows.length} TOTAL`, clickable: false },
+    { key: "outstanding", label: "Outstanding", value: fmtUsd(outstanding), accent: "#2B1F14", sub: `${highValue} high-value ≥ $500`, pillClass: "pill-blue", pillText: "CLICK TO FILTER", clickable: true },
+    { key: "invoices", label: "Invoices", value: fmtNum(rows.length), accent: "#C8431D", sub: `${repeatBusinessInvoices} from repeat businesses`, pillClass: "pill-pink", pillText: "CLICK TO FILTER", clickable: true },
     { key: "ach", label: "ACH in flight", value: fmtNum(ach), accent: "#2A4D5C", sub: "collection in progress", pillClass: "pill-blue", pillText: "CLICK TO FILTER", clickable: true },
     { key: "multi", label: "Multi-month", value: fmtNum(multi), accent: "#D9A441", sub: "overdue ≥ 2 cycles", pillClass: "pill-amber", pillText: "CLICK TO FILTER", clickable: true },
     { key: "tickets", label: "Tickets matched", value: fmtNum(tickets), accent: "#7C2D12", sub: "linked Linear issues", pillClass: "pill-purple", pillText: "CLICK TO FILTER", clickable: true },
