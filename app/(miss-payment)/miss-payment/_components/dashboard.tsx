@@ -157,19 +157,13 @@ export default function Dashboard() {
     return !!(a && (a.caller || a.connectionStatus || a.comments || a.oldComments || a.amComment));
   };
 
-  // 2026-06-12 — pre-compute repeat-business customer ids on the tab-filtered
-  // set so the "invoices" KPI filter matches the count shown on the card.
-  const repeatBusinessSet = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of tabFiltered) {
-      counts.set(r.customerId, (counts.get(r.customerId) || 0) + 1);
-    }
-    const out = new Set<string>();
-    for (const [cid, n] of counts) if (n >= 2) out.add(cid);
-    return out;
-  }, [tabFiltered]);
-
-  const filtered = useMemo(() => {
+  // 2026-06-12 — userFiltered applies the top filter row (search + AMs +
+  // statuses + months + ACH + auto-debit + multi-only) but NOT the active KPI
+  // filter. KpiCards counts off this set so the cards respond to top-row
+  // filter changes (pick an AM → counts update) without double-counting the
+  // KPI predicate (clicking Outstanding shouldn't shrink the Outstanding
+  // total below the actual filtered-row count).
+  const userFiltered = useMemo(() => {
     const q = filters.q.trim().toLowerCase();
     return tabFiltered.filter((r) => {
       if (q) {
@@ -186,9 +180,27 @@ export default function Dashboard() {
         const key = r.entityId || r.customerId;
         if (!multiMonthSet.has(key)) return false;
       }
-      // 2026-06-12 — Outstanding card filter: only high-value invoices.
+      return true;
+    });
+  }, [tabFiltered, filters, multiMonthSet]);
+
+  // Repeat-business set must be computed on userFiltered so the "invoices"
+  // KPI's "N from repeat businesses" count matches what the cards show.
+  const repeatBusinessSet = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of userFiltered) {
+      counts.set(r.customerId, (counts.get(r.customerId) || 0) + 1);
+    }
+    const out = new Set<string>();
+    for (const [cid, n] of counts) if (n >= 2) out.add(cid);
+    return out;
+  }, [userFiltered]);
+
+  const filtered = useMemo(() => {
+    return userFiltered.filter((r) => {
+      // Outstanding card filter: only high-value invoices.
       if (activeKpi === "outstanding" && (r.amountDue || 0) < HIGH_VALUE_THRESHOLD) return false;
-      // 2026-06-12 — Invoices card filter: only rows from repeat businesses.
+      // Invoices card filter: only rows from repeat businesses.
       if (activeKpi === "invoices" && !repeatBusinessSet.has(r.customerId)) return false;
       if (activeKpi === "ach" && r.achStatus !== "In Progress") return false;
       if (activeKpi === "multi") {
@@ -200,7 +212,7 @@ export default function Dashboard() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFiltered, filters, multiMonthSet, activeKpi, annotations, repeatBusinessSet]);
+  }, [userFiltered, multiMonthSet, activeKpi, annotations, repeatBusinessSet]);
 
   const tabCounts = useMemo(() => {
     const m: Record<Tab, number> = { All: rows.length, June: 0, May: 0, April: 0, March: 0 };
@@ -307,7 +319,7 @@ export default function Dashboard() {
         </div>
 
         <KpiCards
-          rows={tabFiltered}
+          rows={userFiltered}
           multiMonthSet={multiMonthSet}
           annotations={annotations}
           activeKpi={activeKpi}
