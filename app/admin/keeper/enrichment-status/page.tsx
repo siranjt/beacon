@@ -18,6 +18,7 @@ import AgentHeader from "@/components/AgentHeader";
 import PageViewLogger from "@/components/PageViewLogger";
 import { ENRICHMENT_FIELDS } from "@/lib/brain/metabase-enrichment";
 import EnrichmentRunButton from "./run-button-client";
+import BootstrapButton from "./bootstrap-button-client";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,61 @@ export default async function Page() {
           margin: "0 auto",
         }}
       >
+        {/* META-A2 one-time backfill — bootstraps every active customer's
+            Keeper from BaseSheet. Idempotent (existing facts skipped). Lives
+            above the weekly enrichment card because it's a one-time setup
+            step that should be done first. */}
+        <div
+          style={{
+            padding: "1.25rem 1.5rem",
+            borderRadius: 10,
+            background: "var(--zoca-bg-soft)",
+            border: "1px solid var(--zoca-border)",
+            marginBottom: "1.5rem",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "1rem",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  letterSpacing: "1.5px",
+                  textTransform: "uppercase",
+                  color: "var(--zoca-text-3)",
+                  marginBottom: "0.3rem",
+                }}
+              >
+                One-time backfill
+              </div>
+              <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+                Bootstrap Keeper from BaseSheet
+              </div>
+              <div
+                style={{
+                  fontSize: "0.85rem",
+                  color: "var(--zoca-text-2)",
+                  maxWidth: 540,
+                  lineHeight: 1.5,
+                  marginTop: 4,
+                }}
+              >
+                Pre-populates every active customer&apos;s Keeper with their
+                BaseSheet facts (AE name, MRR, integration state, sold-at).
+                Idempotent — already-present facts are skipped. ~2-3 min for
+                ~900 customers.
+              </div>
+            </div>
+            <BootstrapButton />
+          </div>
+        </div>
+
         <div style={{ marginBottom: "1.5rem" }}>
           <h1
             style={{
