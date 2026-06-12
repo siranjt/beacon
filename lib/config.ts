@@ -34,14 +34,43 @@ export function isAllowedEmail(email: string | null | undefined): boolean {
  * `route` to the local path.
  */
 export type AgentKind = "internal" | "external";
+export type AgentId =
+  | "customer"
+  | "performance"
+  | "escalation"
+  | "post-payment"
+  | "miss-payment"
+  | "negative-keyword";
 export type Agent = {
-  id: "customer" | "performance" | "escalation" | "post-payment" | "miss-payment" | "negative-keyword";
+  id: AgentId;
   name: string;
   description: string;
   accent: string;       // Watchfire accent color for the card
   route: string;        // local path or external URL depending on `kind`
   kind: AgentKind;
 };
+
+/**
+ * Agents currently locked behind a "will be operational shortly" curtain for
+ * everyone (admins included). The route-group layouts intercept page routes
+ * and render `<MaintenanceCurtain />` instead of letting users in. Launcher
+ * cards visually disable + skip navigation.
+ *
+ * API routes under these agents stay reachable so webhooks (Stripe → Post-
+ * Payment) and internal cross-agent calls don't break.
+ *
+ * To unlock: drop the entry from this set. To lock another agent: add its
+ * AgentId, then create `app/(<agent>)/layout.tsx` that re-renders
+ * MaintenanceCurtain when the flag is on.
+ */
+export const LOCKED_AGENTS = new Set<AgentId>([
+  "performance",
+  "post-payment",
+]);
+
+export function isAgentLocked(id: AgentId): boolean {
+  return LOCKED_AGENTS.has(id);
+}
 
 export const AGENTS: Agent[] = [
   {
