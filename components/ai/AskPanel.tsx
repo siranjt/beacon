@@ -56,6 +56,9 @@ import BeamThinkingPill from "@/components/ai/BeamThinkingPill";
 // customer-360 / performance-report; disabled with explanatory tooltip on
 // whole-book scopes (entityId is required for a Keeper write).
 import BeamMicButton from "@/components/ai/BeamMicButton";
+// WAVE-B-3 — pending Keeper questions surfaced ABOVE the composer. Renders
+// nothing when there are no questions; auto-removes on answer/dismiss.
+import KeeperQuestionStrip from "@/components/keeper/KeeperQuestionStrip";
 // Phase E-17 Wave 3a — inline citations + confidence calibration.
 import CitationChip from "@/components/ai/CitationChip";
 import ConfidenceBadge, {
@@ -1780,6 +1783,25 @@ export default function AskPanel() {
               )}
             </div>
 
+            {/* WAVE-B-3 — Keeper question strip. Sits just above the
+                composer so the AM can answer a learn-prompt before
+                composing their next message. Component renders null when
+                there are no pending questions, so it adds zero visual
+                weight in the common case. */}
+            <KeeperQuestionStrip
+              entityId={
+                scope.kind === "customer-360"
+                  ? scope.entityId
+                  : scope.kind === "performance-report"
+                    ? scope.entityId
+                    : undefined
+              }
+              customerId={
+                scope.kind === "post-payment-customer"
+                  ? scope.cbCustomerId
+                  : undefined
+              }
+            />
             {/* Composer */}
             <form
               onSubmit={onSubmit}

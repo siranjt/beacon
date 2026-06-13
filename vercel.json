@@ -98,6 +98,10 @@
     {
       "path": "/api/cron/keeper/enrich-from-metabase",
       "schedule": "0 6 * * 0"
+    },
+    {
+      "path": "/api/cron/keeper/generate-questions",
+      "schedule": "0 6 * * *"
     }
   ],
   "functions": {
