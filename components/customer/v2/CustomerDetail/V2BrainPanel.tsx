@@ -49,6 +49,11 @@ import type {
 // WAVE-A-1 — Memory Score header chip. Lives in the panel header so AMs see
 // "X% covered" the moment the Keeper panel opens.
 import KeeperChip from "@/components/keeper/KeeperChip";
+// WAVE-C-2 — voice-teach surface. Brass mic next to the chip lets AMs speak
+// a fact for THIS customer, see a confirm card, and write through the
+// existing writeBrainFact path. onSaved bumps refreshNonce so the new row
+// appears immediately without page reload.
+import KeeperMicButton from "@/components/keeper/KeeperMicButton";
 
 type Props = {
   entityId: string;
@@ -285,6 +290,13 @@ function sourceColor(source: string): { bg: string; fg: string; border: string }
         fg: "rgb(85, 72, 60)",
         border: "rgba(110, 95, 80, 0.28)",
       };
+    case "voice_teach":
+      // Wave C — lapis-tinted; AM spoke + confirmed via card.
+      return {
+        bg: "rgba(48, 80, 124, 0.12)",
+        fg: "rgb(30, 56, 98)",
+        border: "rgba(48, 80, 124, 0.32)",
+      };
     default:
       return {
         bg: "rgba(110, 95, 80, 0.08)",
@@ -313,6 +325,8 @@ function sourceLabel(source: string): string {
       return "AI extract";
     case "beacon_ai_conversation":
       return "Beam chat";
+    case "voice_teach":
+      return "Voice teach";
     default:
       return source.replace(/_/g, " ");
   }
@@ -800,6 +814,20 @@ export default function V2BrainPanel({ entityId }: Props) {
               size="lg"
             />
           )}
+          {/* WAVE-C-2 — voice-teach mic. Wrapped in a span with stopPropagation
+              so clicking the mic doesn't toggle the panel collapse. */}
+          <span
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            <KeeperMicButton
+              entityId={entityId}
+              customerId={data?.customer_id ?? null}
+              bizname={data?.bizname ?? null}
+              onSaved={() => setRefreshNonce((n) => n + 1)}
+            />
+          </span>
         </div>
         <span className="text-[10px] text-zoca-text-2">
           {collapsed ? "expand" : "collapse"}

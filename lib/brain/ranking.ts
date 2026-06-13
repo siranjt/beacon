@@ -92,6 +92,13 @@ export function sourceTrust(source_type: string): number {
       return 0.65;
     case "beacon_ai_conversation":
       return 0.55;
+    // Wave C — AM spoke the fact into a mic, then confirmed via card.
+    // The AM IS the source (just like manual) but the Haiku layer adds a
+    // classification step they didn't typo-check the way manual entry forces.
+    // Sit between manual (0.95) and customer_note (0.75) — closer to manual
+    // because the confirm card means the AM eyeballed the value.
+    case "voice_teach":
+      return 0.85;
     default:
       return 0.5;
   }

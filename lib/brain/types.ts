@@ -91,6 +91,12 @@ export type TopicSubcategory =
  *   beacon_ai_conversation → AM said it via add_fact_to_brain tool
  *   beacon_ai_extracted    → Haiku extraction (must validate before use)
  *   manual                 → AM typed directly in the Brain panel
+ *   voice_teach            → Wave C — AM SPOKE the fact via a mic button
+ *                            (KeeperMicButton on V2BrainPanel, BeamMicButton
+ *                            on AskPanel). Transcript → Haiku draft → AM
+ *                            confirms via card → write. Source pill lets
+ *                            admins filter Validate inbox to voice-taught
+ *                            facts when calibrating the prompt.
  */
 export type FactSourceType =
   | "basesheet"
@@ -98,7 +104,8 @@ export type FactSourceType =
   | "customer_note"
   | "beacon_ai_conversation"
   | "beacon_ai_extracted"
-  | "manual";
+  | "manual"
+  | "voice_teach";
 
 export type ConfidenceState = "candidate" | "confirmed";
 

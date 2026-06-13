@@ -52,6 +52,10 @@ import { isResolvable } from "@/lib/ai/action-state";
 // empty-streaming-assistant placeholder that previously rendered as a
 // blank parchment bubble with an invisible blinking cursor.
 import BeamThinkingPill from "@/components/ai/BeamThinkingPill";
+// WAVE-C-2 — voice-teach mic in the composer row. Scope-aware: enabled on
+// customer-360 / performance-report; disabled with explanatory tooltip on
+// whole-book scopes (entityId is required for a Keeper write).
+import BeamMicButton from "@/components/ai/BeamMicButton";
 // Phase E-17 Wave 3a — inline citations + confidence calibration.
 import CitationChip from "@/components/ai/CitationChip";
 import ConfidenceBadge, {
@@ -1825,25 +1829,31 @@ export default function AskPanel() {
                 }}
               >
                 <span>Beam · grounded in {audience}</span>
-                <button
-                  type="submit"
-                  disabled={streaming || !draft.trim()}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: 8,
-                    border: `1px solid ${C.char}`,
-                    background:
-                      streaming || !draft.trim() ? C.border : C.char,
-                    color: C.parchment,
-                    fontFamily: "inherit",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor:
-                      streaming || !draft.trim() ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {streaming ? "Thinking…" : "Send"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* WAVE-C-2 — voice-teach mic. Renders disabled on
+                      whole-book scopes; the tooltip points the AM at the
+                      Customer 360 page when they want to teach a fact. */}
+                  <BeamMicButton scope={scope} />
+                  <button
+                    type="submit"
+                    disabled={streaming || !draft.trim()}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 8,
+                      border: `1px solid ${C.char}`,
+                      background:
+                        streaming || !draft.trim() ? C.border : C.char,
+                      color: C.parchment,
+                      fontFamily: "inherit",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor:
+                        streaming || !draft.trim() ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {streaming ? "Thinking…" : "Send"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
