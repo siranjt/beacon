@@ -21,8 +21,8 @@ import InvoicesTable from "./invoices-table";
 import ExportButton from "./export-button";
 import { RefreshCw } from "lucide-react";
 
-type Tab = "All" | "July" | "June" | "May";
-const TABS: Tab[] = ["All", "July", "June", "May"];
+type Tab = "All" | "August" | "July" | "June" | "May";
+const TABS: Tab[] = ["All", "August", "July", "June", "May"];
 
 const KPI_LABELS: Record<KpiKey, string> = {
   outstanding: "High-value (≥ $500)",
@@ -215,9 +215,10 @@ export default function Dashboard() {
   }, [userFiltered, multiMonthSet, activeKpi, annotations, repeatBusinessSet]);
 
   const tabCounts = useMemo(() => {
-    const m: Record<Tab, number> = { All: rows.length, July: 0, June: 0, May: 0 };
+    const m: Record<Tab, number> = { All: rows.length, August: 0, July: 0, June: 0, May: 0 };
     for (const r of rows) {
-      if (r.invoiceMonth === "July") m.July++;
+      if (r.invoiceMonth === "August") m.August++;
+      else if (r.invoiceMonth === "July") m.July++;
       else if (r.invoiceMonth === "June") m.June++;
       else if (r.invoiceMonth === "May") m.May++;
     }
