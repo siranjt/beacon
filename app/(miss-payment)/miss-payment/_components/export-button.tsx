@@ -4,12 +4,16 @@
  * Miss Payment Beacon — Excel export button.
  * Builds a multi-sheet xlsx with:
  *  - "Miss-payment Sheet"   — every visible row
- *  - "June" / "May" / "April" / "March" — month-bucketed sheets
+ *  - "August" / "July" / "June" / "May" — month-bucketed sheets
  *  - "<Month> <ord> <year>" — date-stamped clones of the month sheets
  *  - "Multi-month <ord> <year>" — entities that owe across multiple months
  *
- * Header style + per-cell caller/connection conditional fills match the
- * standalone Excel report the Finance team has been distributing.
+ * 2026-07-31 — column layout locked to the 18-column finance-facing
+ * format: base identity + Chargebee state + AM Comment + Amount Due +
+ * MRR + Ticket URL. Interactive Caller/Connection/Comments annotations
+ * still live in the in-app UI for Shakthi + Joshi to work through calls,
+ * but they are NO LONGER exported to Excel — Finance reconciles on the
+ * clean data slice only.
  */
 
 import { Download } from "lucide-react";
@@ -32,17 +36,9 @@ const HEADERS = [
   "Phone Number",
   "Customer Company",
   "Amount Due",
-  "Caller",
-  "Connection status",
-  "Comments",
-  "Old comments",
+  "MRR",
   "Ticket URL",
 ];
-
-const COL = {
-  caller: HEADERS.indexOf("Caller"),
-  conn: HEADERS.indexOf("Connection status"),
-};
 
 const HEADER_STYLE = {
   font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFFFF" } },
@@ -68,10 +64,7 @@ function rowValues(r: InvoiceRow, ann: any) {
     r.phoneNumber,
     r.customerCompany,
     r.amountDue,
-    ann?.caller || "",
-    ann?.connectionStatus || "",
-    ann?.comments || "",
-    ann?.oldComments || "",
+    r.mrr ?? "",
     r.latestTicket?.url || "",
   ];
 }
@@ -84,29 +77,12 @@ function styleSheet(XLSX: any, ws: any) {
     if (cell) cell.s = HEADER_STYLE;
   }
 
-  for (let r = 1; r <= range.e.r; r++) {
-    const callerCell = ws[XLSX.utils.encode_cell({ r, c: COL.caller })];
-    if (callerCell?.v === "Shakthi") {
-      callerCell.s = { font: { color: { rgb: "FF9C0006" }, bold: true }, fill: { fgColor: { rgb: "FFFCE4E4" }, patternType: "solid" } };
-    } else if (callerCell?.v === "Joshi") {
-      callerCell.s = { font: { color: { rgb: "FF006100" }, bold: true }, fill: { fgColor: { rgb: "FFE2EFDA" }, patternType: "solid" } };
-    }
-    const connCell = ws[XLSX.utils.encode_cell({ r, c: COL.conn })];
-    if (connCell?.v === "Connected") {
-      connCell.s = { font: { color: { rgb: "FF006100" }, bold: true }, fill: { fgColor: { rgb: "FFE2EFDA" }, patternType: "solid" } };
-    } else if (connCell?.v === "VM") {
-      connCell.s = { font: { color: { rgb: "FF1F3864" }, bold: true }, fill: { fgColor: { rgb: "FFD9E2F3" }, patternType: "solid" } };
-    } else if (connCell?.v === "Not connected") {
-      connCell.s = { font: { color: { rgb: "FF9C0006" }, bold: true }, fill: { fgColor: { rgb: "FFFCE4E4" }, patternType: "solid" } };
-    }
-  }
-
   ws["!freeze"] = { xSplit: 0, ySplit: 1 };
   ws["!autofilter"] = { ref: ws["!ref"] };
   ws["!cols"] = HEADERS.map((h) => {
     if (h === "Customer Email" || h === "Biz name" || h === "Customer Company") return { wch: 30 };
     if (h === "Ticket URL") return { wch: 60 };
-    if (h === "Comments" || h === "Old comments" || h === "AM Comment") return { wch: 25 };
+    if (h === "AM Comment") return { wch: 25 };
     return { wch: 18 };
   });
 }
@@ -139,7 +115,9 @@ export default function ExportButton({
 
     XLSX.utils.book_append_sheet(wb, buildSheet(XLSX, rows, annotations), "Miss-payment Sheet");
 
-    const months = ["June", "May", "April", "March"];
+    // 2026-07-31 — month tab set kept in lockstep with dashboard.tsx TABS.
+    // Change here whenever a month tab is added/dropped.
+    const months = ["August", "July", "June", "May"];
     for (const m of months) {
       const mr = rows.filter((r) => r.invoiceMonth === m);
       XLSX.utils.book_append_sheet(wb, buildSheet(XLSX, mr, annotations), m);

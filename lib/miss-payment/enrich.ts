@@ -76,6 +76,18 @@ export function buildInvoiceRows(args: {
     const amountDue = (inv.amount_due ?? 0) / 100;
     const status = (inv.status as InvoiceStatus) || "payment_due";
 
+    // 2026-07-31 — MRR column addition. Prefer Chargebee's
+    // `subscription.mrr` (per-plan monthly, in cents). Falls back to
+    // plan_amount when a plan doesn't publish mrr. Null when the sub
+    // object is missing entirely (rare — usually means Chargebee 404
+    // during batched fetch).
+    const mrr: number | null = (() => {
+      if (!sub) return null;
+      if (typeof sub.mrr === "number") return sub.mrr / 100;
+      if (typeof sub.plan_amount === "number") return sub.plan_amount / 100;
+      return null;
+    })();
+
     const cancellingAt = sub?.cancelled_at
       ? dateLabel(sub.cancelled_at)
       : sub?.cancel_schedule_created_at
@@ -117,6 +129,7 @@ export function buildInvoiceRows(args: {
       phoneNumber: bs.phone_number || customer.phone || "",
       customerCompany: customer.company || bs.bizname || "",
       amountDue,
+      mrr,
       status,
       latestTicket,
     };
