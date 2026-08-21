@@ -31,13 +31,6 @@ export type InvoiceRow = {
   phoneNumber: string;
   customerCompany: string;
   amountDue: number;
-  /**
-   * Subscription MRR in USD. Derived from Chargebee's subscription
-   * response — prefers `sub.mrr` (already in cents), falls back to
-   * `sub.plan_amount * (billing_period ?? 1)` for plans that don't
-   * publish `mrr`. Null when we can't derive from either.
-   */
-  mrr: number | null;
   status: InvoiceStatus;
   /** Most-recent open Finance ticket matched to this row's entity_id. */
   latestTicket?: LatestTicket;
