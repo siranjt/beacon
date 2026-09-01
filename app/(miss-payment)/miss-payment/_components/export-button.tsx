@@ -145,7 +145,7 @@ export default function ExportButton({
 
     // 2026-07-31 — month tab set kept in lockstep with dashboard.tsx TABS.
     // Change here whenever a month tab is added/dropped.
-    const months = ["August", "July", "June", "May"];
+    const months = ["September", "August", "July", "June", "May"];
     for (const m of months) {
       const mr = rows.filter((r) => r.invoiceMonth === m);
       XLSX.utils.book_append_sheet(wb, buildSheet(XLSX, mr, annotations), m);
