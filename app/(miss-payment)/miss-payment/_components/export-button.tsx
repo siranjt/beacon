@@ -1,20 +1,21 @@
 "use client";
 
 /**
- * Miss Payment Beacon — Excel + CSV export.
+ * Miss Payment Beacon — Excel export button.
  * Builds a multi-sheet xlsx with:
  *  - "Miss-payment Sheet"   — every visible row
  *  - "August" / "July" / "June" / "May" — month-bucketed sheets
  *  - "<Month> <ord> <year>" — date-stamped clones of the month sheets
  *  - "Multi-month <ord> <year>" — entities that owe across multiple months
  *
- * The CSV button emits the same 21-column layout (single flat sheet of
- * the currently-visible rows). Both formats stay locked to the finance
- * team's expected header set; changes here must land in both HEADERS
- * consumers (xlsx multi-sheet + csv single dump) to stay reconcilable.
+ * Column layout locked to the 21-header finance-facing format: base
+ * identity + Chargebee state + AM Comment + Amount Due + Caller +
+ * Connection status + Comments + Old comments + Ticket URL. Header
+ * style + per-cell caller/connection conditional fills match the
+ * standalone Excel report Finance has been distributing.
  */
 
-import { Download, FileText } from "lucide-react";
+import { Download } from "lucide-react";
 import type { InvoiceRow, AnnotationsMap } from "@/lib/miss-payment/types";
 
 const HEADERS = [
@@ -113,26 +114,6 @@ function styleSheet(XLSX: any, ws: any) {
   });
 }
 
-/**
- * CSV escape per RFC 4180: wrap any field that contains a comma, quote,
- * CR or LF in double-quotes; double any embedded quote. Numbers/nulls
- * become bare strings.
- */
-function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function buildCsv(rows: InvoiceRow[], annotations: AnnotationsMap): string {
-  const lines: string[] = [HEADERS.map(csvCell).join(",")];
-  for (const r of rows) {
-    lines.push(rowValues(r, annotations[r.invoiceNumber]).map(csvCell).join(","));
-  }
-  // Trailing newline so shells / Excel read cleanly.
-  return lines.join("\r\n") + "\r\n";
-}
 
 function ordinal(n: number) {
   const s = ["th", "st", "nd", "rd"];
@@ -185,31 +166,10 @@ export default function ExportButton({
     XLSX.writeFile(wb, `missed-payments-${today.toISOString().slice(0, 10)}.xlsx`);
   }
 
-  function onExportCsv() {
-    const csv = buildCsv(rows, annotations);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const today = new Date().toISOString().slice(0, 10);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `missed-payments-${today}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    // Give the browser a beat before revoking so the download can hand off.
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
   return (
-    <div style={{ display: "inline-flex", gap: 8 }}>
-      <button onClick={onExport} className="btn-ghost">
-        <Download size={14} />
-        Export Excel
-      </button>
-      <button onClick={onExportCsv} className="btn-ghost">
-        <FileText size={14} />
-        Download CSV
-      </button>
-    </div>
+    <button onClick={onExport} className="btn-ghost">
+      <Download size={14} />
+      Export Excel
+    </button>
   );
 }
