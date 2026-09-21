@@ -2,9 +2,10 @@
 
 /**
  * Miss Payment Beacon — invoices table.
- * 21 columns. Sortable on every chargebee-sourced field. Inline-editable
- * AM Comment / Caller / Connection / Comments / Old comments cells with
- * blur-to-save. Linear ticket badge in the last column when a join hit.
+ * 25 columns. Sortable on every chargebee-sourced field. Inline-editable
+ * Will Pay / remarks / reason / ETA / AM Comment / Caller / Connection /
+ * Comments / Old comments cells with blur-to-save. Linear ticket badge
+ * in the last column when a join hit.
  */
 
 import { useMemo, useState } from "react";
@@ -51,6 +52,11 @@ function connStyle(v: string): React.CSSProperties {
   if (v === "Connected") return { background: "#DAE5DC", color: "#2D5037" };
   if (v === "VM") return { background: "#D8E1E6", color: "#1F3B47" };
   if (v === "Not connected") return { background: "#F5C9B6", color: "#7C2D12" };
+  return {};
+}
+function willPayStyle(v: string): React.CSSProperties {
+  if (v === "Will Pay") return { background: "#DAE5DC", color: "#2D5037" };
+  if (v === "Will Not Pay") return { background: "#F5C9B6", color: "#7C2D12" };
   return {};
 }
 
@@ -123,7 +129,7 @@ export default function InvoicesTable({
 
   return (
     <div className="overflow-x-auto surface !p-0">
-      <table className="zoca-tbl w-full" style={{ minWidth: 1900 }}>
+      <table className="zoca-tbl w-full" style={{ minWidth: 2280 }}>
         <thead>
           <tr>
             {header("Customer Id", "customerId")}
@@ -133,6 +139,10 @@ export default function InvoicesTable({
             {header("Sub status", "subscriptionStatus")}
             {header("Cancelling at", "cancellingAt")}
             {header("Invoice #", "invoiceNumber")}
+            <th>Will Pay?</th>
+            <th>Remarks</th>
+            <th>Reason</th>
+            <th>ETA</th>
             {header("ACH", "achStatus")}
             {header("Auto debit", "autoDebit")}
             <th>AM Comment</th>
@@ -151,10 +161,10 @@ export default function InvoicesTable({
         </thead>
         <tbody>
           {loading && (
-            <tr><td colSpan={21} className="text-center text-zoca-textMuted py-8">Loading…</td></tr>
+            <tr><td colSpan={25} className="text-center text-zoca-textMuted py-8">Loading…</td></tr>
           )}
           {!loading && sorted.length === 0 && (
-            <tr><td colSpan={21} className="text-center text-zoca-textMuted py-8">No invoices match these filters.</td></tr>
+            <tr><td colSpan={25} className="text-center text-zoca-textMuted py-8">No invoices match these filters.</td></tr>
           )}
           {sorted.map((r) => {
             const a = annotations[r.invoiceNumber] || {};
@@ -168,6 +178,17 @@ export default function InvoicesTable({
                 <td>{r.subscriptionStatus}</td>
                 <td>{r.cancellingAt}</td>
                 <td className="font-mono text-[11px] text-zoca-blueDeep">{r.invoiceNumber}</td>
+                <td>
+                  <EditableSelect
+                    value={a.willPay || ""}
+                    options={["Will Pay", "Will Not Pay"]}
+                    onSave={(v) => onSave(r.invoiceNumber, { willPay: v as any })}
+                    styleFn={willPayStyle}
+                  />
+                </td>
+                <td><EditableText value={a.remarks || ""} onSave={(v) => onSave(r.invoiceNumber, { remarks: v })} /></td>
+                <td><EditableText value={a.reason || ""} onSave={(v) => onSave(r.invoiceNumber, { reason: v })} /></td>
+                <td><EditableText value={a.eta || ""} onSave={(v) => onSave(r.invoiceNumber, { eta: v })} /></td>
                 <td><AchPill s={r.achStatus} /></td>
                 <td>{r.autoDebit}</td>
                 <td><EditableText value={a.amComment || ""} onSave={(v) => onSave(r.invoiceNumber, { amComment: v })} /></td>

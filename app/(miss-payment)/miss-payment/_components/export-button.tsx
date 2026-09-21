@@ -26,6 +26,14 @@ const HEADERS = [
   "Subscription status",
   "Cancelling at",
   "Invoice Number",
+  // 2026-09-01 — Four commitment-tracking columns wedged between the
+  // Chargebee invoice number and the ACH state per finance's request.
+  // Populated by Shakthi/Joshi during collection calls via the in-app
+  // table's editable controls.
+  "Will Pay/Will Not Pay",
+  "remarks",
+  "reason",
+  "ETA",
   "ACH status",
   "Auto debit",
   "AM Comment",
@@ -62,6 +70,10 @@ function rowValues(r: InvoiceRow, ann: any) {
     r.subscriptionStatus,
     r.cancellingAt,
     r.invoiceNumber,
+    ann?.willPay || "",
+    ann?.remarks || "",
+    ann?.reason || "",
+    ann?.eta || "",
     r.achStatus,
     r.autoDebit,
     ann?.amComment || "",
@@ -109,7 +121,9 @@ function styleSheet(XLSX: any, ws: any) {
   ws["!cols"] = HEADERS.map((h) => {
     if (h === "Customer Email" || h === "Biz name" || h === "Customer Company") return { wch: 30 };
     if (h === "Ticket URL") return { wch: 60 };
-    if (h === "Comments" || h === "Old comments" || h === "AM Comment") return { wch: 25 };
+    if (h === "Comments" || h === "Old comments" || h === "AM Comment" || h === "remarks" || h === "reason") return { wch: 25 };
+    if (h === "Will Pay/Will Not Pay") return { wch: 18 };
+    if (h === "ETA") return { wch: 14 };
     return { wch: 18 };
   });
 }

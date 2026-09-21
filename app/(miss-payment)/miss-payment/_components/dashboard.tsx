@@ -154,7 +154,18 @@ export default function Dashboard() {
 
   const annotationHasNotes = (inv: string) => {
     const a = annotations[inv];
-    return !!(a && (a.caller || a.connectionStatus || a.comments || a.oldComments || a.amComment));
+    return !!(
+      a &&
+      (a.caller ||
+        a.connectionStatus ||
+        a.comments ||
+        a.oldComments ||
+        a.amComment ||
+        a.willPay ||
+        a.remarks ||
+        a.reason ||
+        a.eta)
+    );
   };
 
   // 2026-06-12 — userFiltered applies the top filter row (search + AMs +

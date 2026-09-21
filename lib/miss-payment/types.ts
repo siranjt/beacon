@@ -38,6 +38,20 @@ export type InvoiceRow = {
 
 export type InvoiceAnnotation = {
   amComment?: string;
+  /**
+   * 2026-09-01 — Will Pay / Will Not Pay commitment captured from the
+   * customer during the collection call. Feeds a green/red dropdown in
+   * the table and lands as the "Will Pay/Will Not Pay" column in the
+   * Excel export. Positioned between Invoice Number and ACH status per
+   * finance's request.
+   */
+  willPay?: "" | "Will Pay" | "Will Not Pay";
+  /** Free-text remarks from the call, distinct from `comments`. */
+  remarks?: string;
+  /** Reason the customer gave for the delay / non-payment. */
+  reason?: string;
+  /** ETA the customer committed to (date string, free-form). */
+  eta?: string;
   caller?: "" | "Shakthi" | "Joshi";
   connectionStatus?: "" | "Connected" | "VM" | "Not connected";
   comments?: string;
